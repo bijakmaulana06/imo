@@ -1,0 +1,153 @@
+@import "tailwindcss";
+
+:root {
+  /* STARRY NIGHT ACCENTS (For Cards, Buttons & UI Highlights) */
+  --sn-1-deep: #152137;
+  --sn-2-dark: #243d5b;
+  --sn-3-mid: #375d84;
+  --sn-4-soft: #92c0d7;
+  --sn-5-pale: #def7fc;
+
+  --background: #020510;
+  --foreground: #e8ecf4;
+  
+  --brand-navy: var(--sn-2-dark);
+  --brand-light-blue: var(--sn-4-soft);
+  --accent-cyan: #7df9ff;
+  --accent-purple: #b48cff;
+  --accent-yellow: #ffd166;
+  
+  --card-bg: rgba(21, 33, 55, 0.65);
+  --card-border: rgba(146, 192, 215, 0.2);
+  --card-border-hover: rgba(125, 249, 255, 0.5);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  
+  --color-sn-deep: var(--sn-1-deep);
+  --color-sn-dark: var(--sn-2-dark);
+  --color-sn-mid: var(--sn-3-mid);
+  --color-sn-soft: var(--sn-4-soft);
+  --color-sn-pale: var(--sn-5-pale);
+
+  --color-brand-navy: var(--brand-navy);
+  --color-brand-light-blue: var(--brand-light-blue);
+  --color-accent-cyan: var(--accent-cyan);
+  --color-accent-purple: var(--accent-purple);
+  --color-accent-yellow: var(--accent-yellow);
+  
+  --color-card-bg: var(--card-bg);
+  --color-card-border: var(--card-border);
+  --color-card-border-hover: var(--card-border-hover);
+  
+  --font-sans: var(--font-montserrat), ui-sans-serif, system-ui;
+  --font-display: var(--font-josefin), ui-sans-serif, system-ui;
+  --font-imo: var(--font-cinzel), serif;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+}
+
+.font-imo {
+  font-family: var(--font-cinzel), Georgia, serif;
+}
+
+/* ═══════════════════════════════════════════════════════
+   SCROLLBAR — DEEP SPACE CYBER
+   ═══════════════════════════════════════════════════════ */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #020510;
+}
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #152137, #243d5b, #7df9ff);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #7df9ff;
+  box-shadow: 0 0 10px rgba(125, 249, 255, 0.8);
+}
+
+/* ═══════════════════════════════════════════════════════
+   GLASSMORPHISM — STARRY NIGHT GLASS PANELS
+   ═══════════════════════════════════════════════════════ */
+.glass {
+  background: rgba(21, 33, 55, 0.65);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  border: 1px solid rgba(146, 192, 215, 0.2);
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.08),
+    0 8px 32px rgba(0, 0, 0, 0.6);
+}
+
+.glass-hover:hover {
+  border-color: rgba(125, 249, 255, 0.5);
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.12),
+    0 0 35px rgba(125, 249, 255, 0.25),
+    0 8px 32px rgba(0, 0, 0, 0.8);
+}
+
+/* ═══════════════════════════════════════════════════════
+   NEON TEXT GLOW
+   ═══════════════════════════════════════════════════════ */
+.glow-text-cyan {
+  text-shadow:
+    0 0 10px rgba(125, 249, 255, 0.9),
+    0 0 25px rgba(125, 249, 255, 0.5),
+    0 0 50px rgba(125, 249, 255, 0.3);
+}
+
+.glow-text-purple {
+  text-shadow:
+    0 0 10px rgba(180, 140, 255, 0.9),
+    0 0 25px rgba(180, 140, 255, 0.5),
+    0 0 50px rgba(180, 140, 255, 0.3);
+}
+
+.glow-text-yellow {
+  text-shadow:
+    0 0 10px rgba(255, 209, 102, 0.9),
+    0 0 25px rgba(255, 209, 102, 0.5),
+    0 0 50px rgba(255, 209, 102, 0.3);
+}
+
+/* ═══════════════════════════════════════════════════════
+   ANIMATIONS & COSMIC MOTION
+   ═══════════════════════════════════════════════════════ */
+@keyframes laser-sweep {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
+@keyframes pulse-signal {
+  0%, 100% { opacity: 0.3; transform: scale(0.95); }
+  50% { opacity: 1; transform: scale(1.1); box-shadow: 0 0 15px rgba(125, 249, 255, 0.8); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+.animate-laser {
+  animation: laser-sweep 3s ease-in-out infinite;
+}
+
+.animate-signal {
+  animation: pulse-signal 2s ease-in-out infinite;
+}
+
+.animate-shimmer {
+  background-size: 200% auto;
+  animation: shimmer 3.5s linear infinite;
+}

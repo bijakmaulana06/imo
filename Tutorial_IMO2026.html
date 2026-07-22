@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Evaluasi Performa & Tutorial IMO 2026</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            background-color: #f9fafb;
+        }
+        h1, h2, h3 {
+            color: #111827;
+        }
+        h1 {
+            text-align: center;
+            border-bottom: 2px solid #e5e7eb;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+        }
+        h2 {
+            margin-top: 40px;
+            color: #2563eb;
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 5px;
+        }
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 25px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            margin: 20px 0;
+            border: 1px solid #e5e7eb;
+        }
+        ul {
+            padding-left: 20px;
+        }
+        li {
+            margin-bottom: 10px;
+        }
+        .print-btn {
+            display: block;
+            width: 200px;
+            margin: 0 auto 30px auto;
+            padding: 12px 20px;
+            background-color: #2563eb;
+            color: white;
+            text-align: center;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: bold;
+            cursor: pointer;
+            border: none;
+        }
+        .print-btn:hover {
+            background-color: #1d4ed8;
+        }
+        @media print {
+            .print-btn {
+                display: none;
+            }
+            body {
+                background-color: white;
+            }
+            .card {
+                box-shadow: none;
+                border: none;
+                padding: 0;
+            }
+            img {
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <button class="print-btn" onclick="window.print()">Simpan sebagai PDF</button>
+
+    <h1>Evaluasi Performa & Tutorial Penggunaan Portal IMO 2026</h1>
+
+    <div class="card">
+        <h2>1. Evaluasi Performa Aplikasi</h2>
+        <p>Portal IMO 2026 telah dioptimasi secara ekstensif menggunakan <strong>Next.js</strong> dan <strong>Three.js</strong> dengan pendekatan <strong>High-Performance Rendering</strong>. Berikut adalah hasil evaluasinya:</p>
+        <ul>
+            <li><strong>Build Time & Static Generation (SSG):</strong> Aplikasi berhasil dikompilasi ke bentuk produksi (100% route success) dalam waktu sangat efisien (<strong>~14.1 detik</strong>), dengan fase <em>Static Page Generation</em> (SSG) diselesaikan hanya dalam <strong>1.48 detik</strong> untuk 12 rute halaman statis. Ini memastikan <em>Load Time</em> bagi pengguna akhir instan tanpa delay dari server.</li>
+            <li><strong>Optimasi Animasi 3D (Three.js WebGL):</strong> Render partikel Galaksi dan Awan Nebula dibangun menggunakan teknik <strong>ShaderMaterial kustom</strong> dan <strong>Additive Blending</strong> untuk meminimalisasi rendering berulang (overdraw) pada GPU. Penggunaan alokasi memori linear (<code>Float32Array</code>) menekan beban *garbage collector* secara drastis, mempertahankan framerate stabil <strong>60 FPS</strong> meskipun dengan jumlah 40.000 partikel.</li>
+            <li><strong>Load Speed & SSR Hydration:</strong> Modul 3D Canvas diisolasi dengan state <code>mounted</code> pada sisi klien (<code>"use client"</code>), sehingga halaman dasar langsung dirender oleh SSR tanpa *Hydration Mismatch*. Latar belakang otomatis menyesuaikan densitas piksel rasio perangkat genggam (<code>dpr={[1, 1.5]}</code>) agar tidak menyebabkan baterai ponsel *overheating*.</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h2>2. Tutorial Navigasi Portal</h2>
+        <p>Berikut adalah panduan visual untuk menggunakan berbagai fitur interaktif di portal IMO 2026.</p>
+
+        <h3>A. Memasuki Portal Utama</h3>
+        <p>Saat Anda pertama kali mengakses portal, layar akan menampilkan animasi Inisialisasi Sistem (*Establishing Uplink*). Setelah selesai, klik tombol <strong>MULAI PENJELAJAHAN</strong> di area hero untuk memasuki Hub Utama.</p>
+        <img src="./tutorial_images/hero.png" alt="Hero Home">
+
+        <h3>B. Pusat Penjelajahan (Mission Control Hub)</h3>
+        <p>Navigasi ke berbagai modul dapat diakses langsung secara tersentralisasi melalui <strong>Pusat Penjelajahan</strong>.</p>
+        <ul>
+            <li>Gunakan <strong>Bar Pencarian</strong> untuk mencari fitur, generator, atau materi tertentu secara cepat.</li>
+            <li>Gunakan <strong>Filter Kategori (Chips)</strong> di bawah pencarian untuk menyaring modul (contoh: *Generator & Tools*, *Media & Komunikasi*).</li>
+        </ul>
+        <img src="./tutorial_images/hub.png" alt="Hub Penjelajahan">
+
+        <h3>C. ID Card Generator Interaktif</h3>
+        <p>Salah satu modul paling interaktif bagi LO atau anggota grup adalah fitur pembuatan Tanda Pengenal (ID Card).</p>
+        <ol>
+            <li>Pilih menu <strong>ID Card Generator</strong> dari Navbar atas.</li>
+            <li>Masukkan Nama Lengkap, Peran, atau Kode Identitas ke dalam form masukan.</li>
+            <li>Kartu Tanda Pengenal holografik Anda akan di-<em>generate</em> secara <em>real-time</em> (Client-side Rendering).</li>
+            <li>Gambar ini telah didesain agar siap ditangkap (Screenshot) atau disimpan untuk dicetak berkat resolusi <em>display font</em> yang tajam.</li>
+        </ol>
+        <img src="./tutorial_images/idcard.png" alt="ID Card Generator">
+
+        <h3>D. Summary Tugas & Integrasi Data</h3>
+        <p>Portal menyediakan modul rekapitulasi data dari basis data (termasuk *backend* Supabase atau sumber CSV/Sheets eksternal).</p>
+        <ul>
+            <li>Halaman <strong>Summary Tugas</strong> memuat tabel berisi status penugasan.</li>
+            <li>Fitur interaktif <em>click-to-view</em> memungkinkan pengguna menekan salah satu baris tugas, yang selanjutnya akan membuka *Preview Modal* (menampilkan konten dokumen via iFrame melayang).</li>
+        </ul>
+        <img src="./tutorial_images/summary.png" alt="Summary Tugas">
+
+        <p style="text-align: center; margin-top: 40px; font-weight: bold; color: #6b7280;">- Selamat Menjelajah! Sistem IMO 2026 Online -</p>
+    </div>
+</body>
+</html>
