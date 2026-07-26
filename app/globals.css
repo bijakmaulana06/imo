@@ -1,5 +1,12 @@
-@import url('https://fonts.googleapis.com/css2?family=Griffy&display=swap');
 @import "tailwindcss";
+
+@font-face {
+  font-family: 'Griffy';
+  src: url('/fonts/Griffy-Regular.woff') format('woff');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
 
 :root {
   /* STARRY NIGHT ACCENTS (For Cards, Buttons & UI Highlights) */

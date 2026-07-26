@@ -7,7 +7,6 @@ import Card from "@/components/Card";
 import { toPng } from "html-to-image";
 import html2canvas from "html2canvas";
 import Cropper from "cropperjs";
-import { GRIFFY_FONT_BASE64 } from "@/lib/griffyFont";
 import {
   Download,
   User,
@@ -26,7 +25,31 @@ import {
 } from "lucide-react";
 
 // Default SVG Placeholder Avatar DataURL
-const DEFAULT_AVATAR_DATA_URL = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="250" viewBox="0 0 200 250" fill="%230f172a"><rect width="200" height="250" fill="%230f172a"/><circle cx="100" cy="90" r="45" fill="%23334155"/><path d="M 30 220 C 30 150, 170 150, 170 220 Z" fill="%23334155"/><text x="100" y="240" font-family="sans-serif" font-size="12" fill="%237df9ff" text-anchor="middle">IMO PASFOTO</text></svg>`;
+const DEFAULT_AVATAR_DATA_URL = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='250' viewBox='0 0 200 250' fill='%230f172a'><rect width='200' height='250' fill='%230f172a'/><circle cx='100' cy='90' r='45' fill='%23334155'/><path d='M 30 220 C 30 150, 170 150, 170 220 Z' fill='%23334155'/><text x='100' y='240' font-family='sans-serif' font-size='12' fill='%237df9ff' text-anchor='middle'>IMO PASFOTO</text></svg>`;
+
+let cachedGriffyFontCss: string | null = null;
+
+async function loadGriffyFontBase64(): Promise<string> {
+  if (cachedGriffyFontCss) return cachedGriffyFontCss;
+  try {
+    const res = await fetch("/fonts/Griffy-Regular.woff");
+    if (!res.ok) return "";
+    const blob = await res.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const b64 = reader.result as string;
+        cachedGriffyFontCss = `@font-face { font-family: 'Griffy'; src: url('${b64}') format('woff'); font-weight: normal; font-style: normal; }`;
+        resolve(cachedGriffyFontCss);
+      };
+      reader.onerror = () => resolve("");
+      reader.readAsDataURL(blob);
+    });
+  } catch (err) {
+    console.warn("Failed to load Griffy font for export:", err);
+    return "";
+  }
+}
 
 const DEFAULT_CUSTOM_HTML = `<div style="width:100%; height:100%; padding:24px; background:linear-gradient(135deg, #07142e 0%, #020510 60%, #1a0b36 100%); color:#fff; border-radius:16px; border:2px solid #7df9ff; box-shadow:0 0 30px rgba(125,249,255,0.3); display:flex; flex-direction:column; justify-content:space-between; position:relative; overflow:hidden; font-family:sans-serif;">
   
@@ -90,8 +113,11 @@ export default function IdCardGeneratorPage() {
     jurusan: "Informatika / STEI",
     peran: "Peserta Resmi",
     quote: "Different Minds, One Generation Chasing Glories",
+    motto: "Different Minds, One Generation Chasing Glories",
     foto: DEFAULT_AVATAR_DATA_URL,
     photo: DEFAULT_AVATAR_DATA_URL,
+    warna: "#7df9ff",
+    color: "#7df9ff",
   });
 
   const [isExporting, setIsExporting] = useState<boolean>(false);
@@ -122,38 +148,37 @@ export default function IdCardGeneratorPage() {
     if (!cropperImageRef.current) return;
 
     if (cropperInstanceRef.current) {
-      cropperInstanceRef.current.destroy();
+      try {
+        cropperInstanceRef.current.destroy();
+      } catch (e) {}
       cropperInstanceRef.current = null;
     }
 
-    setTimeout(() => {
-      if (!cropperImageRef.current) return;
+    try {
       cropperInstanceRef.current = new Cropper(cropperImageRef.current, {
         aspectRatio: currentAspectRatio,
         viewMode: 1,
-        dragMode: "move",
-        autoCropArea: 0.9,
+        dragMode: "crop",
+        autoCropArea: 0.85,
         restore: false,
         guides: true,
         center: true,
-        highlight: false,
+        highlight: true,
         cropBoxMovable: true,
         cropBoxResizable: true,
         toggleDragModeOnDblclick: false,
+        responsive: true,
+        checkOrientation: false,
       });
-    }, 150);
+    } catch (e) {
+      console.warn("Error initializing Cropper:", e);
+    }
   }, [currentAspectRatio]);
 
   useEffect(() => {
-    if (showCropModal && rawImageSrc) {
+    if (showCropModal && rawImageSrc && cropperImageRef.current && cropperImageRef.current.complete) {
       initCropper();
     }
-    return () => {
-      if (cropperInstanceRef.current) {
-        cropperInstanceRef.current.destroy();
-        cropperInstanceRef.current = null;
-      }
-    };
   }, [showCropModal, rawImageSrc, initCropper]);
 
   // Extract text placeholders inside {key} automatically
@@ -185,23 +210,42 @@ export default function IdCardGeneratorPage() {
 
   // Apply Cropped Photo
   const handleApplyCrop = () => {
-    if (!cropperInstanceRef.current) return;
+    let croppedDataUrl = "";
+    if (cropperInstanceRef.current) {
+      try {
+        const canvas = cropperInstanceRef.current.getCroppedCanvas({
+          width: 600,
+          height: 800,
+          imageSmoothingEnabled: true,
+          imageSmoothingQuality: "high",
+        });
 
-    const canvas = cropperInstanceRef.current.getCroppedCanvas({
-      width: 600,
-      height: 800,
-      imageSmoothingEnabled: true,
-      imageSmoothingQuality: "high",
-    });
+        if (canvas) {
+          croppedDataUrl = canvas.toDataURL("image/png");
+        }
+      } catch (e) {
+        console.warn("getCroppedCanvas error, fallback to rawImageSrc:", e);
+      }
+    }
 
-    if (canvas) {
-      const croppedDataUrl = canvas.toDataURL("image/png");
+    if (!croppedDataUrl && rawImageSrc) {
+      croppedDataUrl = rawImageSrc;
+    }
+
+    if (croppedDataUrl) {
       setCroppedPhoto(croppedDataUrl);
       setFormValues((prev) => ({
         ...prev,
         foto: croppedDataUrl,
         photo: croppedDataUrl,
       }));
+    }
+
+    if (cropperInstanceRef.current) {
+      try {
+        cropperInstanceRef.current.destroy();
+      } catch (e) {}
+      cropperInstanceRef.current = null;
     }
 
     setShowCropModal(false);
@@ -217,15 +261,27 @@ export default function IdCardGeneratorPage() {
 
   // Cropper Controls
   const handleZoom = (delta: number) => {
-    cropperInstanceRef.current?.zoom(delta);
+    try {
+      cropperInstanceRef.current?.zoom(delta);
+    } catch (e) {
+      console.warn("Cropper zoom not ready:", e);
+    }
   };
 
   const handleRotate = (degree: number) => {
-    cropperInstanceRef.current?.rotate(degree);
+    try {
+      cropperInstanceRef.current?.rotate(degree);
+    } catch (e) {
+      console.warn("Cropper rotate not ready:", e);
+    }
   };
 
   const handleResetCrop = () => {
-    cropperInstanceRef.current?.reset();
+    try {
+      cropperInstanceRef.current?.reset();
+    } catch (e) {
+      console.warn("Cropper reset not ready:", e);
+    }
   };
 
   // Update dynamic form value
@@ -250,25 +306,34 @@ export default function IdCardGeneratorPage() {
   const renderedHtml = useMemo(() => {
     let result = customHtml;
 
-    // Handle foto/photo placeholder replacement intelligently
-    ["foto", "photo"].forEach((photoKey) => {
-      const srcAttrMatch = result.includes(`src="{${photoKey}}"`) || result.includes(`src='{${photoKey}}'`);
-      const hrefAttrMatch =
-        result.includes(`href="{${photoKey}}"`) ||
-        result.includes(`href='{${photoKey}}'`) ||
-        result.includes(`xlink:href="{${photoKey}}"`) ||
-        result.includes(`xlink:href='{${photoKey}}'`);
-      const urlCSSMatch = result.includes(`url('{${photoKey}}')`) || result.includes(`url("{${photoKey}}")`) || result.includes(`url({${photoKey}})`);
-      const rawTagRegex = new RegExp(`{${photoKey}}`, "g");
+    // Auto-inject photo frame & {foto} {warna} tag if template is SVG and lacks photo tag
+    if (result.includes("<svg") && !result.includes("photo-frame-boundary") && !result.includes("{foto}") && !result.includes("{photo}")) {
+      const clipPathDefNew = `<clipPath id="photoFrameClip"><rect x="140" y="145" width="54" height="72" rx="6" ry="6" /></clipPath><filter id="photoGlowFilter" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="0" stdDeviation="2.2" flood-color="{warna}" flood-opacity="0.9" /></filter>`;
+      const photoGroupDefNew = `<!-- PASFOTO PHOTO FRAME & BOUNDARY ({foto}) ({warna}) --><g id="photo-frame-boundary" class="photo-frame"><rect x="140" y="145" width="54" height="72" rx="6" ry="6" fill="#0f172a" stroke="{warna}" stroke-width="1.2" stroke-opacity="0.4" filter="url(#photoGlowFilter)" /><image id="user-photo" x="140" y="145" width="54" height="72" preserveAspectRatio="xMidYMid slice" clip-path="url(#photoFrameClip)" href="{foto}" xlink:href="{foto}" /><rect x="140" y="145" width="54" height="72" rx="6" ry="6" fill="none" stroke="{warna}" stroke-width="1.5" stroke-opacity="0.75" filter="url(#photoGlowFilter)" /></g>`;
 
-      if (srcAttrMatch || hrefAttrMatch || urlCSSMatch) {
-        result = result.replace(rawTagRegex, croppedPhoto);
-      } else if (result.includes(`{${photoKey}}`)) {
-        // Replace standalone {foto} with responsive contained image element
-        const imgElement = `<span style="display:inline-block; max-width:100%; max-height:100%; vertical-align:middle; overflow:hidden; border-radius:inherit;"><img src="${croppedPhoto}" style="max-width:100%; max-height:100%; width:auto; height:auto; object-fit:contain; display:block;" alt="Pasfoto" /></span>`;
-        result = result.replace(rawTagRegex, imgElement);
+      if (result.includes("<defs>")) {
+        result = result.replace("<defs>", `<defs>${clipPathDefNew}`);
       }
-    });
+      result = result.replace("</svg>", `${photoGroupDefNew}</svg>`);
+    }
+
+    const currentPhotoUrl = (croppedPhoto || formValues["foto"] || formValues["photo"] || DEFAULT_AVATAR_DATA_URL).replace(/"/g, "'");
+    const frameColor = formValues["warna"] || formValues["color"] || "#7df9ff";
+
+    // Replace user-photo image href directly if user-photo element exists in SVG
+    if (result.includes('id="user-photo"')) {
+      result = result.replace(/<image\b[^>]*id="user-photo"[^>]*>/gi, (imageTag) => {
+        let updatedTag = imageTag.replace(/href="[^"]*"/gi, `href="${currentPhotoUrl}"`);
+        updatedTag = updatedTag.replace(/xlink:href="[^"]*"/gi, `xlink:href="${currentPhotoUrl}"`);
+        return updatedTag;
+      });
+    }
+
+    // Handle foto/photo placeholder replacement intelligently
+    result = result.replace(/\{foto\}|\{photo\}/g, currentPhotoUrl);
+
+    // Handle warna/color placeholder replacement
+    result = result.replace(/\{warna\}|\{color\}/g, frameColor);
 
     // Transform SVG motto text into pure SVG vector tspan elements FIRST before replacing general placeholders
     const mottoVal = formValues["motto"] || formValues["quote"] || formValues["deskripsi"] || "";
@@ -298,7 +363,7 @@ export default function IdCardGeneratorPage() {
       })
       .join("");
 
-    const svgWrappedMotto = `<text fill="#0b1e36" font-size="5.2" font-family="'Griffy', cursive, sans-serif" font-weight="bold" dominant-baseline="central" text-anchor="start">${mottoTspans}</text>`;
+    const svgWrappedMotto = `<text fill="#0b1e36" font-size="5.2" font-family="'Griffy', 'Griffy-Regular', cursive, sans-serif" font-weight="bold" dominant-baseline="central" text-anchor="start" text-rendering="geometricPrecision" shape-rendering="geometricPrecision">${mottoTspans}</text>`;
 
     result = result.replace(
       /<foreignObject\b[^>]*>(?:(?!<\/foreignObject>)[\s\S])*?(\{motto\}|\{quote\}|\{deskripsi\})(?:(?!<\/foreignObject>)[\s\S])*?<\/foreignObject>/gi,
@@ -310,8 +375,8 @@ export default function IdCardGeneratorPage() {
     );
     result = result.replace(/\{motto\}|\{quote\}/g, svgWrappedMotto);
 
-    // Replace font-family in SVG text tags to Griffy
-    result = result.replace(/font-family="[^"]*"/gi, `font-family="'Griffy', cursive, sans-serif"`);
+    // Replace font-family in SVG text tags to Griffy and add geometricPrecision for ultra-sharp text
+    result = result.replace(/font-family="[^"]*"/gi, `font-family="'Griffy', 'Griffy-Regular', cursive, sans-serif" text-rendering="geometricPrecision" shape-rendering="geometricPrecision"`);
 
     detectedPlaceholders.forEach((key) => {
       if (key === "foto" || key === "photo" || key === "motto" || key === "quote" || key === "deskripsi") return;
@@ -341,59 +406,39 @@ export default function IdCardGeneratorPage() {
     });
   }, [customHtml, detectedPlaceholders, formValues, croppedPhoto]);
 
-  // Export PNG Function - inject Griffy font into live SVG defs BEFORE html-to-image clones DOM
+  // Export PNG Function (Ultra-HD 2400px Crisp Render Engine)
   const handleExportPng = useCallback(async () => {
     if (!cardRef.current) return;
     setIsExporting(true);
 
-    // Track injected nodes for cleanup
-    const injectedNodes: { parent: Element; child: Element }[] = [];
-
     try {
-      // Step 1: Wait for fonts
       if (typeof document !== "undefined" && document.fonts) {
-        await document.fonts.load("1em 'Griffy'");
         await document.fonts.ready;
       }
+      const fontCss = await loadGriffyFontBase64();
+      await new Promise((res) => setTimeout(res, 250));
 
       const container = cardRef.current;
+      const width = container.offsetWidth || 450;
+      const height = container.offsetHeight || 250;
 
-      // Step 2: Inject font into EVERY SVG element's defs on live DOM
-      // html-to-image will clone the live DOM including our injected styles
-      const allSvgs = Array.from(container.querySelectorAll("svg"));
-      // Also inject into the container's root if it IS an svg
-      if (container instanceof SVGElement) allSvgs.unshift(container as unknown as SVGSVGElement);
+      // Ultra-HD Print Quality: Target 2400px width with exact aspect ratio scaling
+      const exportWidth = 2400;
+      const exportHeight = Math.round(exportWidth * (height / width));
+      const scaleFactor = exportWidth / width;
 
-      for (const svgEl of allSvgs) {
-        let defs = svgEl.querySelector(":scope > defs");
-        if (!defs) {
-          defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
-          svgEl.prepend(defs);
-          injectedNodes.push({ parent: svgEl, child: defs });
-        }
-        const style = document.createElementNS("http://www.w3.org/2000/svg", "style");
-        style.textContent = GRIFFY_FONT_BASE64;
-        defs.prepend(style);
-        injectedNodes.push({ parent: defs, child: style });
-      }
-
-      // Step 3: Also inject a <style> into document head as extra coverage
-      const headStyle = document.createElement("style");
-      headStyle.id = "__griffy_export_style__";
-      headStyle.textContent = GRIFFY_FONT_BASE64;
-      document.head.appendChild(headStyle);
-
-      // Step 4: Wait one frame for the browser to parse the injected styles
-      await new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res)));
-      await new Promise((res) => setTimeout(res, 150));
-
-      // Step 5: Export via html-to-image
       const dataUrl = await toPng(container, {
+        width: exportWidth,
+        height: exportHeight,
+        style: {
+          transform: `scale(${scaleFactor})`,
+          transformOrigin: "top left",
+          width: `${width}px`,
+          height: `${height}px`,
+        },
         cacheBust: false,
-        pixelRatio: 4,
         quality: 1.0,
-        fontEmbedCSS: GRIFFY_FONT_BASE64,
-        skipFonts: true,
+        fontEmbedCSS: fontCss,
         imagePlaceholder: "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7",
         filter: (node) => {
           if (node instanceof HTMLElement && (node.id === "eruda" || node.tagName === "SCRIPT")) return false;
@@ -414,12 +459,6 @@ export default function IdCardGeneratorPage() {
       console.error("Export failed:", err);
       alert("Gagal memproses gambar. Silakan coba lagi.");
     } finally {
-      // Cleanup all injected nodes
-      for (const { parent, child } of injectedNodes) {
-        if (parent.contains(child)) parent.removeChild(child);
-      }
-      const headStyle = document.getElementById("__griffy_export_style__");
-      if (headStyle) document.head.removeChild(headStyle);
       setIsExporting(false);
     }
   }, [formValues]);
@@ -435,6 +474,8 @@ export default function IdCardGeneratorPage() {
       quote: "Motto / Jargon",
       foto: "Unggah & Potong Pasfoto",
       photo: "Unggah & Potong Pasfoto",
+      warna: "Warna Bingkai & Efek Glow",
+      color: "Warna Bingkai & Efek Glow",
     };
     if (keyMap[key.toLowerCase()]) return keyMap[key.toLowerCase()];
     return key
@@ -510,6 +551,59 @@ export default function IdCardGeneratorPage() {
                     .filter((key) => key !== "foto" && key !== "photo")
                     .map((key) => {
                       const isLongText = key === "quote" || key === "deskripsi" || key === "motto";
+                      const isColorInput = key === "warna" || key === "color";
+
+                      if (isColorInput) {
+                        const currentColor = formValues[key] || "#7df9ff";
+                        const presetColors = [
+                          { label: "Cyan Glow", hex: "#7df9ff" },
+                          { label: "Gold", hex: "#ffd166" },
+                          { label: "Neon Pink", hex: "#ff4757" },
+                          { label: "Emerald", hex: "#2ed573" },
+                          { label: "Violet", hex: "#a55eea" },
+                          { label: "Pure White", hex: "#ffffff" },
+                        ];
+
+                        return (
+                          <div key={key} className="space-y-2">
+                            <label className="block text-slate-300 uppercase font-mono tracking-wider font-bold">
+                              {formatLabel(key)}
+                            </label>
+                            <div className="flex items-center space-x-3">
+                              <div className="relative w-10 h-10 rounded-xl overflow-hidden border border-card-border/60 flex-shrink-0 shadow-[0_0_12px_rgba(125,249,255,0.2)]">
+                                <input
+                                  type="color"
+                                  value={currentColor}
+                                  onChange={(e) => handleInputChange(key, e.target.value)}
+                                  className="absolute -inset-2 w-14 h-14 cursor-pointer bg-transparent border-0"
+                                />
+                              </div>
+
+                              <input
+                                type="text"
+                                value={currentColor}
+                                onChange={(e) => handleInputChange(key, e.target.value)}
+                                placeholder="#7df9ff"
+                                className="flex-grow px-4 py-2.5 rounded-xl bg-slate-950/80 border border-card-border/50 text-slate-100 text-sm font-mono focus:outline-none focus:border-accent-cyan/60"
+                              />
+                            </div>
+
+                            {/* Preset Color Chips */}
+                            <div className="flex items-center space-x-2 pt-1 flex-wrap gap-1">
+                              {presetColors.map((preset) => (
+                                <button
+                                  key={preset.hex}
+                                  type="button"
+                                  onClick={() => handleInputChange(key, preset.hex)}
+                                  className="w-6 h-6 rounded-full border border-white/20 transition hover:scale-110 cursor-pointer shadow-sm"
+                                  style={{ backgroundColor: preset.hex, boxShadow: `0 0 8px ${preset.hex}66` }}
+                                  title={preset.label}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      }
 
                       return (
                         <div key={key}>
