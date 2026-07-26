@@ -24,59 +24,11 @@ import {
   RefreshCw,
   Upload,
 } from "lucide-react";
+import { DEFAULT_ID_CARD_TEMPLATE } from "@/lib/defaultTemplate";
 
 type ActiveTab = "links" | "contacts" | "announcements" | "templates";
 
-const DEFAULT_ADMIN_HTML_TEMPLATE = `<div style="width:100%; height:100%; padding:24px; background:linear-gradient(135deg, #07142e 0%, #020510 60%, #1a0b36 100%); color:#fff; border-radius:16px; border:2px solid #7df9ff; box-shadow:0 0 30px rgba(125,249,255,0.3); display:flex; flex-direction:column; justify-between; position:relative; overflow:hidden; font-family:sans-serif;">
-  
-  <!-- Header Card -->
-  <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(125,249,255,0.3); padding-bottom:12px; position:relative; z-index:4;">
-    <div style="font-family:monospace; font-weight:bold; font-size:18px; color:#7df9ff; letter-spacing:2px;">
-      IMO 2026 OFFICIAL ID
-    </div>
-    <span style="font-size:11px; padding:3px 10px; background:rgba(125,249,255,0.15); border:1px solid rgba(125,249,255,0.4); color:#7df9ff; border-radius:999px; font-family:monospace; text-transform:uppercase;">
-      {peran}
-    </span>
-  </div>
-
-  <!-- Main Body Section with Photo Layering -->
-  <div style="margin-top:16px; margin-bottom:16px; display:flex; align-items:center; gap:16px; position:relative; z-index:3;">
-    <!-- Pasfoto Photo Frame (Layer 1 & Layer 2) -->
-    <div style="position:relative; width:95px; height:120px; flex-shrink:0; border-radius:12px; overflow:hidden; border:2px solid #7df9ff; box-shadow:0 0 15px rgba(125,249,255,0.4); background:#0f172a;">
-      <!-- Layer 1: Cropped Pasfoto Image -->
-      <img src="{foto}" style="width:100%; height:100%; object-fit:cover; display:block;" alt="Pasfoto" />
-      <!-- Layer 2: Avatar Frame Overlay -->
-      <div style="position:absolute; inset:0; border:1px solid rgba(255,255,255,0.2); pointer-events:none; background:linear-gradient(180deg, rgba(255,255,255,0.15) 0%, transparent 50%);"></div>
-    </div>
-
-    <!-- Participant Details (Layer 4: Top Text Overlay) -->
-    <div style="flex-grow:1; display:flex; flex-direction:column; justify-content:center;">
-      <div style="font-size:22px; font-weight:900; color:#ffffff; letter-spacing:0.5px; line-height:1.2; margin-bottom:4px;">
-        {nama}
-      </div>
-      <div style="font-size:13px; font-family:monospace; color:#7df9ff; margin-bottom:3px;">
-        NIM: {nim}
-      </div>
-      <div style="font-size:13px; color:#e2e8f0; font-family:monospace; margin-bottom:3px;">
-        Kelompok: {kelompok}
-      </div>
-      <div style="font-size:11px; color:#94a3b8;">
-        Jurusan: {jurusan}
-      </div>
-    </div>
-  </div>
-
-  <!-- Motto Quote & Footer Section -->
-  <div style="position:relative; z-index:4;">
-    <div style="font-size:11px; font-style:italic; color:#b48cff; border-left:2px solid #b48cff; padding-left:8px; margin-bottom:12px;">
-      "{quote}"
-    </div>
-    <div style="font-size:11px; font-family:monospace; color:#64748b; border-top:1px solid rgba(255,255,255,0.1); padding-top:10px; display:flex; justify-content:space-between; align-items:center;">
-      <span>VERIFIED MEMBER</span>
-      <span>STATUS: ONLINE</span>
-    </div>
-  </div>
-</div>`;
+const DEFAULT_ADMIN_HTML_TEMPLATE = DEFAULT_ID_CARD_TEMPLATE;
 
 export default function AdminDashboardPage() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("links");
@@ -184,33 +136,81 @@ export default function AdminDashboardPage() {
     });
   }, [adminTemplateHtml, adminDetectedPlaceholders]);
 
-  // Load saved Admin template on mount
+  // Load saved Admin template on mount (localStorage + Supabase DB)
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem("imo2026_id_card_html_template");
-      if (saved) {
-        setAdminTemplateHtml(saved);
+    async function loadSavedTemplate() {
+      try {
+        const saved = localStorage.getItem("imo2026_id_card_html_template");
+        if (saved) {
+          setAdminTemplateHtml(saved);
+          return;
+        }
+      } catch (e) {
+        console.warn("Local storage read error", e);
       }
-    } catch (e) {
-      console.warn("Local storage read error", e);
+
+      try {
+        const { data, error } = await supabase
+          .from("id_card_templates")
+          .select("layout_json")
+          .eq("is_active", true)
+          .order("updated_at", { ascending: false })
+          .limit(1);
+
+        if (!error && data && data.length > 0 && data[0].layout_json?.html) {
+          setAdminTemplateHtml(data[0].layout_json.html);
+        }
+      } catch (e) {
+        console.warn("Could not load template from Supabase:", e);
+      }
     }
+
+    loadSavedTemplate();
   }, []);
 
-  const handleSaveAdminHtmlTemplate = () => {
+  const handleSaveAdminHtmlTemplate = async () => {
     try {
       localStorage.setItem("imo2026_id_card_html_template", adminTemplateHtml);
-      setSaveSuccessMsg("Templat Resmi Berhasil Disimpan!");
-      setTimeout(() => setSaveSuccessMsg(null), 3000);
+
+      // Save to Supabase DB so it persists for all users on Vercel deployment
+      const { data: existing } = await supabase.from("id_card_templates").select("id").limit(1);
+      if (existing && existing.length > 0) {
+        await supabase.from("id_card_templates").update({
+          layout_json: { html: adminTemplateHtml },
+          updated_at: new Date().toISOString(),
+          is_active: true
+        }).eq("id", existing[0].id);
+      } else {
+        await supabase.from("id_card_templates").insert([{
+          name: "Official IMO Template",
+          background_url: "",
+          layout_json: { html: adminTemplateHtml },
+          is_active: true,
+          is_default: true
+        }]);
+      }
+
+      setSaveSuccessMsg("Templat Resmi Berhasil Disimpan & Diterapkan ke Vercel!");
+      setTimeout(() => setSaveSuccessMsg(null), 3500);
     } catch (e) {
-      alert("Gagal menyimpan templat ke penyimpanan lokal.");
+      console.warn("Error saving template to Supabase:", e);
+      setSaveSuccessMsg("Templat disimpan di browser lokal.");
+      setTimeout(() => setSaveSuccessMsg(null), 3000);
     }
   };
 
-  const handleResetAdminTemplate = () => {
-    if (confirm("Apakah Anda yakin ingin mereset templat ke struktur HTML standar bawaan?")) {
+  const handleResetAdminTemplate = async () => {
+    if (confirm("Apakah Anda yakin ingin mereset templat ke struktur SVG/HTML standar bawaan?")) {
       setAdminTemplateHtml(DEFAULT_ADMIN_HTML_TEMPLATE);
       try {
         localStorage.removeItem("imo2026_id_card_html_template");
+        const { data: existing } = await supabase.from("id_card_templates").select("id").limit(1);
+        if (existing && existing.length > 0) {
+          await supabase.from("id_card_templates").update({
+            layout_json: { html: DEFAULT_ADMIN_HTML_TEMPLATE },
+            updated_at: new Date().toISOString()
+          }).eq("id", existing[0].id);
+        }
       } catch (e) {}
     }
   };

@@ -7,6 +7,8 @@ import Card from "@/components/Card";
 import { toPng } from "html-to-image";
 import html2canvas from "html2canvas";
 import Cropper from "cropperjs";
+import { DEFAULT_ID_CARD_TEMPLATE } from "@/lib/defaultTemplate";
+import { createClient } from "@/utils/supabase/client";
 import {
   Download,
   User,
@@ -51,56 +53,7 @@ async function loadGriffyFontBase64(): Promise<string> {
   }
 }
 
-const DEFAULT_CUSTOM_HTML = `<div style="width:100%; height:100%; padding:24px; background:linear-gradient(135deg, #07142e 0%, #020510 60%, #1a0b36 100%); color:#fff; border-radius:16px; border:2px solid #7df9ff; box-shadow:0 0 30px rgba(125,249,255,0.3); display:flex; flex-direction:column; justify-content:space-between; position:relative; overflow:hidden; font-family:sans-serif;">
-  
-  <!-- Header Card -->
-  <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(125,249,255,0.3); padding-bottom:12px; position:relative; z-index:4;">
-    <div style="font-family:monospace; font-weight:bold; font-size:18px; color:#7df9ff; letter-spacing:2px;">
-      IMO 2026 OFFICIAL ID
-    </div>
-    <span style="font-size:11px; padding:3px 10px; background:rgba(125,249,255,0.15); border:1px solid rgba(125,249,255,0.4); color:#7df9ff; border-radius:999px; font-family:monospace; text-transform:uppercase;">
-      {peran}
-    </span>
-  </div>
-
-  <!-- Main Body Section with Photo Layering -->
-  <div style="margin-top:16px; margin-bottom:16px; display:flex; align-items:center; gap:16px; position:relative; z-index:3;">
-    <!-- Pasfoto Photo Frame (Layer 1 & Layer 2) -->
-    <div style="position:relative; width:95px; height:120px; flex-shrink:0; border-radius:12px; overflow:hidden; border:2px solid #7df9ff; box-shadow:0 0 15px rgba(125,249,255,0.4); background:#0f172a;">
-      <!-- Layer 1: Cropped Pasfoto Image -->
-      <img src="{foto}" style="width:100%; height:100%; object-fit:cover; display:block;" alt="Pasfoto" />
-      <!-- Layer 2: Avatar Frame Overlay -->
-      <div style="position:absolute; inset:0; border:1px solid rgba(255,255,255,0.2); pointer-events:none; background:linear-gradient(180deg, rgba(255,255,255,0.15) 0%, transparent 50%);"></div>
-    </div>
-
-    <!-- Participant Details (Layer 4: Top Text Overlay) -->
-    <div style="flex-grow:1; display:flex; flex-direction:column; justify-content:center;">
-      <div style="font-size:22px; font-weight:900; color:#ffffff; letter-spacing:0.5px; line-height:1.2; margin-bottom:4px;">
-        {nama}
-      </div>
-      <div style="font-size:13px; font-family:monospace; color:#7df9ff; margin-bottom:3px;">
-        NIM: {nim}
-      </div>
-      <div style="font-size:13px; color:#e2e8f0; font-family:monospace; margin-bottom:3px;">
-        Kelompok: {kelompok}
-      </div>
-      <div style="font-size:11px; color:#94a3b8;">
-        Jurusan: {jurusan}
-      </div>
-    </div>
-  </div>
-
-  <!-- Motto Quote & Footer Section -->
-  <div style="position:relative; z-index:4;">
-    <div style="font-size:11px; font-style:italic; color:#b48cff; border-left:2px solid #b48cff; padding-left:8px; margin-bottom:12px;">
-      "{quote}"
-    </div>
-    <div style="font-size:11px; font-family:monospace; color:#64748b; border-top:1px solid rgba(255,255,255,0.1); padding-top:10px; display:flex; justify-content:space-between; align-items:center;">
-      <span>VERIFIED MEMBER</span>
-      <span>STATUS: ONLINE</span>
-    </div>
-  </div>
-</div>`;
+const DEFAULT_CUSTOM_HTML = DEFAULT_ID_CARD_TEMPLATE;
 
 export default function IdCardGeneratorPage() {
   const [customHtml, setCustomHtml] = useState<string>(DEFAULT_CUSTOM_HTML);
@@ -131,16 +84,39 @@ export default function IdCardGeneratorPage() {
   const cropperImageRef = useRef<HTMLImageElement | null>(null);
   const cropperInstanceRef = useRef<Cropper | null>(null);
 
-  // Load Admin-configured HTML Template on Mount
+  // Load Admin-configured HTML Template on Mount (localStorage + Supabase DB fallback)
   useEffect(() => {
-    try {
-      const savedAdminTemplate = localStorage.getItem("imo2026_id_card_html_template");
-      if (savedAdminTemplate) {
-        setCustomHtml(savedAdminTemplate);
+    async function loadTemplate() {
+      // 1. Try localStorage first
+      try {
+        const savedAdminTemplate = localStorage.getItem("imo2026_id_card_html_template");
+        if (savedAdminTemplate) {
+          setCustomHtml(savedAdminTemplate);
+          return;
+        }
+      } catch (e) {
+        console.warn("Could not load saved admin template from localStorage:", e);
       }
-    } catch (e) {
-      console.warn("Could not load saved admin template:", e);
+
+      // 2. Fetch active template from Supabase (for Vercel deployment & multi-device sync)
+      try {
+        const supabase = createClient();
+        const { data, error } = await supabase
+          .from("id_card_templates")
+          .select("layout_json")
+          .eq("is_active", true)
+          .order("updated_at", { ascending: false })
+          .limit(1);
+
+        if (!error && data && data.length > 0 && data[0].layout_json?.html) {
+          setCustomHtml(data[0].layout_json.html);
+        }
+      } catch (e) {
+        console.warn("Could not load template from Supabase:", e);
+      }
     }
+
+    loadTemplate();
   }, []);
 
   // Initialize Cropper.js instance reliably
