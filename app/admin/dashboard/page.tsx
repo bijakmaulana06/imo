@@ -17,9 +17,66 @@ import {
   LogOut,
   ExternalLink,
   Pin,
+  Save,
+  FileCode2,
+  CheckCircle2,
+  Sparkles,
+  RefreshCw,
+  Upload,
 } from "lucide-react";
 
 type ActiveTab = "links" | "contacts" | "announcements" | "templates";
+
+const DEFAULT_ADMIN_HTML_TEMPLATE = `<div style="width:100%; height:100%; padding:24px; background:linear-gradient(135deg, #07142e 0%, #020510 60%, #1a0b36 100%); color:#fff; border-radius:16px; border:2px solid #7df9ff; box-shadow:0 0 30px rgba(125,249,255,0.3); display:flex; flex-direction:column; justify-between; position:relative; overflow:hidden; font-family:sans-serif;">
+  
+  <!-- Header Card -->
+  <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(125,249,255,0.3); padding-bottom:12px; position:relative; z-index:4;">
+    <div style="font-family:monospace; font-weight:bold; font-size:18px; color:#7df9ff; letter-spacing:2px;">
+      IMO 2026 OFFICIAL ID
+    </div>
+    <span style="font-size:11px; padding:3px 10px; background:rgba(125,249,255,0.15); border:1px solid rgba(125,249,255,0.4); color:#7df9ff; border-radius:999px; font-family:monospace; text-transform:uppercase;">
+      {peran}
+    </span>
+  </div>
+
+  <!-- Main Body Section with Photo Layering -->
+  <div style="margin-top:16px; margin-bottom:16px; display:flex; align-items:center; gap:16px; position:relative; z-index:3;">
+    <!-- Pasfoto Photo Frame (Layer 1 & Layer 2) -->
+    <div style="position:relative; width:95px; height:120px; flex-shrink:0; border-radius:12px; overflow:hidden; border:2px solid #7df9ff; box-shadow:0 0 15px rgba(125,249,255,0.4); background:#0f172a;">
+      <!-- Layer 1: Cropped Pasfoto Image -->
+      <img src="{foto}" style="width:100%; height:100%; object-fit:cover; display:block;" alt="Pasfoto" />
+      <!-- Layer 2: Avatar Frame Overlay -->
+      <div style="position:absolute; inset:0; border:1px solid rgba(255,255,255,0.2); pointer-events:none; background:linear-gradient(180deg, rgba(255,255,255,0.15) 0%, transparent 50%);"></div>
+    </div>
+
+    <!-- Participant Details (Layer 4: Top Text Overlay) -->
+    <div style="flex-grow:1; display:flex; flex-direction:column; justify-content:center;">
+      <div style="font-size:22px; font-weight:900; color:#ffffff; letter-spacing:0.5px; line-height:1.2; margin-bottom:4px;">
+        {nama}
+      </div>
+      <div style="font-size:13px; font-family:monospace; color:#7df9ff; margin-bottom:3px;">
+        NIM: {nim}
+      </div>
+      <div style="font-size:13px; color:#e2e8f0; font-family:monospace; margin-bottom:3px;">
+        Kelompok: {kelompok}
+      </div>
+      <div style="font-size:11px; color:#94a3b8;">
+        Jurusan: {jurusan}
+      </div>
+    </div>
+  </div>
+
+  <!-- Motto Quote & Footer Section -->
+  <div style="position:relative; z-index:4;">
+    <div style="font-size:11px; font-style:italic; color:#b48cff; border-left:2px solid #b48cff; padding-left:8px; margin-bottom:12px;">
+      "{quote}"
+    </div>
+    <div style="font-size:11px; font-family:monospace; color:#64748b; border-top:1px solid rgba(255,255,255,0.1); padding-top:10px; display:flex; justify-content:space-between; align-items:center;">
+      <span>VERIFIED MEMBER</span>
+      <span>STATUS: ONLINE</span>
+    </div>
+  </div>
+</div>`;
 
 export default function AdminDashboardPage() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("links");
@@ -30,6 +87,10 @@ export default function AdminDashboardPage() {
   const [contacts, setContacts] = useState<any[]>([]);
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [templates, setTemplates] = useState<any[]>([]);
+
+  // Admin Custom HTML Template State
+  const [adminTemplateHtml, setAdminTemplateHtml] = useState<string>(DEFAULT_ADMIN_HTML_TEMPLATE);
+  const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
 
   const [showAddLinkModal, setShowAddLinkModal] = useState(false);
   const [newLink, setNewLink] = useState({
@@ -57,6 +118,125 @@ export default function AdminDashboardPage() {
     category: "PENTING",
     pinned: false,
   });
+
+  // Extract placeholders inside {key}
+  const adminDetectedPlaceholders = React.useMemo(() => {
+    const matches = adminTemplateHtml.match(/{([a-zA-Z0-9_]+)}/g);
+    if (!matches) return [];
+    const keys = matches.map((m) => m.slice(1, -1));
+    return Array.from(new Set(keys));
+  }, [adminTemplateHtml]);
+
+  // Render preview sample
+  const renderedAdminPreviewHtml = React.useMemo(() => {
+    const sampleValues: Record<string, string> = {
+      nama: "Budi Santoso",
+      nim: "2026010042",
+      kelompok: "Kelompok 1",
+      jurusan: "Informatika / STEI",
+      peran: "Peserta Resmi",
+      quote: "Different Minds, One Generation Chasing Glories",
+    };
+
+    const samplePhoto = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="250" viewBox="0 0 200 250" fill="%230f172a"><rect width="200" height="250" fill="%230f172a"/><circle cx="100" cy="90" r="45" fill="%23334155"/><path d="M 30 220 C 30 150, 170 150, 170 220 Z" fill="%23334155"/><text x="100" y="240" font-family="sans-serif" font-size="12" fill="%237df9ff" text-anchor="middle">PASFOTO</text></svg>`;
+
+    let result = adminTemplateHtml;
+    ["foto", "photo"].forEach((photoKey) => {
+      const srcAttrMatch = result.includes(`src="{${photoKey}}"`) || result.includes(`src='{${photoKey}}'`);
+      const hrefAttrMatch =
+        result.includes(`href="{${photoKey}}"`) ||
+        result.includes(`href='{${photoKey}}'`) ||
+        result.includes(`xlink:href="{${photoKey}}"`) ||
+        result.includes(`xlink:href='{${photoKey}}'`);
+      const urlCSSMatch = result.includes(`url('{${photoKey}}')`) || result.includes(`url("{${photoKey}}")`) || result.includes(`url({${photoKey}})`);
+      const rawTagRegex = new RegExp(`{${photoKey}}`, "g");
+
+      if (srcAttrMatch || hrefAttrMatch || urlCSSMatch) {
+        result = result.replace(rawTagRegex, samplePhoto);
+      } else if (result.includes(`{${photoKey}}`)) {
+        const imgElement = `<span style="display:inline-block; max-width:100%; max-height:100%; vertical-align:middle; overflow:hidden; border-radius:inherit;"><img src="${samplePhoto}" style="max-width:100%; max-height:100%; width:auto; height:auto; object-fit:contain; display:block;" alt="Pasfoto" /></span>`;
+        result = result.replace(rawTagRegex, imgElement);
+      }
+    });
+
+    adminDetectedPlaceholders.forEach((key) => {
+      if (key === "foto" || key === "photo") return;
+      const val = sampleValues[key] || `[Isi ${key}]`;
+      const regex = new RegExp(`{${key}}`, "g");
+      result = result.replace(regex, val);
+    });
+
+    // Scope <style> blocks so CSS rules don't leak into outer document
+    return result.replace(/<style\b[^>]*>([\s\S]*?)<\/style>/gi, (match, cssContent) => {
+      const scopedCss = cssContent.replace(
+        /([^{}+>,\s][^{}]+)\s*\{/g,
+        (m: string, selector: string) => {
+          const trimmed = selector.trim();
+          if (trimmed.startsWith("@")) return m;
+          const scopedSelectors = trimmed
+            .split(",")
+            .map((s: string) => `.id-card-preview-scope ${s.trim()}`)
+            .join(", ");
+          return `${scopedSelectors} {`;
+        }
+      );
+      return `<style>${scopedCss}</style>`;
+    });
+  }, [adminTemplateHtml, adminDetectedPlaceholders]);
+
+  // Load saved Admin template on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("imo2026_id_card_html_template");
+      if (saved) {
+        setAdminTemplateHtml(saved);
+      }
+    } catch (e) {
+      console.warn("Local storage read error", e);
+    }
+  }, []);
+
+  const handleSaveAdminHtmlTemplate = () => {
+    try {
+      localStorage.setItem("imo2026_id_card_html_template", adminTemplateHtml);
+      setSaveSuccessMsg("Templat Resmi Berhasil Disimpan!");
+      setTimeout(() => setSaveSuccessMsg(null), 3000);
+    } catch (e) {
+      alert("Gagal menyimpan templat ke penyimpanan lokal.");
+    }
+  };
+
+  const handleResetAdminTemplate = () => {
+    if (confirm("Apakah Anda yakin ingin mereset templat ke struktur HTML standar bawaan?")) {
+      setAdminTemplateHtml(DEFAULT_ADMIN_HTML_TEMPLATE);
+      try {
+        localStorage.removeItem("imo2026_id_card_html_template");
+      } catch (e) {}
+    }
+  };
+
+  const handleAdminTemplateFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const fileName = file.name.toLowerCase();
+    if (!fileName.endsWith(".html") && !fileName.endsWith(".htm") && !fileName.endsWith(".svg")) {
+      alert("Format file tidak didukung. Harap unggah file ber-ekstensi .html atau .svg");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const content = evt.target?.result as string;
+      if (content) {
+        setAdminTemplateHtml(content);
+        setSaveSuccessMsg(`File ${file.name} berhasil diunggah! Klik "Simpan Templat Resmi" untuk menerapkan.`);
+        setTimeout(() => setSaveSuccessMsg(null), 4000);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
 
   const router = useRouter();
   const supabase = createClient();
@@ -379,10 +559,113 @@ export default function AdminDashboardPage() {
         )}
 
         {activeTab === "templates" && (
-          <div className="glass rounded-2xl p-8 border border-card-border/40 text-center">
-            <CreditCard className="h-10 w-10 text-accent-cyan mx-auto mb-3" />
-            <h3 className="font-display font-bold text-slate-100 text-lg">ID Card Engine active (Client-Side Rendering)</h3>
-            <p className="text-xs text-slate-400 mt-1">Template utama IMO 2026 aktif dan siap dirender 100% di browser pengguna.</p>
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+              <div>
+                <h2 className="font-display font-black text-xl text-slate-100 flex items-center space-x-2">
+                  <CreditCard className="h-6 w-6 text-accent-cyan" />
+                  <span>Kustomisasi Templat HTML Resmi ID Card (/id-card)</span>
+                </h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  Desain & atur struktur HTML kustom ID Card peserta. Tag teks seperti <code className="text-accent-cyan font-mono">{`{nama}`}</code>, <code className="text-accent-cyan font-mono">{`{nim}`}</code>, atau tag kustom baru akan **otomatis dideteksi dan dibuatkan form inputnya** untuk seluruh peserta.
+                </p>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                {saveSuccessMsg && (
+                  <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-xl border border-emerald-500/30 flex items-center space-x-1">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                    <span>{saveSuccessMsg}</span>
+                  </span>
+                )}
+                <Button variant="primary" size="sm" onClick={handleSaveAdminHtmlTemplate}>
+                  <Save className="h-4 w-4 mr-1.5" />
+                  <span>Simpan Templat Resmi</span>
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+              {/* HTML Code Editor */}
+              <div className="lg:col-span-7 space-y-4">
+                <Card glowColor="purple">
+                  <div className="flex justify-between items-center mb-3 pb-3 border-b border-card-border/30 flex-wrap gap-2">
+                    <span className="font-mono text-xs font-bold text-accent-purple uppercase tracking-wider flex items-center space-x-1.5">
+                      <FileCode2 className="h-4 w-4" />
+                      <span>Kode HTML & CSS Kustom ID Card</span>
+                    </span>
+
+                    <div className="flex items-center space-x-2">
+                      <label className="text-xs font-mono text-slate-200 hover:text-accent-cyan bg-slate-900 hover:bg-slate-800 border border-card-border/60 hover:border-accent-cyan/60 px-3 py-1.5 rounded-xl cursor-pointer transition flex items-center space-x-1.5 touch-manipulation">
+                        <Upload className="h-3.5 w-3.5 text-accent-cyan" />
+                        <span>Unggah File (.html / .svg)</span>
+                        <input
+                          type="file"
+                          accept=".html,.htm,.svg,text/html,image/svg+xml"
+                          onChange={handleAdminTemplateFileUpload}
+                          className="hidden"
+                        />
+                      </label>
+
+                      <button
+                        onClick={handleResetAdminTemplate}
+                        className="text-xs font-mono text-slate-400 hover:text-red-400 flex items-center space-x-1 cursor-pointer bg-slate-900 hover:bg-slate-800 border border-card-border/40 px-2.5 py-1.5 rounded-xl transition"
+                        title="Reset Ke HTML Default"
+                      >
+                        <RefreshCw className="h-3.5 w-3.5" />
+                        <span>Reset</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <textarea
+                    rows={16}
+                    value={adminTemplateHtml}
+                    onChange={(e) => setAdminTemplateHtml(e.target.value)}
+                    className="w-full p-4 rounded-xl bg-slate-950/90 border border-card-border/60 text-emerald-400 font-mono text-xs focus:outline-none focus:border-accent-purple/60 leading-relaxed shadow-inner"
+                  />
+
+                  {/* Detected Tags Indicator */}
+                  <div className="pt-3 border-t border-card-border/30">
+                    <div className="text-[11px] font-mono text-slate-400 mb-2 font-bold uppercase tracking-wider">
+                      Tag Teks Terdeteksi ({adminDetectedPlaceholders.length}):
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {adminDetectedPlaceholders.map((tag) => (
+                        <span
+                          key={tag}
+                          className="px-2.5 py-0.5 rounded-full bg-accent-cyan/10 border border-accent-cyan/30 text-accent-cyan font-mono text-[11px]"
+                        >
+                          {"{" + tag + "}"}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </Card>
+              </div>
+
+              {/* Live Preview Panel */}
+              <div className="lg:col-span-5 space-y-4 sticky top-24">
+                <Card glowColor="cyan">
+                  <div className="flex justify-between items-center mb-4 pb-3 border-b border-card-border/30">
+                    <span className="font-mono text-xs font-bold text-accent-cyan uppercase tracking-wider flex items-center space-x-1.5">
+                      <Sparkles className="h-4 w-4" />
+                      <span>Preview Live ID Card Admin</span>
+                    </span>
+                  </div>
+
+                  {/* Card Preview Container */}
+                  <div className="w-full flex justify-center items-center overflow-hidden py-2">
+                    <div className="w-full max-w-[420px] min-h-[240px] rounded-2xl mx-auto overflow-hidden shadow-2xl border border-card-border/50 flex flex-col justify-center items-center">
+                      <div
+                        className="id-card-preview-scope w-full h-full flex flex-col justify-center items-center"
+                        dangerouslySetInnerHTML={{ __html: renderedAdminPreviewHtml }}
+                      />
+                    </div>
+                  </div>
+                </Card>
+              </div>
+            </div>
           </div>
         )}
       </main>

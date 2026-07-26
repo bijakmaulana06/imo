@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import { Josefin_Sans, Montserrat, Cinzel_Decorative } from "next/font/google";
+import { Josefin_Sans, Montserrat, Cinzel_Decorative, Griffy } from "next/font/google";
 import "./globals.css";
+import "cropperjs/dist/cropper.css";
 
 const josefinSans = Josefin_Sans({
   variable: "--font-josefin",
@@ -20,6 +21,12 @@ const cinzelDecorative = Cinzel_Decorative({
   weight: ["700", "900"],
 });
 
+const griffy = Griffy({
+  variable: "--font-griffy",
+  subsets: ["latin"],
+  weight: ["400"],
+});
+
 export const metadata: Metadata = {
   title: "IMO 2026 - Innovative Minds Outclass",
   description: "Portal Resmi IMO 2026: Different Minds, Different Stories, One Generation Chasing Glories.",
@@ -33,7 +40,7 @@ export default function RootLayout({
   return (
     <html
       lang="id"
-      className={`${josefinSans.variable} ${montserrat.variable} ${cinzelDecorative.variable} h-full antialiased dark`}
+      className={`${josefinSans.variable} ${montserrat.variable} ${cinzelDecorative.variable} ${griffy.variable} h-full antialiased dark`}
     >
       <body className="min-h-full flex flex-col bg-background text-foreground font-sans">
         {children}

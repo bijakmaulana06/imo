@@ -1,128 +1,447 @@
 "use client";
 
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import StarfieldBackground from "@/components/StarfieldBackground";
 import Card from "@/components/Card";
-import Button from "@/components/Button";
-import ImoLogo from "@/components/ImoLogo";
-import { QRCodeSVG } from "qrcode.react";
 import { toPng } from "html-to-image";
+import html2canvas from "html2canvas";
+import Cropper from "cropperjs";
+import { GRIFFY_FONT_BASE64 } from "@/lib/griffyFont";
 import {
   Download,
-  Upload,
   User,
-  ShieldCheck,
   Sparkles,
-  RefreshCw,
-  Palette,
   CreditCard,
+  Upload,
+  Crop,
+  RotateCcw,
+  RotateCw,
+  ZoomIn,
+  ZoomOut,
+  Check,
+  X,
+  RefreshCw,
   Image as ImageIcon,
 } from "lucide-react";
 
-type ColorTheme = "cyan" | "purple" | "gold" | "emerald";
+// Default SVG Placeholder Avatar DataURL
+const DEFAULT_AVATAR_DATA_URL = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="250" viewBox="0 0 200 250" fill="%230f172a"><rect width="200" height="250" fill="%230f172a"/><circle cx="100" cy="90" r="45" fill="%23334155"/><path d="M 30 220 C 30 150, 170 150, 170 220 Z" fill="%23334155"/><text x="100" y="240" font-family="sans-serif" font-size="12" fill="%237df9ff" text-anchor="middle">IMO PASFOTO</text></svg>`;
+
+const DEFAULT_CUSTOM_HTML = `<div style="width:100%; height:100%; padding:24px; background:linear-gradient(135deg, #07142e 0%, #020510 60%, #1a0b36 100%); color:#fff; border-radius:16px; border:2px solid #7df9ff; box-shadow:0 0 30px rgba(125,249,255,0.3); display:flex; flex-direction:column; justify-content:space-between; position:relative; overflow:hidden; font-family:sans-serif;">
+  
+  <!-- Header Card -->
+  <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(125,249,255,0.3); padding-bottom:12px; position:relative; z-index:4;">
+    <div style="font-family:monospace; font-weight:bold; font-size:18px; color:#7df9ff; letter-spacing:2px;">
+      IMO 2026 OFFICIAL ID
+    </div>
+    <span style="font-size:11px; padding:3px 10px; background:rgba(125,249,255,0.15); border:1px solid rgba(125,249,255,0.4); color:#7df9ff; border-radius:999px; font-family:monospace; text-transform:uppercase;">
+      {peran}
+    </span>
+  </div>
+
+  <!-- Main Body Section with Photo Layering -->
+  <div style="margin-top:16px; margin-bottom:16px; display:flex; align-items:center; gap:16px; position:relative; z-index:3;">
+    <!-- Pasfoto Photo Frame (Layer 1 & Layer 2) -->
+    <div style="position:relative; width:95px; height:120px; flex-shrink:0; border-radius:12px; overflow:hidden; border:2px solid #7df9ff; box-shadow:0 0 15px rgba(125,249,255,0.4); background:#0f172a;">
+      <!-- Layer 1: Cropped Pasfoto Image -->
+      <img src="{foto}" style="width:100%; height:100%; object-fit:cover; display:block;" alt="Pasfoto" />
+      <!-- Layer 2: Avatar Frame Overlay -->
+      <div style="position:absolute; inset:0; border:1px solid rgba(255,255,255,0.2); pointer-events:none; background:linear-gradient(180deg, rgba(255,255,255,0.15) 0%, transparent 50%);"></div>
+    </div>
+
+    <!-- Participant Details (Layer 4: Top Text Overlay) -->
+    <div style="flex-grow:1; display:flex; flex-direction:column; justify-content:center;">
+      <div style="font-size:22px; font-weight:900; color:#ffffff; letter-spacing:0.5px; line-height:1.2; margin-bottom:4px;">
+        {nama}
+      </div>
+      <div style="font-size:13px; font-family:monospace; color:#7df9ff; margin-bottom:3px;">
+        NIM: {nim}
+      </div>
+      <div style="font-size:13px; color:#e2e8f0; font-family:monospace; margin-bottom:3px;">
+        Kelompok: {kelompok}
+      </div>
+      <div style="font-size:11px; color:#94a3b8;">
+        Jurusan: {jurusan}
+      </div>
+    </div>
+  </div>
+
+  <!-- Motto Quote & Footer Section -->
+  <div style="position:relative; z-index:4;">
+    <div style="font-size:11px; font-style:italic; color:#b48cff; border-left:2px solid #b48cff; padding-left:8px; margin-bottom:12px;">
+      "{quote}"
+    </div>
+    <div style="font-size:11px; font-family:monospace; color:#64748b; border-top:1px solid rgba(255,255,255,0.1); padding-top:10px; display:flex; justify-content:space-between; align-items:center;">
+      <span>VERIFIED MEMBER</span>
+      <span>STATUS: ONLINE</span>
+    </div>
+  </div>
+</div>`;
 
 export default function IdCardGeneratorPage() {
-  const [fullName, setFullName] = useState<string>("Budi Santoso");
-  const [nim, setNim] = useState<string>("2026010042");
-  const [group, setGroup] = useState<string>("Kelompok 1");
-  const [major, setMajor] = useState<string>("Informatika / STEI");
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
-  const [colorTheme, setColorTheme] = useState<ColorTheme>("cyan");
-  const [showHologram, setShowHologram] = useState<boolean>(true);
+  const [customHtml, setCustomHtml] = useState<string>(DEFAULT_CUSTOM_HTML);
+  const [croppedPhoto, setCroppedPhoto] = useState<string>(DEFAULT_AVATAR_DATA_URL);
+
+  const [formValues, setFormValues] = useState<Record<string, string>>({
+    nama: "Budi Santoso",
+    nim: "2026010042",
+    kelompok: "Kelompok 1",
+    jurusan: "Informatika / STEI",
+    peran: "Peserta Resmi",
+    quote: "Different Minds, One Generation Chasing Glories",
+    foto: DEFAULT_AVATAR_DATA_URL,
+    photo: DEFAULT_AVATAR_DATA_URL,
+  });
+
   const [isExporting, setIsExporting] = useState<boolean>(false);
 
-  const cardRef = useRef<HTMLDivElement>(null);
+  // Cropper Modal States
+  const [showCropModal, setShowCropModal] = useState<boolean>(false);
+  const [rawImageSrc, setRawImageSrc] = useState<string | null>(null);
+  const [currentAspectRatio, setCurrentAspectRatio] = useState<number>(3 / 4);
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const cropperImageRef = useRef<HTMLImageElement | null>(null);
+  const cropperInstanceRef = useRef<Cropper | null>(null);
+
+  // Load Admin-configured HTML Template on Mount
+  useEffect(() => {
+    try {
+      const savedAdminTemplate = localStorage.getItem("imo2026_id_card_html_template");
+      if (savedAdminTemplate) {
+        setCustomHtml(savedAdminTemplate);
+      }
+    } catch (e) {
+      console.warn("Could not load saved admin template:", e);
+    }
+  }, []);
+
+  // Initialize Cropper.js instance reliably
+  const initCropper = useCallback(() => {
+    if (!cropperImageRef.current) return;
+
+    if (cropperInstanceRef.current) {
+      cropperInstanceRef.current.destroy();
+      cropperInstanceRef.current = null;
+    }
+
+    setTimeout(() => {
+      if (!cropperImageRef.current) return;
+      cropperInstanceRef.current = new Cropper(cropperImageRef.current, {
+        aspectRatio: currentAspectRatio,
+        viewMode: 1,
+        dragMode: "move",
+        autoCropArea: 0.9,
+        restore: false,
+        guides: true,
+        center: true,
+        highlight: false,
+        cropBoxMovable: true,
+        cropBoxResizable: true,
+        toggleDragModeOnDblclick: false,
+      });
+    }, 150);
+  }, [currentAspectRatio]);
+
+  useEffect(() => {
+    if (showCropModal && rawImageSrc) {
+      initCropper();
+    }
+    return () => {
+      if (cropperInstanceRef.current) {
+        cropperInstanceRef.current.destroy();
+        cropperInstanceRef.current = null;
+      }
+    };
+  }, [showCropModal, rawImageSrc, initCropper]);
+
+  // Extract text placeholders inside {key} automatically
+  const detectedPlaceholders = useMemo(() => {
+    const matches = customHtml.match(/{([a-zA-Z0-9_]+)}/g);
+    if (!matches) return [];
+    const keys = matches.map((m) => m.slice(1, -1));
+    return Array.from(new Set(keys));
+  }, [customHtml]);
+
+  // Handle Photo File Select
+  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      alert("Ukuran foto maksimal 5MB.");
+    if (file.size > 10 * 1024 * 1024) {
+      alert("Ukuran foto maksimal 10MB.");
       return;
     }
 
     const reader = new FileReader();
     reader.onload = () => {
-      setPhotoUrl(reader.result as string);
+      setRawImageSrc(reader.result as string);
+      setShowCropModal(true);
     };
     reader.readAsDataURL(file);
+    e.target.value = ""; // Reset input
   };
 
+  // Apply Cropped Photo
+  const handleApplyCrop = () => {
+    if (!cropperInstanceRef.current) return;
+
+    const canvas = cropperInstanceRef.current.getCroppedCanvas({
+      width: 600,
+      height: 800,
+      imageSmoothingEnabled: true,
+      imageSmoothingQuality: "high",
+    });
+
+    if (canvas) {
+      const croppedDataUrl = canvas.toDataURL("image/png");
+      setCroppedPhoto(croppedDataUrl);
+      setFormValues((prev) => ({
+        ...prev,
+        foto: croppedDataUrl,
+        photo: croppedDataUrl,
+      }));
+    }
+
+    setShowCropModal(false);
+  };
+
+  // Change Cropper Aspect Ratio
+  const handleChangeAspectRatio = (ratio: number) => {
+    setCurrentAspectRatio(ratio);
+    if (cropperInstanceRef.current) {
+      cropperInstanceRef.current.setAspectRatio(ratio);
+    }
+  };
+
+  // Cropper Controls
+  const handleZoom = (delta: number) => {
+    cropperInstanceRef.current?.zoom(delta);
+  };
+
+  const handleRotate = (degree: number) => {
+    cropperInstanceRef.current?.rotate(degree);
+  };
+
+  const handleResetCrop = () => {
+    cropperInstanceRef.current?.reset();
+  };
+
+  // Update dynamic form value
+  const handleInputChange = (key: string, value: string) => {
+    setFormValues((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
+  };
+
+  // Reset template to default
+  const handleResetTemplate = () => {
+    try {
+      localStorage.removeItem("imo2026_id_card_html_template");
+      setCustomHtml(DEFAULT_CUSTOM_HTML);
+    } catch (e) {
+      console.warn("Could not reset template:", e);
+    }
+  };
+
+  // Live replace placeholders inside HTML template
+  const renderedHtml = useMemo(() => {
+    let result = customHtml;
+
+    // Handle foto/photo placeholder replacement intelligently
+    ["foto", "photo"].forEach((photoKey) => {
+      const srcAttrMatch = result.includes(`src="{${photoKey}}"`) || result.includes(`src='{${photoKey}}'`);
+      const hrefAttrMatch =
+        result.includes(`href="{${photoKey}}"`) ||
+        result.includes(`href='{${photoKey}}'`) ||
+        result.includes(`xlink:href="{${photoKey}}"`) ||
+        result.includes(`xlink:href='{${photoKey}}'`);
+      const urlCSSMatch = result.includes(`url('{${photoKey}}')`) || result.includes(`url("{${photoKey}}")`) || result.includes(`url({${photoKey}})`);
+      const rawTagRegex = new RegExp(`{${photoKey}}`, "g");
+
+      if (srcAttrMatch || hrefAttrMatch || urlCSSMatch) {
+        result = result.replace(rawTagRegex, croppedPhoto);
+      } else if (result.includes(`{${photoKey}}`)) {
+        // Replace standalone {foto} with responsive contained image element
+        const imgElement = `<span style="display:inline-block; max-width:100%; max-height:100%; vertical-align:middle; overflow:hidden; border-radius:inherit;"><img src="${croppedPhoto}" style="max-width:100%; max-height:100%; width:auto; height:auto; object-fit:contain; display:block;" alt="Pasfoto" /></span>`;
+        result = result.replace(rawTagRegex, imgElement);
+      }
+    });
+
+    // Transform SVG motto text into pure SVG vector tspan elements FIRST before replacing general placeholders
+    const mottoVal = formValues["motto"] || formValues["quote"] || formValues["deskripsi"] || "";
+    const mottoTextToWrap = mottoVal || "{motto}";
+    const mottoWords = mottoTextToWrap.trim().split(/\s+/);
+    const mottoLines: string[] = [];
+    let mottoCurrentLine = "";
+    for (const word of mottoWords) {
+      if ((mottoCurrentLine + " " + word).trim().length <= 26) {
+        mottoCurrentLine = (mottoCurrentLine + " " + word).trim();
+      } else {
+        if (mottoCurrentLine) mottoLines.push(mottoCurrentLine);
+        mottoCurrentLine = word;
+      }
+    }
+    if (mottoCurrentLine) mottoLines.push(mottoCurrentLine);
+
+    const displayMottoLines = mottoLines.slice(0, 3);
+    const mottoLineHeight = 6.2;
+    const mottoTotalHeight = (displayMottoLines.length - 1) * mottoLineHeight;
+    const mottoInitialY = 241 - mottoTotalHeight / 2;
+
+    const mottoTspans = displayMottoLines
+      .map((line, idx) => {
+        const lineY = mottoInitialY + idx * mottoLineHeight;
+        return `<tspan x="136" y="${lineY.toFixed(2)}">${line}</tspan>`;
+      })
+      .join("");
+
+    const svgWrappedMotto = `<text fill="#0b1e36" font-size="5.2" font-family="'Griffy', cursive, sans-serif" font-weight="bold" dominant-baseline="central" text-anchor="start">${mottoTspans}</text>`;
+
+    result = result.replace(
+      /<foreignObject\b[^>]*>(?:(?!<\/foreignObject>)[\s\S])*?(\{motto\}|\{quote\}|\{deskripsi\})(?:(?!<\/foreignObject>)[\s\S])*?<\/foreignObject>/gi,
+      svgWrappedMotto
+    );
+    result = result.replace(
+      /<text\b[^>]*>(?:(?!<\/text>)[\s\S])*?(\{motto\}|\{quote\}|\{deskripsi\})(?:(?!<\/text>)[\s\S])*?<\/text>/gi,
+      svgWrappedMotto
+    );
+    result = result.replace(/\{motto\}|\{quote\}/g, svgWrappedMotto);
+
+    // Replace font-family in SVG text tags to Griffy
+    result = result.replace(/font-family="[^"]*"/gi, `font-family="'Griffy', cursive, sans-serif"`);
+
+    detectedPlaceholders.forEach((key) => {
+      if (key === "foto" || key === "photo" || key === "motto" || key === "quote" || key === "deskripsi") return;
+      let val = formValues[key];
+      if (val === undefined || val === "") {
+        val = `{${key}}`;
+      }
+      const regex = new RegExp(`{${key}}`, "g");
+      result = result.replace(regex, val);
+    });
+
+    // Scope <style> blocks so CSS rules don't leak into outer document
+    return result.replace(/<style\b[^>]*>([\s\S]*?)<\/style>/gi, (match, cssContent) => {
+      const scopedCss = cssContent.replace(
+        /([^{}+>,\s][^{}]+)\s*\{/g,
+        (m: string, selector: string) => {
+          const trimmed = selector.trim();
+          if (trimmed.startsWith("@")) return m;
+          const scopedSelectors = trimmed
+            .split(",")
+            .map((s: string) => `.id-card-preview-scope ${s.trim()}`)
+            .join(", ");
+          return `${scopedSelectors} {`;
+        }
+      );
+      return `<style>${scopedCss}</style>`;
+    });
+  }, [customHtml, detectedPlaceholders, formValues, croppedPhoto]);
+
+  // Export PNG Function - inject Griffy font into live SVG defs BEFORE html-to-image clones DOM
   const handleExportPng = useCallback(async () => {
     if (!cardRef.current) return;
     setIsExporting(true);
 
-    try {
-      await new Promise((res) => setTimeout(res, 200));
+    // Track injected nodes for cleanup
+    const injectedNodes: { parent: Element; child: Element }[] = [];
 
-      const dataUrl = await toPng(cardRef.current, {
-        cacheBust: true,
-        pixelRatio: 2,
-        quality: 0.95,
+    try {
+      // Step 1: Wait for fonts
+      if (typeof document !== "undefined" && document.fonts) {
+        await document.fonts.load("1em 'Griffy'");
+        await document.fonts.ready;
+      }
+
+      const container = cardRef.current;
+
+      // Step 2: Inject font into EVERY SVG element's defs on live DOM
+      // html-to-image will clone the live DOM including our injected styles
+      const allSvgs = Array.from(container.querySelectorAll("svg"));
+      // Also inject into the container's root if it IS an svg
+      if (container instanceof SVGElement) allSvgs.unshift(container as unknown as SVGSVGElement);
+
+      for (const svgEl of allSvgs) {
+        let defs = svgEl.querySelector(":scope > defs");
+        if (!defs) {
+          defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+          svgEl.prepend(defs);
+          injectedNodes.push({ parent: svgEl, child: defs });
+        }
+        const style = document.createElementNS("http://www.w3.org/2000/svg", "style");
+        style.textContent = GRIFFY_FONT_BASE64;
+        defs.prepend(style);
+        injectedNodes.push({ parent: defs, child: style });
+      }
+
+      // Step 3: Also inject a <style> into document head as extra coverage
+      const headStyle = document.createElement("style");
+      headStyle.id = "__griffy_export_style__";
+      headStyle.textContent = GRIFFY_FONT_BASE64;
+      document.head.appendChild(headStyle);
+
+      // Step 4: Wait one frame for the browser to parse the injected styles
+      await new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res)));
+      await new Promise((res) => setTimeout(res, 150));
+
+      // Step 5: Export via html-to-image
+      const dataUrl = await toPng(container, {
+        cacheBust: false,
+        pixelRatio: 4,
+        quality: 1.0,
+        fontEmbedCSS: GRIFFY_FONT_BASE64,
         skipFonts: true,
+        imagePlaceholder: "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7",
+        filter: (node) => {
+          if (node instanceof HTMLElement && (node.id === "eruda" || node.tagName === "SCRIPT")) return false;
+          return true;
+        },
       });
 
       const link = document.createElement("a");
-      const safeName = fullName.trim().replace(/[^a-zA-Z0-9]/g, "_") || "IMO_Participant";
+      const activeName = formValues["nama"] || "Participant";
+      const safeName = activeName.trim().replace(/[^a-zA-Z0-9]/g, "_") || "IMO_Participant";
       link.download = `ID_CARD_IMO2026_${safeName}.png`;
       link.href = dataUrl;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-    } catch (err) {
-      console.error("Export Error:", err);
-      alert("Gagal mengunduh ID Card secara otomatis. Silakan ambil tangkapan layar (screenshot) kartu identitas Anda.");
+
+    } catch (err: any) {
+      console.error("Export failed:", err);
+      alert("Gagal memproses gambar. Silakan coba lagi.");
     } finally {
+      // Cleanup all injected nodes
+      for (const { parent, child } of injectedNodes) {
+        if (parent.contains(child)) parent.removeChild(child);
+      }
+      const headStyle = document.getElementById("__griffy_export_style__");
+      if (headStyle) document.head.removeChild(headStyle);
       setIsExporting(false);
     }
-  }, [fullName]);
+  }, [formValues]);
 
-  const themeStyles = {
-    cyan: {
-      border: "border-accent-cyan/60",
-      glow: "shadow-[0_0_40px_rgba(125,249,255,0.3)]",
-      badgeBg: "bg-accent-cyan/15 border-accent-cyan/40 text-accent-cyan",
-      textGlow: "glow-text-cyan text-accent-cyan",
-      gradient: "from-accent-cyan/20 via-slate-950 to-slate-950",
-      accentBg: "bg-accent-cyan text-black",
-    },
-    purple: {
-      border: "border-accent-purple/60",
-      glow: "shadow-[0_0_40px_rgba(180,140,255,0.3)]",
-      badgeBg: "bg-accent-purple/15 border-accent-purple/40 text-accent-purple",
-      textGlow: "glow-text-purple text-accent-purple",
-      gradient: "from-accent-purple/20 via-slate-950 to-slate-950",
-      accentBg: "bg-accent-purple text-black",
-    },
-    gold: {
-      border: "border-accent-yellow/60",
-      glow: "shadow-[0_0_40px_rgba(255,209,102,0.3)]",
-      badgeBg: "bg-accent-yellow/15 border-accent-yellow/40 text-accent-yellow",
-      textGlow: "glow-text-yellow text-accent-yellow",
-      gradient: "from-accent-yellow/20 via-slate-950 to-slate-950",
-      accentBg: "bg-accent-yellow text-black",
-    },
-    emerald: {
-      border: "border-emerald-500/60",
-      glow: "shadow-[0_0_40px_rgba(16,185,129,0.3)]",
-      badgeBg: "bg-emerald-500/15 border-emerald-500/40 text-emerald-400",
-      textGlow: "text-emerald-400",
-      gradient: "from-emerald-500/20 via-slate-950 to-slate-950",
-      accentBg: "bg-emerald-400 text-black",
-    },
+  // Format label from placeholder key (e.g. nomor_hp -> Nomor Hp)
+  const formatLabel = (key: string) => {
+    const keyMap: Record<string, string> = {
+      nama: "Nama Lengkap",
+      nim: "NIM / Nomor Peserta",
+      kelompok: "Kelompok",
+      jurusan: "Jurusan / Fakultas",
+      peran: "Peran / Status Peserta",
+      quote: "Motto / Jargon",
+      foto: "Unggah & Potong Pasfoto",
+      photo: "Unggah & Potong Pasfoto",
+    };
+    if (keyMap[key.toLowerCase()]) return keyMap[key.toLowerCase()];
+    return key
+      .split("_")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
   };
-
-  const currentTheme = themeStyles[colorTheme];
-
-  const qrPayload = JSON.stringify({
-    org: "IMO 2026",
-    name: fullName,
-    nim: nim,
-    group: group,
-    hash: `IMO-${nim}-${group.replace(/\s+/g, "")}`,
-  });
 
   return (
     <div className="relative min-h-screen flex flex-col z-0 overflow-hidden bg-[#020510] text-slate-100 font-sans">
@@ -130,296 +449,263 @@ export default function IdCardGeneratorPage() {
       <Navbar />
 
       <main className="flex-grow max-w-6xl mx-auto w-full px-4 py-12 relative z-10">
+        {/* Header Title */}
         <div className="text-center mb-10">
           <div className="inline-flex items-center space-x-2 px-3.5 py-1 rounded-full border border-accent-cyan/30 bg-accent-cyan/5 text-accent-cyan text-xs font-bold uppercase tracking-wider mb-4">
             <CreditCard className="h-4 w-4" />
-            <span>100% Client-Side Engine</span>
+            <span>Kartu Identitas Resmi IMO 2026</span>
           </div>
           <h1 className="text-3xl md:text-5xl font-display font-black tracking-wider text-slate-100 mb-3">
             ID CARD GENERATOR
           </h1>
           <p className="text-slate-400 text-sm md:text-base max-w-2xl mx-auto leading-relaxed">
-            Buat & kustomisasi Kartu Identitas Resmi IMO 2026 secara instan. Pemrosesan dilakukan **100% di perangkat Anda** tanpa mengunggah berkas ke server.
+            Isi formulir dan unggah pasfoto Anda. Gunakan fitur **Pemotong Foto Interaktif** untuk mendapatkan ukuran pasfoto yang presisi.
           </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+
+          {/* LEFT SIDE: CLEAN USER FORM */}
           <div className="lg:col-span-6 space-y-6">
             <Card glowColor="purple">
               <h3 className="font-display font-bold text-lg text-slate-100 mb-4 flex items-center space-x-2 border-b border-card-border/30 pb-3">
                 <User className="h-5 w-5 text-accent-cyan" />
-                <span>Informasi Peserta</span>
+                <span>Formulir Data Peserta</span>
               </h3>
 
-              <div className="space-y-4 text-xs font-sans">
-                <div>
-                  <label className="block text-slate-400 uppercase font-mono tracking-wider mb-1.5">
-                    Nama Lengkap
-                  </label>
-                  <input
-                    type="text"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="Masukkan nama lengkap Anda..."
-                    className="w-full px-4 py-2.5 rounded-xl bg-slate-950/80 border border-card-border/50 text-slate-100 text-sm focus:outline-none focus:border-accent-cyan/60"
-                  />
-                </div>
+              {/* Photo Upload Section */}
+              <div className="mb-5 pb-5 border-b border-card-border/30">
+                <label className="block text-slate-300 uppercase font-mono tracking-wider mb-2 font-bold text-xs flex items-center space-x-2">
+                  <ImageIcon className="h-4 w-4 text-accent-cyan" />
+                  <span>Foto Profil / Pasfoto Peserta</span>
+                </label>
 
-                <div>
-                  <label className="block text-slate-400 uppercase font-mono tracking-wider mb-1.5">
-                    NIM / Nomor Peserta
-                  </label>
-                  <input
-                    type="text"
-                    value={nim}
-                    onChange={(e) => setNim(e.target.value)}
-                    placeholder="Contoh: 2026010042"
-                    className="w-full px-4 py-2.5 rounded-xl bg-slate-950/80 border border-card-border/50 text-slate-100 text-sm focus:outline-none focus:border-accent-cyan/60 font-mono"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-slate-400 uppercase font-mono tracking-wider mb-1.5">
-                      Kelompok
-                    </label>
-                    <select
-                      value={group}
-                      onChange={(e) => setGroup(e.target.value)}
-                      className="w-full px-4 py-2.5 rounded-xl bg-slate-950/80 border border-card-border/50 text-slate-100 text-sm focus:outline-none focus:border-accent-cyan/60"
-                    >
-                      {[...Array(20)].map((_, i) => (
-                        <option key={i} value={`Kelompok ${i + 1}`}>
-                          Kelompok {i + 1}
-                        </option>
-                      ))}
-                    </select>
+                <div className="flex items-center space-x-4">
+                  <div className="w-16 h-20 rounded-xl overflow-hidden bg-slate-950 border border-card-border/60 flex-shrink-0 relative shadow-inner">
+                    <img src={croppedPhoto} alt="Preview Pasfoto" className="w-full h-full object-cover" />
                   </div>
 
-                  <div>
-                    <label className="block text-slate-400 uppercase font-mono tracking-wider mb-1.5">
-                      Program Studi / Fakultas
-                    </label>
-                    <input
-                      type="text"
-                      value={major}
-                      onChange={(e) => setMajor(e.target.value)}
-                      placeholder="Contoh: Informatika"
-                      className="w-full px-4 py-2.5 rounded-xl bg-slate-950/80 border border-card-border/50 text-slate-100 text-sm focus:outline-none focus:border-accent-cyan/60"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-slate-400 uppercase font-mono tracking-wider mb-1.5">
-                    Foto Profil (Maks. 5MB)
-                  </label>
-                  <div className="flex items-center space-x-3">
-                    <label className="flex-grow flex items-center justify-center space-x-2 px-4 py-2.5 rounded-xl bg-slate-950 border border-dashed border-card-border/60 hover:border-accent-cyan text-slate-300 text-xs font-semibold cursor-pointer transition">
-                      <Upload className="h-4 w-4 text-accent-cyan" />
-                      <span>{photoUrl ? "Ganti Foto Profil" : "Unggah Foto dari Perangkat"}</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handlePhotoUpload}
-                        className="hidden"
-                      />
+                  <div className="flex-grow space-y-2">
+                    <label className="w-full px-4 py-2.5 rounded-xl bg-accent-cyan/15 hover:bg-accent-cyan/25 border border-accent-cyan/40 text-accent-cyan text-xs font-mono font-bold uppercase tracking-wider flex items-center justify-center space-x-2 cursor-pointer transition touch-manipulation">
+                      <Upload className="h-4 w-4" />
+                      <span>{croppedPhoto !== DEFAULT_AVATAR_DATA_URL ? "Ganti & Potong Foto" : "Unggah & Potong Foto"}</span>
+                      <input type="file" accept="image/*" onChange={handlePhotoSelect} className="hidden" />
                     </label>
 
-                    {photoUrl && (
-                      <button
-                        onClick={() => setPhotoUrl(null)}
-                        className="px-3 py-2 rounded-xl bg-rose-500/20 text-rose-300 text-xs font-bold hover:bg-rose-500 hover:text-white transition"
-                        title="Hapus foto"
-                      >
-                        Hapus
-                      </button>
-                    )}
+                    <p className="text-[11px] text-slate-400 font-mono">
+                      Mendukung format JPG, PNG, WEBP (Maks 10MB).
+                    </p>
                   </div>
                 </div>
               </div>
+
+              {/* Dynamic Text Input Fields */}
+              {detectedPlaceholders.length === 0 ? (
+                <p className="text-xs text-slate-400 py-4 italic">
+                  Belum ada templat kartu yang dikonfigurasi.
+                </p>
+              ) : (
+                <div className="space-y-4 text-xs font-sans">
+                  {detectedPlaceholders
+                    .filter((key) => key !== "foto" && key !== "photo")
+                    .map((key) => {
+                      const isLongText = key === "quote" || key === "deskripsi" || key === "motto";
+
+                      return (
+                        <div key={key}>
+                          <label className="block text-slate-300 uppercase font-mono tracking-wider mb-1.5 font-bold">
+                            {formatLabel(key)}
+                          </label>
+
+                          {isLongText ? (
+                            <textarea
+                              rows={2}
+                              value={formValues[key] || ""}
+                              onChange={(e) => handleInputChange(key, e.target.value)}
+                              placeholder={`Masukkan ${formatLabel(key).toLowerCase()}...`}
+                              className="w-full px-4 py-2.5 rounded-xl bg-slate-950/80 border border-card-border/50 text-slate-100 text-sm focus:outline-none focus:border-accent-cyan/60 font-sans"
+                            />
+                          ) : (
+                            <input
+                              type="text"
+                              value={formValues[key] || ""}
+                              onChange={(e) => handleInputChange(key, e.target.value)}
+                              placeholder={`Masukkan ${formatLabel(key).toLowerCase()}...`}
+                              className="w-full px-4 py-2.5 rounded-xl bg-slate-950/80 border border-card-border/50 text-slate-100 text-sm focus:outline-none focus:border-accent-cyan/60 font-sans"
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
             </Card>
+          </div>
 
-            <Card glowColor="cyan">
-              <h3 className="font-display font-bold text-lg text-slate-100 mb-4 flex items-center space-x-2 border-b border-card-border/30 pb-3">
-                <Palette className="h-5 w-5 text-accent-purple" />
-                <span>Kustomisasi Tampilan</span>
-              </h3>
+          {/* RIGHT SIDE: LIVE CARD PREVIEW & DOWNLOAD */}
+          <div className="lg:col-span-6 sticky top-24 space-y-6">
+            <Card glowColor="cyan" className="flex flex-col items-center">
+              <div className="w-full flex justify-between items-center mb-6 border-b border-card-border/30 pb-3 flex-wrap gap-2">
+                <span className="font-mono text-xs text-accent-cyan font-bold uppercase tracking-wider flex items-center space-x-1.5">
+                  <Sparkles className="h-4 w-4" />
+                  <span>Preview Tampilan Kartu</span>
+                </span>
 
-              <div className="space-y-4 text-xs">
-                <div>
-                  <label className="block text-slate-400 uppercase font-mono tracking-wider mb-2">
-                    Skema Warna Kartu:
-                  </label>
-                  <div className="grid grid-cols-4 gap-2">
-                    {[
-                      { id: "cyan", label: "Cyan Neon", color: "bg-accent-cyan" },
-                      { id: "purple", label: "Nebula Purple", color: "bg-accent-purple" },
-                      { id: "gold", label: "Gold Horizon", color: "bg-accent-yellow" },
-                      { id: "emerald", label: "Emerald Cyber", color: "bg-emerald-400" },
-                    ].map((t) => (
-                      <button
-                        key={t.id}
-                        onClick={() => setColorTheme(t.id as ColorTheme)}
-                        className={`flex flex-col items-center justify-center p-2.5 rounded-xl border transition cursor-pointer ${
-                          colorTheme === t.id
-                            ? "border-accent-cyan bg-slate-900 shadow-[0_0_15px_rgba(125,249,255,0.3)]"
-                            : "border-card-border/40 bg-slate-950/60 hover:bg-slate-900"
-                        }`}
-                      >
-                        <div className={`h-4 w-4 rounded-full ${t.color} mb-1.5`} />
-                        <span className="text-[10px] text-slate-300 font-mono">{t.label}</span>
-                      </button>
-                    ))}
-                  </div>
+                <button
+                  onClick={handleExportPng}
+                  disabled={isExporting}
+                  className="px-4 py-2 rounded-xl bg-accent-cyan hover:bg-cyan-300 text-black text-xs font-mono font-bold uppercase tracking-wider transition shadow-[0_0_15px_rgba(125,249,255,0.4)] flex items-center space-x-1.5 cursor-pointer disabled:opacity-50 touch-manipulation"
+                >
+                  <Download className="h-4 w-4" />
+                  <span>{isExporting ? "Memproses..." : "Unduh Gambar PNG"}</span>
+                </button>
+              </div>
+
+              {/* CARD PREVIEW CANVAS FOR PNG DOWNLOAD */}
+              <div className="w-full flex justify-center items-center overflow-hidden py-2">
+                <div
+                  ref={cardRef}
+                  className="w-full max-w-[450px] min-h-[250px] rounded-2xl relative select-none overflow-hidden transition-all duration-500 shadow-2xl flex flex-col justify-center items-center"
+                  style={{ textRendering: "geometricPrecision", shapeRendering: "geometricPrecision" }}
+                >
+                  <div
+                    className="id-card-preview-scope w-full h-full flex flex-col justify-center items-center"
+                    dangerouslySetInnerHTML={{ __html: renderedHtml }}
+                  />
                 </div>
+              </div>
 
-                <div className="flex items-center justify-between pt-2">
-                  <div>
-                    <span className="font-bold text-slate-200 block">Stempel Hologram IMO</span>
-                    <span className="text-[11px] text-slate-400">Tampilkan efek watermark hologram otentikasi.</span>
-                  </div>
-                  <button
-                    onClick={() => setShowHologram(!showHologram)}
-                    className={`w-12 h-6 rounded-full p-1 transition duration-300 cursor-pointer ${
-                      showHologram ? "bg-accent-cyan" : "bg-slate-800"
-                    }`}
-                  >
-                    <div
-                      className={`h-4 w-4 rounded-full bg-slate-950 transition transform ${
-                        showHologram ? "translate-x-6" : "translate-x-0"
-                      }`}
-                    />
-                  </button>
-                </div>
+              <div className="mt-6 text-center text-xs text-slate-500 font-mono">
+                Isi form di sebelah kiri untuk melihat perubahan secara live, lalu klik tombol **Unduh Gambar PNG**.
               </div>
             </Card>
           </div>
 
-          <div className="lg:col-span-6 flex flex-col items-center space-y-6">
-            <div className="w-full flex items-center justify-between px-2">
-              <span className="text-xs font-mono text-slate-400 uppercase tracking-widest flex items-center space-x-1.5">
-                <Sparkles className="h-4 w-4 text-accent-cyan" />
-                <span>Pratinjau Kartu Real-Time</span>
-              </span>
-              <span className="text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full">
-                Ready to Render
-              </span>
-            </div>
-
-            <div className="w-full flex justify-center overflow-x-auto p-2">
-              <div
-                ref={cardRef}
-                className={`relative w-[340px] sm:w-[380px] h-[580px] sm:h-[620px] rounded-3xl bg-slate-950 border-2 ${currentTheme.border} ${currentTheme.glow} ${currentTheme.gradient} bg-gradient-to-b flex flex-col justify-between p-6 overflow-hidden select-none shadow-2xl transition-all duration-300`}
-              >
-                <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b15_1px,transparent_1px),linear-gradient(to_bottom,#1e293b15_1px,transparent_1px)] bg-[size:16px_16px] pointer-events-none" />
-
-                {showHologram && (
-                  <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(125,249,255,0.1),transparent_60%)] pointer-events-none flex items-center justify-center">
-                    <div className="opacity-10 rotate-45 select-none pointer-events-none text-center">
-                      <ShieldCheck className="h-48 w-48 text-accent-cyan mx-auto mb-2" />
-                      <span className="font-display font-black text-2xl tracking-widest text-slate-100 uppercase">
-                        OFFICIAL PARTICIPANT
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                <div className="relative z-10 flex items-center justify-between border-b border-card-border/40 pb-4">
-                  <div className="flex items-center space-x-2">
-                    <ImoLogo height={32} />
-                    <span className="font-display font-extrabold text-accent-purple text-base">2026</span>
-                  </div>
-                  <span className={`text-[9px] font-mono font-extrabold uppercase px-2.5 py-1 rounded-full border ${currentTheme.badgeBg}`}>
-                    MEMBER PASS
-                  </span>
-                </div>
-
-                <div className="relative z-10 my-auto flex flex-col items-center text-center py-2">
-                  <div className={`relative h-28 w-28 sm:h-32 sm:w-32 rounded-2xl p-1 bg-slate-900 border-2 ${currentTheme.border} shadow-[0_0_25px_rgba(0,0,0,0.8)] overflow-hidden mb-4`}>
-                    {photoUrl ? (
-                      <img
-                        src={photoUrl}
-                        alt="Foto Profil"
-                        className="w-full h-full object-cover rounded-xl"
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-slate-950 flex flex-col items-center justify-center text-slate-600">
-                        <ImageIcon className="h-10 w-10 mb-1 opacity-50" />
-                        <span className="text-[10px] font-mono">Belum ada foto</span>
-                      </div>
-                    )}
-                    
-                    <div className="absolute bottom-1 right-1 p-1 rounded-full bg-slate-950 border border-accent-cyan/60 text-accent-cyan shadow-md">
-                      <ShieldCheck className="h-3.5 w-3.5" />
-                    </div>
-                  </div>
-
-                  <h2 className="font-display font-black text-lg sm:text-xl text-slate-100 tracking-wide uppercase leading-snug line-clamp-1">
-                    {fullName || "NAMA PESERTA"}
-                  </h2>
-                  <p className="text-xs font-mono font-bold text-slate-400 tracking-wider mb-2">
-                    NIM: {nim || "2026000000"}
-                  </p>
-
-                  <div className="flex flex-wrap gap-1.5 justify-center">
-                    <span className={`text-[10px] font-mono font-bold uppercase px-3 py-1 rounded-full border ${currentTheme.badgeBg}`}>
-                      {group}
-                    </span>
-                    <span className="text-[10px] font-mono font-bold uppercase px-3 py-1 rounded-full bg-slate-900/90 border border-slate-800 text-slate-300">
-                      {major || "Program Studi"}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="relative z-10 pt-4 border-t border-card-border/40 flex items-center justify-between bg-slate-950/60 p-3 rounded-2xl border border-card-border/30">
-                  <div className="text-left space-y-0.5">
-                    <span className="text-[9px] font-mono text-slate-400 uppercase tracking-widest block">AUTHENTICATION</span>
-                    <span className="text-[10px] font-mono font-bold text-accent-cyan block">IMO-VERIFIED-PASS</span>
-                    <span className="text-[8px] font-mono text-slate-500 uppercase block">IMO 2026 OFFICIAL BADGE</span>
-                  </div>
-
-                  <div className="p-1.5 rounded-xl bg-white border border-slate-700 shadow-md">
-                    <QRCodeSVG
-                      value={qrPayload}
-                      size={54}
-                      bgColor={"#FFFFFF"}
-                      fgColor={"#050810"}
-                      level={"M"}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="w-full max-w-[380px]">
-              <button
-                onClick={handleExportPng}
-                disabled={isExporting}
-                className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-accent-cyan via-accent-purple to-accent-cyan hover:opacity-95 text-black font-display font-black text-sm uppercase tracking-widest shadow-[0_0_30px_rgba(125,249,255,0.4)] transition duration-300 flex items-center justify-center space-x-3 cursor-pointer disabled:opacity-50"
-              >
-                {isExporting ? (
-                  <>
-                    <RefreshCw className="h-5 w-5 animate-spin" />
-                    <span>Merekam Gambar (100% Client)...</span>
-                  </>
-                ) : (
-                  <>
-                    <Download className="h-5 w-5" />
-                    <span>Unduh ID Card (High-Res PNG)</span>
-                  </>
-                )}
-              </button>
-              <p className="text-[11px] text-slate-400 text-center font-mono mt-2">
-                *Diproses 100% di browser Anda (Android Chrome & iOS Safari Support).
-              </p>
-            </div>
-          </div>
         </div>
       </main>
 
+      {/* CROPPER.JS INTERACTIVE MODAL */}
+      {showCropModal && rawImageSrc && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn">
+          <div className="glass rounded-2xl p-6 border border-accent-cyan/40 max-w-xl w-full flex flex-col max-h-[90vh] shadow-2xl">
+            {/* Modal Header */}
+            <div className="flex justify-between items-center pb-4 border-b border-card-border/40 mb-4">
+              <div className="flex items-center space-x-2">
+                <Crop className="h-5 w-5 text-accent-cyan" />
+                <h3 className="font-display font-bold text-lg text-slate-100">
+                  Potong & Atur Pasfoto Peserta
+                </h3>
+              </div>
+
+              <button
+                onClick={() => setShowCropModal(false)}
+                className="p-1.5 rounded-xl bg-slate-900 text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Cropper Work Area */}
+            <div className="relative w-full h-[320px] sm:h-[380px] bg-slate-950 rounded-xl overflow-hidden mb-4 border border-card-border/60 flex items-center justify-center">
+              <img
+                ref={cropperImageRef}
+                src={rawImageSrc}
+                alt="Target Crop"
+                onLoad={initCropper}
+                className="max-h-full max-w-full block"
+              />
+            </div>
+
+            {/* Toolbar Controls */}
+            <div className="space-y-4">
+              {/* Aspect Ratio Presets */}
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-mono text-slate-400 font-bold uppercase tracking-wider">
+                  Rasio Bingkai:
+                </span>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => handleChangeAspectRatio(3 / 4)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition border cursor-pointer ${currentAspectRatio === 3 / 4
+                        ? "bg-accent-cyan text-black border-accent-cyan shadow-[0_0_10px_rgba(125,249,255,0.4)]"
+                        : "bg-slate-950 border-card-border/60 text-slate-300 hover:border-accent-cyan"
+                      }`}
+                  >
+                    3:4 (Pasfoto Formal)
+                  </button>
+
+                  <button
+                    onClick={() => handleChangeAspectRatio(1)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition border cursor-pointer ${currentAspectRatio === 1
+                        ? "bg-accent-cyan text-black border-accent-cyan shadow-[0_0_10px_rgba(125,249,255,0.4)]"
+                        : "bg-slate-950 border-card-border/60 text-slate-300 hover:border-accent-cyan"
+                      }`}
+                  >
+                    1:1 (Square)
+                  </button>
+                </div>
+              </div>
+
+              {/* Manipulation Buttons (Rotate, Zoom, Reset) */}
+              <div className="flex items-center justify-between gap-2 pt-2 border-t border-card-border/30">
+                <div className="flex items-center space-x-1.5">
+                  <button
+                    onClick={() => handleRotate(-90)}
+                    className="p-2 rounded-xl bg-slate-900 border border-card-border/60 text-slate-300 hover:text-accent-cyan hover:border-accent-cyan transition cursor-pointer"
+                    title="Putar Kiri 90°"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                  </button>
+
+                  <button
+                    onClick={() => handleRotate(90)}
+                    className="p-2 rounded-xl bg-slate-900 border border-card-border/60 text-slate-300 hover:text-accent-cyan hover:border-accent-cyan transition cursor-pointer"
+                    title="Putar Kanan 90°"
+                  >
+                    <RotateCw className="h-4 w-4" />
+                  </button>
+
+                  <button
+                    onClick={() => handleZoom(0.1)}
+                    className="p-2 rounded-xl bg-slate-900 border border-card-border/60 text-slate-300 hover:text-accent-cyan hover:border-accent-cyan transition cursor-pointer"
+                    title="Perbesar (Zoom In)"
+                  >
+                    <ZoomIn className="h-4 w-4" />
+                  </button>
+
+                  <button
+                    onClick={() => handleZoom(-0.1)}
+                    className="p-2 rounded-xl bg-slate-900 border border-card-border/60 text-slate-300 hover:text-accent-cyan hover:border-accent-cyan transition cursor-pointer"
+                    title="Perkecil (Zoom Out)"
+                  >
+                    <ZoomOut className="h-4 w-4" />
+                  </button>
+
+                  <button
+                    onClick={handleResetCrop}
+                    className="p-2 rounded-xl bg-slate-900 border border-card-border/60 text-slate-300 hover:text-accent-cyan hover:border-accent-cyan transition cursor-pointer"
+                    title="Reset Pemotongan"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                  </button>
+                </div>
+
+                {/* Submit / Apply Button */}
+                <button
+                  onClick={handleApplyCrop}
+                  className="px-5 py-2.5 rounded-xl bg-accent-cyan hover:bg-cyan-300 text-black text-xs font-mono font-bold uppercase tracking-wider transition shadow-[0_0_15px_rgba(125,249,255,0.4)] flex items-center space-x-1.5 cursor-pointer touch-manipulation"
+                >
+                  <Check className="h-4 w-4" />
+                  <span>Potong & Terapkan Foto</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <footer className="w-full py-8 text-center text-xs text-slate-500 font-mono border-t border-card-border/20 mt-16 bg-background/50">
-        &copy; {new Date().getFullYear()} IMO 2026. Client-Side ID Card Engine.
+        &copy; {new Date().getFullYear()} IMO 2026 Official ID Card Engine.
       </footer>
     </div>
   );
