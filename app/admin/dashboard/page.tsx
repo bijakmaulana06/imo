@@ -66,8 +66,10 @@ export default function AdminDashboardPage() {
   const [showAddAnnoModal, setShowAddAnnoModal] = useState(false);
   const [newAnno, setNewAnno] = useState({
     title: "",
-    content: "",
-    category: "PENTING",
+    notes: "",
+    gdrive_url: "",
+    autoform_url: "/documents",
+    category: "Contoh Surat",
     pinned: false,
   });
 
@@ -340,10 +342,23 @@ export default function AdminDashboardPage() {
   const handleCreateAnno = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const { error } = await supabase.from("announcements").insert([newAnno]);
+      // Store notes, gdrive_url & autoform_url inside content JSON for maximum schema compatibility
+      const contentPayload = JSON.stringify({
+        notes: newAnno.notes,
+        gdrive_url: newAnno.gdrive_url,
+        autoform_url: newAnno.autoform_url,
+      });
+
+      const { error } = await supabase.from("announcements").insert([{
+        title: newAnno.title,
+        content: contentPayload,
+        category: newAnno.category,
+        pinned: newAnno.pinned,
+      }]);
+
       if (error) throw error;
       setShowAddAnnoModal(false);
-      setNewAnno({ title: "", content: "", category: "PENTING", pinned: false });
+      setNewAnno({ title: "", notes: "", gdrive_url: "", autoform_url: "/documents", category: "Contoh Surat", pinned: false });
       loadData();
     } catch (err: any) {
       alert("Gagal menambahkan pengumuman: " + err.message);
@@ -389,33 +404,43 @@ export default function AdminDashboardPage() {
       </header>
 
       <main className="flex-grow max-w-6xl mx-auto w-full px-4 py-10 relative z-10">
-        <div className="flex flex-wrap gap-3 mb-8 border-b border-card-border/30 pb-4">
-          {[
-            { id: "links", label: "Grid Menu Links (/hub)", icon: Layers, count: links.length },
-            { id: "contacts", label: "Kontak LO (/contact)", icon: Users, count: contacts.length },
-            { id: "announcements", label: "Pengumuman Misi", icon: Megaphone, count: announcements.length },
-            { id: "templates", label: "Template ID Card", icon: CreditCard, count: templates.length },
-          ].map((t) => {
-            const Icon = t.icon;
-            const isCurrent = activeTab === t.id;
-            return (
-              <button
-                key={t.id}
-                onClick={() => setActiveTab(t.id as ActiveTab)}
-                className={`flex items-center space-x-2 px-5 py-2.5 rounded-2xl text-xs font-bold transition duration-300 cursor-pointer ${
-                  isCurrent
-                    ? "bg-accent-cyan text-black font-extrabold shadow-[0_0_20px_rgba(125,249,255,0.35)]"
-                    : "bg-slate-900/80 text-slate-300 hover:bg-slate-800 border border-card-border/40"
-                }`}
-              >
-                <Icon className="h-4 w-4" />
-                <span>{t.label}</span>
-                <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono ${isCurrent ? "bg-black/30 text-black" : "bg-slate-800 text-slate-400"}`}>
-                  {t.count}
-                </span>
-              </button>
-            );
-          })}
+        <div className="flex flex-wrap gap-3 mb-8 border-b border-card-border/30 pb-4 items-center justify-between">
+          <div className="flex flex-wrap gap-3">
+            {[
+              { id: "links", label: "Grid Menu Links (/hub)", icon: Layers, count: links.length },
+              { id: "contacts", label: "Kontak LO (/contact)", icon: Users, count: contacts.length },
+              { id: "announcements", label: "Pengumuman Misi", icon: Megaphone, count: announcements.length },
+              { id: "templates", label: "Template ID Card", icon: CreditCard, count: templates.length },
+            ].map((t) => {
+              const Icon = t.icon;
+              const isCurrent = activeTab === t.id;
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => setActiveTab(t.id as ActiveTab)}
+                  className={`flex items-center space-x-2 px-5 py-2.5 rounded-2xl text-xs font-bold transition duration-300 cursor-pointer ${
+                    isCurrent
+                      ? "bg-accent-cyan text-black font-extrabold shadow-[0_0_20px_rgba(125,249,255,0.35)]"
+                      : "bg-slate-900/80 text-slate-300 hover:bg-slate-800 border border-card-border/40"
+                  }`}
+                >
+                  <Icon className="h-4 w-4" />
+                  <span>{t.label}</span>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono ${isCurrent ? "bg-black/30 text-black" : "bg-slate-800 text-slate-400"}`}>
+                    {t.count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          <a
+            href="/admin/document-templates"
+            className="flex items-center space-x-2 px-4 py-2.5 rounded-2xl text-xs font-mono font-bold bg-accent-purple/20 text-accent-purple border border-accent-purple/40 hover:bg-accent-purple/30 transition shadow-[0_0_15px_rgba(180,140,255,0.2)]"
+          >
+            <FileCode2 className="h-4 w-4" />
+            <span>Kelola Auto Form (.docx) &rarr;</span>
+          </a>
         </div>
 
         {activeTab === "links" && (
@@ -532,28 +557,50 @@ export default function AdminDashboardPage() {
             </div>
 
             <div className="space-y-4">
-              {announcements.map((a) => (
-                <div key={a.id} className="glass rounded-2xl p-5 border border-card-border/40 flex items-start justify-between">
-                  <div className="space-y-1">
-                    <div className="flex items-center space-x-2">
-                      {a.pinned && <Pin className="h-4 w-4 text-accent-yellow fill-accent-yellow" />}
-                      <span className="text-[10px] font-mono uppercase bg-accent-yellow/15 text-accent-yellow border border-accent-yellow/30 px-2.5 py-0.5 rounded-full font-bold">
-                        {a.category}
-                      </span>
-                    </div>
-                    <h3 className="font-display font-bold text-lg text-slate-100">{a.title}</h3>
-                    <p className="text-xs text-slate-300 font-sans leading-relaxed">{a.content}</p>
-                  </div>
+              {announcements.map((a) => {
+                let parsedNotes = a.content;
+                let parsedGdriveUrl = "";
+                try {
+                  if (a.content.trim().startsWith("{")) {
+                    const parsed = JSON.parse(a.content);
+                    parsedNotes = parsed.notes || a.content;
+                    parsedGdriveUrl = parsed.gdrive_url || "";
+                  }
+                } catch (e) {}
 
-                  <button
-                    onClick={() => handleDeleteAnno(a.id)}
-                    className="p-2 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-400 hover:bg-rose-500 hover:text-white transition cursor-pointer ml-4 flex-shrink-0"
-                    title="Hapus Pengumuman"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              ))}
+                return (
+                  <div key={a.id} className="glass rounded-2xl p-5 border border-card-border/40 flex items-start justify-between">
+                    <div className="space-y-1.5 max-w-3xl">
+                      <div className="flex items-center space-x-2">
+                        {a.pinned && <Pin className="h-4 w-4 text-accent-yellow fill-accent-yellow" />}
+                        <span className="text-[10px] font-mono uppercase bg-accent-yellow/15 text-accent-yellow border border-accent-yellow/30 px-2.5 py-0.5 rounded-full font-bold">
+                          {a.category}
+                        </span>
+                        {parsedGdriveUrl && (
+                          <span className="text-[10px] font-mono uppercase bg-accent-cyan/15 text-accent-cyan border border-accent-cyan/30 px-2.5 py-0.5 rounded-full font-bold flex items-center space-x-1">
+                            <span>📄 Embedded Doc</span>
+                          </span>
+                        )}
+                      </div>
+                      <h3 className="font-display font-bold text-lg text-slate-100">{a.title}</h3>
+                      <p className="text-xs text-slate-300 font-sans leading-relaxed whitespace-pre-wrap">{parsedNotes}</p>
+                      {parsedGdriveUrl && (
+                        <a href={parsedGdriveUrl} target="_blank" rel="noreferrer" className="text-[11px] text-accent-cyan font-mono hover:underline inline-block mt-1">
+                          🔗 {parsedGdriveUrl}
+                        </a>
+                      )}
+                    </div>
+
+                    <button
+                      onClick={() => handleDeleteAnno(a.id)}
+                      className="p-2 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-400 hover:bg-rose-500 hover:text-white transition cursor-pointer ml-4 flex-shrink-0"
+                      title="Hapus Pengumuman"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -847,29 +894,82 @@ export default function AdminDashboardPage() {
 
       {showAddAnnoModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="glass rounded-2xl p-6 border border-accent-yellow/40 max-w-md w-full">
-            <h3 className="font-display font-bold text-lg text-slate-100 mb-4">Buat Pengumuman Baru</h3>
+          <div className="glass rounded-2xl p-6 border border-accent-yellow/40 max-w-lg w-full">
+            <h3 className="font-display font-bold text-lg text-slate-100 mb-4">Buat Artikel & Dokumen Embed Baru</h3>
             <form onSubmit={handleCreateAnno} className="space-y-4 text-xs font-sans">
               <div>
-                <label className="block text-slate-400 uppercase font-mono mb-1">Judul Pengumuman</label>
+                <label className="block text-slate-400 uppercase font-mono mb-1">Judul Artikel / Informasi</label>
                 <input
                   type="text"
                   required
                   value={newAnno.title}
                   onChange={(e) => setNewAnno({ ...newAnno, title: e.target.value })}
-                  placeholder="Jadwal Briefing Yel-YelIMO 2026"
+                  placeholder="Contoh: Pembagian Gesang & Kendaraan Keberangkatan"
                   className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-card-border text-slate-100 text-sm"
                 />
               </div>
 
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 uppercase font-mono mb-1">Kategori</label>
+                  <select
+                    value={newAnno.category}
+                    onChange={(e) => setNewAnno({ ...newAnno, category: e.target.value })}
+                    className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-card-border text-slate-100 text-xs"
+                  >
+                    <option value="Contoh Surat">Contoh Surat / Dokumen</option>
+                    <option value="Pembagian Gesang">Pembagian Gesang (Kendaraan)</option>
+                    <option value="Jadwal Acara">Jadwal Acara</option>
+                    <option value="Perlengkapan">Perlengkapan Wajib</option>
+                    <option value="PENTING">Pengumuman Penting</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center pt-5">
+                  <label className="flex items-center space-x-2 cursor-pointer text-slate-300 font-mono text-xs">
+                    <input
+                      type="checkbox"
+                      checked={newAnno.pinned}
+                      onChange={(e) => setNewAnno({ ...newAnno, pinned: e.target.checked })}
+                      className="rounded bg-slate-950 border-card-border text-accent-yellow focus:ring-0 h-4 w-4"
+                    />
+                    <span>Sematkan (Pin Highlight)</span>
+                  </label>
+                </div>
+              </div>
+
               <div>
-                <label className="block text-slate-400 uppercase font-mono mb-1">Isi Instruksi / Berita</label>
+                <label className="block text-slate-400 uppercase font-mono mb-1">Link Embed Google Drive / Dokumen (Opsional)</label>
+                <input
+                  type="text"
+                  value={newAnno.gdrive_url}
+                  onChange={(e) => setNewAnno({ ...newAnno, gdrive_url: e.target.value })}
+                  placeholder="https://docs.google.com/... atau https://drive.google.com/file/d/..."
+                  className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-card-border text-accent-cyan text-xs font-mono"
+                />
+                <p className="text-[10px] text-slate-500 mt-1">Dukungan embed: Google Docs, Google Sheets, Google Slides, Google Form, PDF, atau File Drive.</p>
+              </div>
+
+              <div>
+                <label className="block text-slate-400 uppercase font-mono mb-1">Tautan Tombol Autoform Generator (Opsional)</label>
+                <input
+                  type="text"
+                  value={newAnno.autoform_url}
+                  onChange={(e) => setNewAnno({ ...newAnno, autoform_url: e.target.value })}
+                  placeholder="/documents atau /documents/uuid-template"
+                  className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-card-border text-accent-purple text-xs font-mono"
+                />
+                <p className="text-[10px] text-slate-500 mt-1">Isi dengan Rute Autoform (misal: /documents) untuk memunculkan tombol langsung ke pengisian dokumen.</p>
+              </div>
+
+              <div>
+                <label className="block text-slate-400 uppercase font-mono mb-1">Catatan Samping & Highlight Penting</label>
                 <textarea
                   required
-                  value={newAnno.content}
-                  onChange={(e) => setNewAnno({ ...newAnno, content: e.target.value })}
-                  placeholder="Tuliskan instruksi lengkap di sini..."
-                  className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-card-border text-slate-100 text-xs h-28"
+                  value={newAnno.notes}
+                  onChange={(e) => setNewAnno({ ...newAnno, notes: e.target.value })}
+                  placeholder="Tuliskan poin-poin ringkasan/catatan penting yang akan tampil di samping dokumen embed..."
+                  className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-card-border text-slate-100 text-xs h-28 leading-relaxed"
                 />
               </div>
 
@@ -882,7 +982,7 @@ export default function AdminDashboardPage() {
                   Batal
                 </button>
                 <Button variant="primary" size="sm" type="submit">
-                  Publikasikan
+                  Publikasikan Artikel
                 </Button>
               </div>
             </form>

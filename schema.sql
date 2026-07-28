@@ -160,8 +160,45 @@ WITH CHECK (true);
 
 
 -- =========================================================================
--- 5. STORAGE BUCKETS SETUP (Run via dashboard if possible, or instructions)
+-- 5. DOCUMENT TEMPLATES TABLE (Auto Form Fill)
+-- =========================================================================
+CREATE TABLE document_templates (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title TEXT NOT NULL,
+    description TEXT,
+    file_url TEXT NOT NULL,
+    fields_config JSONB NOT NULL DEFAULT '[]'::jsonb,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Trigger for document_templates
+CREATE TRIGGER update_document_templates_updated_at
+BEFORE UPDATE ON document_templates
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at_column();
+
+-- Enable RLS
+ALTER TABLE document_templates ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies
+CREATE POLICY "Allow public read access to document_templates" 
+ON document_templates FOR SELECT 
+TO public 
+USING (is_active = true);
+
+CREATE POLICY "Allow admin write access to document_templates" 
+ON document_templates FOR ALL 
+TO authenticated 
+USING (true) 
+WITH CHECK (true);
+
+
+-- =========================================================================
+-- 6. STORAGE BUCKETS SETUP (Run via dashboard if possible, or instructions)
 -- =========================================================================
 -- Note: Supabase storage buckets must be created manually or via migrations if using CLI.
 -- Buckets to create: 'templates', 'avatars', 'logos'
 -- We'll write policies for these buckets to allow public read and admin write.
+

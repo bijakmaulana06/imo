@@ -38,6 +38,16 @@ interface HubLink {
 
 const DEFAULT_HUB_LINKS: HubLink[] = [
   {
+    id: "guide-0",
+    label: "Pusat Informasi & Panduan (Artikel)",
+    url: "/guide",
+    icon_key: "sparkles",
+    category: "Panduan & Berkas",
+    description: "Artikel dan highlight penting seputar pembagian gesang (kendaraan), jadwal acara, dan perlengkapan.",
+    sort_order: 0,
+    is_active: true,
+  },
+  {
     id: "1",
     label: "Buku Panduan IMO 2026",
     url: "https://drive.google.com",
