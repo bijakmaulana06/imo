@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Josefin_Sans, Montserrat, Cinzel_Decorative, Griffy } from "next/font/google";
 import "./globals.css";
 import "cropperjs/dist/cropper.css";
+import PushNotificationManager from "@/components/PushNotificationManager";
+import ThemeProvider from "@/components/ThemeProvider";
 
 const josefinSans = Josefin_Sans({
   variable: "--font-josefin",
@@ -43,8 +45,11 @@ export default function RootLayout({
       className={`${josefinSans.variable} ${montserrat.variable} ${cinzelDecorative.variable} ${griffy.variable} h-full antialiased dark`}
     >
       <body className="min-h-full flex flex-col bg-background text-foreground font-sans">
+        {/* ThemeProvider: injects CSS custom properties from admin brand_config settings */}
+        <ThemeProvider />
         {children}
-        {/* Eruda Mobile DevTools Console - Inspect langsung di layar HP Android */}
+        <PushNotificationManager />
+        {/* Eruda Mobile DevTools Console */}
         <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
         <script dangerouslySetInnerHTML={{ __html: "eruda.init();" }} />
       </body>

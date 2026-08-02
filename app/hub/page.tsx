@@ -59,72 +59,62 @@ const DEFAULT_HUB_LINKS: HubLink[] = [
   },
   {
     id: "2",
-    label: "ID Card Generator Client Engine",
+    label: "ID Card Generator IMO 2026",
     url: "/id-card",
     icon_key: "qrcode",
     category: "Generator & Tools",
-    description: "Cetak & unduh kartu identitas peserta IMO 2026 100% instan di perangkat Anda.",
+    description: "Generator kartu identitas resmi IMO 2026 diproses instan 100% pada perangkat Anda.",
     sort_order: 2,
     is_active: true,
   },
   {
     id: "3",
-    label: "Summary & Scanner Tugas Kelompok",
-    url: "/info",
+    label: "Auto-Form Generator Dokumen",
+    url: "/documents",
     icon_key: "folder",
-    category: "Pengumpulan Tugas",
-    description: "Pantau status pengumpulan tugas kelompok secara real-time via Google Drive Scanner.",
+    category: "Generator & Tools",
+    description: "Generator otomatis berkas seperti lembar pengesahan dan surat ijin.",
     sort_order: 3,
     is_active: true,
   },
   {
     id: "4",
-    label: "Kontak LO & Pendamping",
+    label: "Direktori Kontak LO & Pendamping",
     url: "/contact",
     icon_key: "users",
     category: "Media & Komunikasi",
-    description: "Daftar kontak WhatsApp resmi pendamping kelompok & Liaison Officer.",
+    description: "Daftar WhatsApp dan Instagram pendamping kelompok Anda.",
     sort_order: 4,
     is_active: true,
   },
   {
     id: "5",
-    label: "Group Chat Telegram Peserta",
+    label: "Grup Telegram & Saluran Informasi IMO 2026",
     url: "https://t.me",
     icon_key: "telegram",
     category: "Media & Komunikasi",
-    description: "Saluran komunikasi resmi & pengumuman cepat untuk seluruh Mahasiswa Baru.",
+    description: "Saluran pengumuman resmi dan grup Telegram koordinasi.",
     sort_order: 5,
     is_active: true,
   },
   {
     id: "6",
-    label: "Official Instagram @imo2026",
+    label: "Instagram Resmi IMO 2026",
     url: "https://instagram.com",
     icon_key: "instagram",
     category: "Media & Komunikasi",
-    description: "Dapatkan update dokumentasi visual, sorotan kegiatan, dan pengumuman media.",
+    description: "Foto kegiatan, pengumuman kilat, dan dokumentasi visual IMO 2026.",
     sort_order: 6,
     is_active: true,
   },
   {
     id: "7",
-    label: "Twibbon Resmi IMO 2026",
-    url: "https://twibbonize.com",
-    icon_key: "sparkles",
-    category: "Generator & Tools",
-    description: "Pasang Twibbon resmi IMO 2026 dan bagikan ke jejaring sosial Anda.",
+    label: "Scanner Pengumpulan Drive",
+    url: "/info",
+    icon_key: "folder",
+    category: "Pengumpulan Tugas",
+    description: "Verifikasi otomatis pengumpulan berkas kelompok dan berkas individu.",
     sort_order: 7,
-    is_active: true,
-  },
-  {
-    id: "8",
-    label: "Formulir Helpdesk & Pertanyaan",
-    url: "https://forms.google.com",
-    icon_key: "help",
-    category: "Panduan & Berkas",
-    description: "Punya pertanyaan seputar kendala pengumpulan tugas? Ajukan melalui form ini.",
-    sort_order: 8,
     is_active: true,
   },
 ];
@@ -134,6 +124,13 @@ export default function HubPage() {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedCategory, setSelectedCategory] = useState<string>("Semua Penjelajahan");
   const [loading, setLoading] = useState<boolean>(true);
+
+  // Dynamic header state from page_content settings
+  const [headerContent, setHeaderContent] = useState({
+    hubBadge: "Pusat Penjelajahan IMO 2026",
+    hubTitle: "PUSAT PENJELAJAHAN",
+    hubDescription: "Portal pusat navigasi cepat untuk mengakses semua panduan, tools generator, saluran media resmi, dan pusat berkas IMO 2026.",
+  });
 
   const renderIcon = (iconKey: string) => {
     switch (iconKey.toLowerCase()) {
@@ -159,31 +156,55 @@ export default function HubPage() {
   };
 
   useEffect(() => {
-    const fetchHubLinks = async () => {
+    const fetchHubData = async () => {
       try {
         const supabase = createClient();
+
+        // 1. Fetch page_content settings for dynamic header
+        const { data: pageContentData } = await supabase
+          .from("system_settings")
+          .select("value")
+          .eq("key", "page_content")
+          .maybeSingle();
+
+        if (pageContentData?.value) {
+          try {
+            const parsed = JSON.parse(pageContentData.value);
+            setHeaderContent({
+              hubBadge: parsed.hubBadge || headerContent.hubBadge,
+              hubTitle: parsed.hubTitle || headerContent.hubTitle,
+              hubDescription: parsed.hubDescription || headerContent.hubDescription,
+            });
+          } catch {}
+        }
+
+        // 2. Fetch hub_links
         const { data, error } = await supabase
           .from("hub_links")
           .select("*")
           .eq("is_active", true)
           .order("sort_order", { ascending: true });
 
-        if (error) {
-          console.warn("Supabase fetch error for hub_links (using defaults):", error.message);
-        } else if (data && data.length > 0) {
+        if (data && data.length > 0) {
           setLinks(data as HubLink[]);
         }
       } catch (err) {
-        console.warn("Fallback to default hub links:", err);
+        console.warn("Fallback to defaults:", err);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchHubLinks();
+    fetchHubData();
   }, []);
 
-  const categories = ["Semua Penjelajahan", "Panduan & Berkas", "Generator & Tools", "Media & Komunikasi", "Pengumpulan Tugas"];
+  const categories = [
+    "Semua Penjelajahan",
+    "Panduan & Berkas",
+    "Generator & Tools",
+    "Media & Komunikasi",
+    "Pengumpulan Tugas",
+  ];
 
   const filteredLinks = links.filter((link) => {
     const matchesSearch =
@@ -205,18 +226,18 @@ export default function HubPage() {
         <div className="text-center mb-10">
           <div className="inline-flex items-center space-x-2 px-3.5 py-1 rounded-full border border-accent-purple/30 bg-accent-purple/5 text-accent-purple text-xs font-bold uppercase tracking-wider mb-4">
             <Layers className="h-4 w-4" />
-            <span>Pusat Penjelajahan IMO 2026</span>
+            <span>{headerContent.hubBadge}</span>
           </div>
           
           <div className="flex items-center justify-center space-x-3 mb-2">
             <ImoLogo height={44} className="h-10 md:h-12" />
             <h1 className="text-3xl md:text-5xl font-display font-black tracking-wider text-slate-100">
-              PUSAT PENJELAJAHAN
+              {headerContent.hubTitle}
             </h1>
           </div>
           
           <p className="text-slate-400 text-sm md:text-base max-w-2xl mx-auto leading-relaxed">
-            Portal pusat navigasi cepat untuk mengakses semua panduan, tools generator, saluran media resmi, dan pusat berkas IMO 2026.
+            {headerContent.hubDescription}
           </p>
         </div>
 
@@ -239,8 +260,8 @@ export default function HubPage() {
                 onClick={() => setSelectedCategory(cat)}
                 className={`px-4 py-2 rounded-full text-xs font-bold transition duration-300 cursor-pointer ${
                   selectedCategory === cat
-                    ? "bg-accent-cyan text-black font-extrabold shadow-[0_0_15px_rgba(125,249,255,0.4)]"
-                    : "bg-slate-900/80 text-slate-300 hover:bg-slate-800 border border-card-border/50"
+                    ? "bg-accent-cyan text-black shadow-[0_0_15px_rgba(125,249,255,0.4)]"
+                    : "bg-slate-900/80 text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-card-border/30"
                 }`}
               >
                 {cat}
@@ -249,92 +270,57 @@ export default function HubPage() {
           </div>
         </div>
 
-        {filteredLinks.length === 0 ? (
-          <Card glowColor="yellow" className="text-center p-12">
-            <Search className="h-10 w-10 text-accent-yellow mx-auto mb-3" />
-            <h3 className="font-display font-bold text-slate-100 text-lg">Tidak Ada Modul Ditemukan</h3>
-            <p className="text-sm text-slate-400 mt-1 mb-4">
-              Tidak ada tautan yang cocok dengan kata kunci &quot;{searchQuery}&quot;.
-            </p>
-            <Button variant="outline" size="sm" onClick={() => { setSearchQuery(""); setSelectedCategory("Semua Penjelajahan"); }}>
-              Reset Pencarian
-            </Button>
-          </Card>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            <AnimatePresence>
-              {filteredLinks.map((item, index) => {
-                const isInternal = item.url.startsWith("/");
+        {/* Link Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredLinks.map((link) => {
+            const isExternal = link.url.startsWith("http://") || link.url.startsWith("https://");
 
-                return (
-                  <motion.div
-                    key={item.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    transition={{ duration: 0.3, delay: index * 0.05 }}
-                  >
-                    <Card
-                      glowColor={index % 3 === 0 ? "cyan" : index % 3 === 1 ? "purple" : "yellow"}
-                      className="h-full flex flex-col justify-between"
-                    >
-                      <div>
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="p-3 rounded-2xl bg-slate-950/80 border border-card-border/60 group-hover:border-accent-cyan/50 group-hover:scale-110 transition duration-300">
-                            {renderIcon(item.icon_key)}
-                          </div>
-                          
-                          <span className="text-[10px] font-mono font-bold uppercase px-2.5 py-1 rounded-full bg-slate-900 border border-card-border/40 text-slate-300 tracking-wider">
-                            {item.category}
-                          </span>
-                        </div>
+            const CardContent = (
+              <Card glowColor="cyan" className="h-full flex flex-col justify-between group cursor-pointer">
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="p-3 rounded-2xl bg-slate-950/80 border border-card-border/50 group-hover:border-accent-cyan/60 transition duration-300">
+                      {renderIcon(link.icon_key)}
+                    </div>
+                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-slate-950/80 border border-card-border/40 text-slate-400">
+                      {link.category}
+                    </span>
+                  </div>
 
-                        <h3 className="font-display font-extrabold text-lg text-slate-100 group-hover:text-accent-cyan transition duration-300 mb-2 leading-snug">
-                          {item.label}
-                        </h3>
+                  <h3 className="font-display font-extrabold text-base text-slate-100 group-hover:text-accent-cyan transition duration-300 mb-2">
+                    {link.label}
+                  </h3>
 
-                        {item.description && (
-                          <p className="text-xs text-slate-400 font-sans leading-relaxed mb-6 line-clamp-3">
-                            {item.description}
-                          </p>
-                        )}
-                      </div>
+                  {link.description && (
+                    <p className="text-xs text-slate-400 leading-relaxed mb-4 line-clamp-3">
+                      {link.description}
+                    </p>
+                  )}
+                </div>
 
-                      <div className="pt-4 border-t border-card-border/20 mt-auto">
-                        {isInternal ? (
-                          <Link
-                            href={item.url}
-                            className="w-full py-2.5 px-4 rounded-xl bg-slate-950 hover:bg-accent-cyan hover:text-black border border-card-border/50 hover:border-accent-cyan text-slate-200 text-xs font-bold transition duration-300 flex items-center justify-between group-hover:shadow-[0_0_15px_rgba(125,249,255,0.3)] cursor-pointer touch-manipulation active:scale-[0.98]"
-                          >
-                            <span>Akses Fitur</span>
-                            <Rocket className="h-4 w-4 text-accent-cyan group-hover:text-black transition" />
-                          </Link>
-                        ) : (
-                          <a
-                            href={item.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="w-full py-2.5 px-4 rounded-xl bg-slate-950 hover:bg-accent-cyan hover:text-black border border-card-border/50 hover:border-accent-cyan text-slate-200 text-xs font-bold transition duration-300 flex items-center justify-between group-hover:shadow-[0_0_15px_rgba(125,249,255,0.3)] cursor-pointer touch-manipulation active:scale-[0.98]"
-                          >
-                            <span>Buka Tautan</span>
-                            <ExternalLink className="h-4 w-4 text-accent-cyan group-hover:text-black transition opacity-70 group-hover:opacity-100" />
-                          </a>
-                        )}
-                      </div>
+                <div className="flex items-center text-xs font-mono font-bold text-accent-cyan group-hover:translate-x-1 transition-transform duration-300 mt-auto pt-2">
+                  <span>Akses Sekarang</span>
+                  {isExternal ? (
+                    <ExternalLink className="h-3.5 w-3.5 ml-1.5" />
+                  ) : (
+                    <Rocket className="h-3.5 w-3.5 ml-1.5" />
+                  )}
+                </div>
+              </Card>
+            );
 
-                    </Card>
-                  </motion.div>
-                );
-              })}
-            </AnimatePresence>
-          </div>
-        )}
-
+            return isExternal ? (
+              <a key={link.id} href={link.url} target="_blank" rel="noopener noreferrer" className="block h-full">
+                {CardContent}
+              </a>
+            ) : (
+              <Link key={link.id} href={link.url} className="block h-full">
+                {CardContent}
+              </Link>
+            );
+          })}
+        </div>
       </main>
-
-      <footer className="w-full py-8 text-center text-xs text-slate-500 font-mono border-t border-card-border/20 mt-16 bg-background/50">
-        &copy; {new Date().getFullYear()} IMO 2026. Mission Control Grid Menu.
-      </footer>
     </div>
   );
 }

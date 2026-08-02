@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import {
   Layers,
   Users,
+  User,
   Megaphone,
   CreditCard,
   Plus,
@@ -23,10 +24,12 @@ import {
   Sparkles,
   RefreshCw,
   Upload,
+  ListChecks,
+  Edit2,
 } from "lucide-react";
 import { DEFAULT_ID_CARD_TEMPLATE } from "@/lib/defaultTemplate";
 
-type ActiveTab = "links" | "contacts" | "announcements" | "templates";
+type ActiveTab = "links" | "contacts" | "announcements" | "templates" | "tasks";
 
 const DEFAULT_ADMIN_HTML_TEMPLATE = DEFAULT_ID_CARD_TEMPLATE;
 
@@ -39,10 +42,39 @@ export default function AdminDashboardPage() {
   const [contacts, setContacts] = useState<any[]>([]);
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [templates, setTemplates] = useState<any[]>([]);
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [gdriveLink, setGdriveLink] = useState<string>("");
+  const [targetTotalGroups, setTargetTotalGroups] = useState<number>(20);
+  const [targetMembersPerGroup, setTargetMembersPerGroup] = useState<number>(10);
+  const [savingGdrive, setSavingGdrive] = useState<boolean>(false);
+  const [syncingFolders, setSyncingFolders] = useState<boolean>(false);
+  const [syncNotice, setSyncNotice] = useState<string | null>(null);
+
+  // State Penugasan Individu
+  const [individuTaskDefs, setIndividuTaskDefs] = useState<any[]>([
+    { id: "ind-1", name: "Jurnal Harian & Resume", keyword: "jurnal", is_active: true },
+    { id: "ind-2", name: "Berkas Administrasi Mandiri", keyword: "administrasi", is_active: true },
+    { id: "ind-3", name: "Twibbon & ID Card", keyword: "twibbon", is_active: true },
+  ]);
+  const [showAddIndividuModal, setShowAddIndividuModal] = useState(false);
+  const [newIndividuTask, setNewIndividuTask] = useState({ name: "", keyword: "", is_active: true });
+  const [editingIndividuTask, setEditingIndividuTask] = useState<any | null>(null);
+
+  const [showAddTaskModal, setShowAddTaskModal] = useState(false);
+  const [newTask, setNewTask] = useState({ name: "", keyword: "", is_active: true });
+  const [editingTask, setEditingTask] = useState<any | null>(null);
 
   // Admin Custom HTML Template State
   const [adminTemplateHtml, setAdminTemplateHtml] = useState<string>(DEFAULT_ADMIN_HTML_TEMPLATE);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
+
+  // PSD Template Manager State
+  const [psdTemplates, setPsdTemplates] = useState<any[]>([]);
+  const [uploadingPsd, setUploadingPsd] = useState(false);
+  const [newPsd, setNewPsd] = useState({ name: "", description: "", is_default: true });
+  const [selectedPsdFile, setSelectedPsdFile] = useState<File | null>(null);
+  const [psdSuccessMsg, setPsdSuccessMsg] = useState<string | null>(null);
+  const [psdErrorMsg, setPsdErrorMsg] = useState<string | null>(null);
 
   const [showAddLinkModal, setShowAddLinkModal] = useState(false);
   const [newLink, setNewLink] = useState({
@@ -262,8 +294,35 @@ export default function AdminDashboardPage() {
       const { data: annoData } = await supabase.from("announcements").select("*").order("published_at", { ascending: false });
       setAnnouncements(annoData || []);
 
-      const { data: templateData } = await supabase.from("id_card_templates").select("*");
+      const { data: templateData } = await supabase.from("id_card_templates").select("*").order("created_at", { ascending: false });
       setTemplates(templateData || []);
+      setPsdTemplates(templateData || []);
+
+      const { data: taskData } = await supabase.from("task_definitions").select("*").order("name", { ascending: true });
+      setTasks(taskData || []);
+
+      const { data: settingData } = await supabase.from("system_settings").select("key, value").in("key", ["gdrive_parent_folder", "total_groups_count", "target_members_per_group", "task_definitions_individu"]);
+      if (settingData) {
+        const folderSetting = settingData.find((s: any) => s.key === "gdrive_parent_folder");
+        if (folderSetting) setGdriveLink(folderSetting.value || "");
+        const countSetting = settingData.find((s: any) => s.key === "total_groups_count");
+        if (countSetting && countSetting.value && !isNaN(Number(countSetting.value))) {
+          setTargetTotalGroups(Number(countSetting.value));
+        }
+        const membersSetting = settingData.find((s: any) => s.key === "target_members_per_group");
+        if (membersSetting && membersSetting.value && !isNaN(Number(membersSetting.value))) {
+          setTargetMembersPerGroup(Number(membersSetting.value));
+        }
+        const individuSetting = settingData.find((s: any) => s.key === "task_definitions_individu");
+        if (individuSetting && individuSetting.value) {
+          try {
+            const parsed = JSON.parse(individuSetting.value);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setIndividuTaskDefs(parsed);
+            }
+          } catch {}
+        }
+      }
 
     } catch (err) {
       console.error("Dashboard Load Error:", err);
@@ -272,9 +331,229 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const handleSaveIndividuTasks = async (updatedDefs: any[]) => {
+    try {
+      const { error } = await supabase.from("system_settings").upsert([
+        {
+          key: "task_definitions_individu",
+          value: JSON.stringify(updatedDefs),
+          description: "Daftar Tugas Individu untuk Anggota Kelompok",
+          updated_at: new Date().toISOString(),
+        }
+      ]);
+      if (error) throw error;
+      setIndividuTaskDefs(updatedDefs);
+    } catch (err: any) {
+      alert("Gagal menyimpan tugas individu: " + err.message);
+    }
+  };
+
+  const handleCreateIndividuTask = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newIndividuTask.name.trim() || !newIndividuTask.keyword.trim()) return;
+    const newTaskObj = {
+      id: `ind-${Date.now()}`,
+      name: newIndividuTask.name.trim(),
+      keyword: newIndividuTask.keyword.trim().toLowerCase(),
+      is_active: newIndividuTask.is_active
+    };
+    const nextDefs = [...individuTaskDefs, newTaskObj];
+    handleSaveIndividuTasks(nextDefs);
+    setShowAddIndividuModal(false);
+    setNewIndividuTask({ name: "", keyword: "", is_active: true });
+  };
+
+  const handleUpdateIndividuTask = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingIndividuTask) return;
+    const nextDefs = individuTaskDefs.map((t) =>
+      t.id === editingIndividuTask.id ? editingIndividuTask : t
+    );
+    handleSaveIndividuTasks(nextDefs);
+    setEditingIndividuTask(null);
+  };
+
+  const handleToggleIndividuTaskActive = (id: string) => {
+    const nextDefs = individuTaskDefs.map((t) =>
+      t.id === id ? { ...t, is_active: !t.is_active } : t
+    );
+    handleSaveIndividuTasks(nextDefs);
+  };
+
+  const handleDeleteIndividuTask = (id: string) => {
+    if (!confirm("Apakah Anda yakin ingin menghapus tugas individu ini?")) return;
+    const nextDefs = individuTaskDefs.filter((t) => t.id !== id);
+    handleSaveIndividuTasks(nextDefs);
+  };
+
+  const loadPsdTemplates = async () => {
+    try {
+      const res = await fetch("/api/id-card-templates");
+      if (res.ok) {
+        const data = await res.json();
+        setPsdTemplates(data.templates || []);
+      }
+    } catch (e) {
+      console.warn("Gagal memuat templat PSD:", e);
+    }
+  };
+
   useEffect(() => {
     loadData();
+    loadPsdTemplates();
   }, []);
+
+  const handleSaveGdriveLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingGdrive(true);
+    setSyncingFolders(true);
+    setSyncNotice(null);
+    try {
+      const { error } = await supabase.from("system_settings").upsert([
+        {
+          key: "gdrive_parent_folder",
+          value: gdriveLink,
+          description: "Folder ID / Link Google Drive Induk untuk mendeteksi tugas kelompok",
+          updated_at: new Date().toISOString(),
+        },
+        {
+          key: "total_groups_count",
+          value: String(targetTotalGroups),
+          description: "Jumlah Total Kelompok yang Dibuatkan Foldernya di Google Drive",
+          updated_at: new Date().toISOString(),
+        },
+        {
+          key: "target_members_per_group",
+          value: String(targetMembersPerGroup),
+          description: "Target Jumlah Anggota Per Kelompok untuk Tugas Individu",
+          updated_at: new Date().toISOString(),
+        }
+      ]);
+      if (error) throw error;
+
+      // Automatically sync folders for all groups immediately!
+      const res = await fetch("/api/drive-sync-folders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ totalGroups: Number(targetTotalGroups) }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Gagal sinkronisasi folder");
+      
+      setSyncNotice(data.message || `Pengaturan disimpan & folder seluruh kelompok (${targetTotalGroups}) siap di Google Drive!`);
+    } catch (err: any) {
+      alert("Gagal menyimpan pengaturan: " + err.message);
+    } finally {
+      setSavingGdrive(false);
+      setSyncingFolders(false);
+    }
+  };
+
+  const handleSyncFolders = async () => {
+    setSyncingFolders(true);
+    setSyncNotice(null);
+    try {
+      const res = await fetch("/api/drive-sync-folders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ totalGroups: Number(targetTotalGroups) }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Gagal sinkronisasi folder");
+      setSyncNotice(data.message);
+    } catch (err: any) {
+      alert("Error sinkronisasi: " + err.message);
+    } finally {
+      setSyncingFolders(false);
+    }
+  };
+
+  const handleCreateTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSyncingFolders(true);
+    setSyncNotice(null);
+    try {
+      const { error } = await supabase.from("task_definitions").insert([{
+        name: newTask.name,
+        keyword: newTask.keyword,
+        is_active: newTask.is_active,
+      }]);
+      if (error) throw error;
+
+      setShowAddTaskModal(false);
+      setNewTask({ name: "", keyword: "", is_active: true });
+
+      // Automatically sync/generate folders for all groups immediately upon task creation!
+      const res = await fetch("/api/drive-sync-folders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ totalGroups: Number(targetTotalGroups) }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Gagal sinkronisasi folder");
+
+      setSyncNotice(`Tugas "${newTask.name}" berhasil dibuat & folder untuk seluruh kelompok (${targetTotalGroups}) langsung disinkronkan di Google Drive!`);
+      loadData();
+    } catch (err: any) {
+      alert("Gagal menambahkan tugas: " + err.message);
+    } finally {
+      setSyncingFolders(false);
+    }
+  };
+
+  const handleUpdateTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTask) return;
+    setSyncingFolders(true);
+    try {
+      const { error } = await supabase.from("task_definitions").update({
+        name: editingTask.name,
+        keyword: editingTask.keyword,
+        is_active: editingTask.is_active,
+        updated_at: new Date().toISOString(),
+      }).eq("id", editingTask.id);
+      if (error) throw error;
+
+      setEditingTask(null);
+
+      // Automatically sync folders for all groups upon updating task
+      await fetch("/api/drive-sync-folders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ totalGroups: Number(targetTotalGroups) }),
+      });
+
+      loadData();
+    } catch (err: any) {
+      alert("Gagal memperbarui tugas: " + err.message);
+    } finally {
+      setSyncingFolders(false);
+    }
+  };
+
+  const handleToggleTaskActive = async (id: string, currentActive: boolean) => {
+    try {
+      const { error } = await supabase.from("task_definitions").update({
+        is_active: !currentActive,
+        updated_at: new Date().toISOString(),
+      }).eq("id", id);
+      if (error) throw error;
+      loadData();
+    } catch (err: any) {
+      alert("Gagal memperbarui status tugas: " + err.message);
+    }
+  };
+
+  const handleDeleteTask = async (id: string) => {
+    if (!confirm("Apakah Anda yakin ingin menghapus tugas ini? (Perubahan berlaku untuk semua kelompok)")) return;
+    try {
+      const { error } = await supabase.from("task_definitions").delete().eq("id", id);
+      if (error) throw error;
+      loadData();
+    } catch (err: any) {
+      alert("Gagal menghapus tugas: " + err.message);
+    }
+  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -376,6 +655,88 @@ export default function AdminDashboardPage() {
     }
   };
 
+  // ── PSD TEMPLATE HANDLERS ────────────────────────────────────────────────
+  const handleUploadPsdTemplate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPsdFile) {
+      setPsdErrorMsg("Pilih file .PSD terlebih dahulu.");
+      return;
+    }
+
+    setUploadingPsd(true);
+    setPsdErrorMsg(null);
+    setPsdSuccessMsg(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", selectedPsdFile);
+      formData.append("name", newPsd.name || selectedPsdFile.name);
+      formData.append("description", newPsd.description);
+      formData.append("is_default", String(newPsd.is_default));
+      formData.append("is_active", "true");
+
+      const res = await fetch("/api/id-card-templates", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Gagal mengunggah templat PSD.");
+
+      setPsdSuccessMsg(`Templat "${data.template?.name || 'PSD'}" berhasil disimpan!`);
+      setNewPsd({ name: "", description: "", is_default: false });
+      setSelectedPsdFile(null);
+      await loadPsdTemplates();
+      setTimeout(() => setPsdSuccessMsg(null), 4000);
+    } catch (err: any) {
+      setPsdErrorMsg(err.message || "Gagal mengunggah templat PSD.");
+    } finally {
+      setUploadingPsd(false);
+    }
+  };
+
+  const handleDeletePsdTemplate = async (id: string) => {
+    if (!confirm("Apakah Anda yakin ingin menghapus templat PSD ini?")) return;
+    try {
+      const res = await fetch(`/api/id-card-templates?id=${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Gagal menghapus templat PSD");
+      await loadPsdTemplates();
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  const handleTogglePsdActive = async (id: string, currentActive: boolean) => {
+    try {
+      const res = await fetch("/api/id-card-templates", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, is_active: !currentActive }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Gagal mengubah status");
+      await loadPsdTemplates();
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  const handleSetPsdDefault = async (id: string) => {
+    try {
+      const res = await fetch("/api/id-card-templates", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, is_default: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Gagal menyetel default");
+      await loadPsdTemplates();
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
   return (
     <div className="relative min-h-screen flex flex-col z-0 overflow-hidden bg-[#020510] text-slate-100 font-sans">
       <StarfieldBackground />
@@ -411,6 +772,7 @@ export default function AdminDashboardPage() {
               { id: "contacts", label: "Kontak LO (/contact)", icon: Users, count: contacts.length },
               { id: "announcements", label: "Pengumuman Misi", icon: Megaphone, count: announcements.length },
               { id: "templates", label: "Template ID Card", icon: CreditCard, count: templates.length },
+              { id: "tasks", label: "Penugasan Kelompok", icon: ListChecks, count: tasks.length },
             ].map((t) => {
               const Icon = t.icon;
               const isCurrent = activeTab === t.id;
@@ -434,13 +796,23 @@ export default function AdminDashboardPage() {
             })}
           </div>
 
-          <a
-            href="/admin/document-templates"
-            className="flex items-center space-x-2 px-4 py-2.5 rounded-2xl text-xs font-mono font-bold bg-accent-purple/20 text-accent-purple border border-accent-purple/40 hover:bg-accent-purple/30 transition shadow-[0_0_15px_rgba(180,140,255,0.2)]"
-          >
-            <FileCode2 className="h-4 w-4" />
-            <span>Kelola Auto Form (.docx) &rarr;</span>
-          </a>
+          <div className="flex items-center space-x-2">
+            <a
+              href="/admin/settings"
+              className="flex items-center space-x-2 px-4 py-2.5 rounded-2xl text-xs font-mono font-bold bg-accent-purple/20 text-accent-purple border border-accent-purple/40 hover:bg-accent-purple hover:text-black transition duration-300 shadow-[0_0_15px_rgba(179,136,255,0.3)]"
+            >
+              <Sparkles className="h-4 w-4" />
+              <span>Pengaturan Web & Push Notif</span>
+            </a>
+
+            <a
+              href="/admin/document-templates"
+              className="flex items-center space-x-2 px-4 py-2.5 rounded-2xl text-xs font-mono font-bold bg-slate-900 border border-white/10 text-slate-300 hover:text-accent-cyan transition"
+            >
+              <FileCode2 className="h-4 w-4 text-accent-cyan" />
+              <span>Auto-Form Generator</span>
+            </a>
+          </div>
         </div>
 
         {activeTab === "links" && (
@@ -611,108 +983,464 @@ export default function AdminDashboardPage() {
               <div>
                 <h2 className="font-display font-black text-xl text-slate-100 flex items-center space-x-2">
                   <CreditCard className="h-6 w-6 text-accent-cyan" />
-                  <span>Kustomisasi Templat HTML Resmi ID Card (/id-card)</span>
+                  <span>Manajemen Templat ID Card (.PSD)</span>
                 </h2>
-                <p className="text-xs text-slate-400 mt-1">
-                  Desain & atur struktur HTML kustom ID Card peserta. Tag teks seperti <code className="text-accent-cyan font-mono">{`{nama}`}</code>, <code className="text-accent-cyan font-mono">{`{nim}`}</code>, atau tag kustom baru akan **otomatis dideteksi dan dibuatkan form inputnya** untuk seluruh peserta.
+                <p className="text-xs text-slate-400 mt-1 max-w-2xl">
+                  Unggah dan kelola file template Photoshop <code className="text-accent-cyan font-mono font-semibold">.PSD</code> resmi. Seluruh peserta akan secara otomatis mendapatkan pilihan templat yang Anda sediakan di halaman ID Card.
                 </p>
               </div>
+            </div>
 
-              <div className="flex items-center space-x-2">
-                {saveSuccessMsg && (
-                  <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-xl border border-emerald-500/30 flex items-center space-x-1">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                    <span>{saveSuccessMsg}</span>
+            {/* Upload Form Box */}
+            <Card glowColor="purple">
+              <div className="flex justify-between items-center mb-4 pb-3 border-b border-card-border/30">
+                <span className="font-mono text-xs font-bold text-accent-purple uppercase tracking-wider flex items-center space-x-2">
+                  <Upload className="h-4 w-4 text-accent-purple" />
+                  <span>Unggah Templat PSD Baru</span>
+                </span>
+                {psdSuccessMsg && (
+                  <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-xl border border-emerald-500/30">
+                    ✓ {psdSuccessMsg}
                   </span>
                 )}
-                <Button variant="primary" size="sm" onClick={handleSaveAdminHtmlTemplate}>
-                  <Save className="h-4 w-4 mr-1.5" />
-                  <span>Simpan Templat Resmi</span>
+                {psdErrorMsg && (
+                  <span className="text-xs font-mono text-rose-400 bg-rose-500/10 px-3 py-1 rounded-xl border border-rose-500/30">
+                    ⚠ {psdErrorMsg}
+                  </span>
+                )}
+              </div>
+
+              <form onSubmit={handleUploadPsdTemplate} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-mono text-slate-300 mb-1.5 font-bold">
+                      Nama Templat *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Templat Resmi IMO 2026 (V1)"
+                      value={newPsd.name}
+                      onChange={(e) => setNewPsd({ ...newPsd, name: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-xl bg-slate-950/80 border border-card-border/60 text-slate-100 text-xs focus:outline-none focus:border-accent-purple"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-mono text-slate-300 mb-1.5 font-bold">
+                      File Photoshop (.PSD) *
+                    </label>
+                    <input
+                      type="file"
+                      required
+                      accept=".psd"
+                      onChange={(e) => setSelectedPsdFile(e.target.files?.[0] || null)}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-950/80 border border-card-border/60 text-slate-300 text-xs file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-mono file:bg-accent-purple/20 file:text-accent-purple hover:file:bg-accent-purple/30"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono text-slate-300 mb-1.5 font-bold">
+                    Deskripsi Singkat (Opsional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Desain bertema portal IMO 2026 dengan frame pasfoto & Motto"
+                    value={newPsd.description}
+                    onChange={(e) => setNewPsd({ ...newPsd, description: e.target.value })}
+                    className="w-full px-4 py-2 rounded-xl bg-slate-950/80 border border-card-border/60 text-slate-100 text-xs focus:outline-none focus:border-accent-purple"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between pt-2">
+                  <label className="flex items-center space-x-2 text-xs font-mono text-slate-300 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={newPsd.is_default}
+                      onChange={(e) => setNewPsd({ ...newPsd, is_default: e.target.checked })}
+                      className="rounded border-slate-700 bg-slate-950 text-accent-purple focus:ring-accent-purple"
+                    />
+                    <span>Jadikan Templat Default Utama</span>
+                  </label>
+
+                  <Button variant="primary" size="sm" type="submit" disabled={uploadingPsd || !selectedPsdFile}>
+                    {uploadingPsd ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 mr-1.5 animate-spin" />
+                        <span>Mengunggah ke Storage...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-4 w-4 mr-1.5" />
+                        <span>Unggah & Simpan Templat</span>
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </form>
+            </Card>
+
+            {/* List of PSD Templates */}
+            <div className="space-y-4">
+              <h3 className="font-display font-bold text-base text-slate-100 flex items-center justify-between">
+                <span>Daftar Templat PSD Tersimpan ({psdTemplates.length})</span>
+              </h3>
+
+              {psdTemplates.length === 0 ? (
+                <div className="p-8 text-center rounded-2xl border border-card-border/30 bg-slate-900/40 text-slate-400 text-xs font-mono">
+                  Belum ada templat PSD kustom yang diunggah. Silakan unggah templat PSD di atas.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {psdTemplates.map((t) => {
+                    const psdUrl = t.background_url || t.layout_json?.psd_url || "";
+                    return (
+                      <div key={t.id} className="glass rounded-2xl p-5 border border-card-border/40 flex flex-col justify-between gap-4">
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="font-display font-bold text-base text-slate-100">{t.name}</span>
+                            <div className="flex items-center space-x-1.5">
+                              {t.is_default && (
+                                <span className="text-[10px] font-mono uppercase bg-accent-cyan/20 text-accent-cyan border border-accent-cyan/40 px-2 py-0.5 rounded-full font-bold">
+                                  Default
+                                </span>
+                              )}
+                              <span
+                                className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border ${
+                                  t.is_active !== false
+                                    ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/40"
+                                    : "bg-slate-800 text-slate-500 border-slate-700"
+                                }`}
+                              >
+                                {t.is_active !== false ? "Aktif" : "Nonaktif"}
+                              </span>
+                            </div>
+                          </div>
+
+                          {t.description && (
+                            <p className="text-xs text-slate-400 leading-snug">{t.description}</p>
+                          )}
+
+                          <div className="text-[11px] font-mono text-slate-500 flex items-center justify-between pt-1">
+                            <span>File: {t.layout_json?.file_name || "Template.psd"}</span>
+                            <span>{new Date(t.created_at || Date.now()).toLocaleDateString("id-ID")}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-3 border-t border-card-border/20 flex-wrap gap-2">
+                          <div className="flex items-center space-x-2">
+                            {!t.is_default && (
+                              <button
+                                onClick={() => handleSetPsdDefault(t.id)}
+                                className="text-xs font-mono text-accent-cyan hover:underline cursor-pointer"
+                              >
+                                Set Default
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleTogglePsdActive(t.id, t.is_active !== false)}
+                              className="text-xs font-mono text-slate-400 hover:text-slate-200 cursor-pointer"
+                            >
+                              {t.is_active !== false ? "Nonaktifkan" : "Aktifkan"}
+                            </button>
+                          </div>
+
+                          <div className="flex items-center space-x-2">
+                            {psdUrl && (
+                              <a
+                                href={psdUrl}
+                                download
+                                target="_blank"
+                                rel="noreferrer"
+                                className="p-2 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 hover:text-white transition"
+                                title="Download File PSD"
+                              >
+                                <ExternalLink className="h-3.5 w-3.5" />
+                              </a>
+                            )}
+                            <button
+                              onClick={() => handleDeletePsdTemplate(t.id)}
+                              className="p-2 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-400 hover:bg-rose-500 hover:text-white transition cursor-pointer"
+                              title="Hapus Templat"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+
+        {activeTab === "tasks" && (
+          <div className="space-y-8">
+            {/* Header & Description */}
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+              <div>
+                <h2 className="font-display font-black text-xl text-slate-100 flex items-center gap-2">
+                  <ListChecks className="h-6 w-6 text-accent-cyan" />
+                  <span>Kelola Penugasan Kelompok</span>
+                </h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  Atur sumber Google Drive dan daftar tugas kelompok. Penambahan tugas berlaku otomatis untuk seluruh kelompok.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  onClick={handleSyncFolders}
+                  disabled={syncingFolders}
+                  className="px-4 py-2.5 rounded-xl bg-accent-purple/20 text-accent-purple border border-accent-purple/40 hover:bg-accent-purple/30 transition text-xs font-mono font-bold flex items-center space-x-2 cursor-pointer disabled:opacity-50"
+                >
+                  <RefreshCw className={`h-4 w-4 ${syncingFolders ? "animate-spin" : ""}`} />
+                  <span>{syncingFolders ? "Menyinkronkan..." : "Sinkronkan Folder Kelompok"}</span>
+                </button>
+                <Button variant="primary" size="sm" onClick={() => setShowAddTaskModal(true)}>
+                  <Plus className="h-4 w-4 mr-1.5" />
+                  <span>Tambah Tugas Kelompok Baru</span>
                 </Button>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-              {/* HTML Code Editor */}
-              <div className="lg:col-span-7 space-y-4">
-                <Card glowColor="purple">
-                  <div className="flex justify-between items-center mb-3 pb-3 border-b border-card-border/30 flex-wrap gap-2">
-                    <span className="font-mono text-xs font-bold text-accent-purple uppercase tracking-wider flex items-center space-x-1.5">
-                      <FileCode2 className="h-4 w-4" />
-                      <span>Kode HTML & CSS Kustom ID Card</span>
-                    </span>
-
-                    <div className="flex items-center space-x-2">
-                      <label className="text-xs font-mono text-slate-200 hover:text-accent-cyan bg-slate-900 hover:bg-slate-800 border border-card-border/60 hover:border-accent-cyan/60 px-3 py-1.5 rounded-xl cursor-pointer transition flex items-center space-x-1.5 touch-manipulation">
-                        <Upload className="h-3.5 w-3.5 text-accent-cyan" />
-                        <span>Unggah File (.html / .svg)</span>
-                        <input
-                          type="file"
-                          accept=".html,.htm,.svg,text/html,image/svg+xml"
-                          onChange={handleAdminTemplateFileUpload}
-                          className="hidden"
-                        />
-                      </label>
-
-                      <button
-                        onClick={handleResetAdminTemplate}
-                        className="text-xs font-mono text-slate-400 hover:text-red-400 flex items-center space-x-1 cursor-pointer bg-slate-900 hover:bg-slate-800 border border-card-border/40 px-2.5 py-1.5 rounded-xl transition"
-                        title="Reset Ke HTML Default"
-                      >
-                        <RefreshCw className="h-3.5 w-3.5" />
-                        <span>Reset</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  <textarea
-                    rows={16}
-                    value={adminTemplateHtml}
-                    onChange={(e) => setAdminTemplateHtml(e.target.value)}
-                    className="w-full p-4 rounded-xl bg-slate-950/90 border border-card-border/60 text-emerald-400 font-mono text-xs focus:outline-none focus:border-accent-purple/60 leading-relaxed shadow-inner"
-                  />
-
-                  {/* Detected Tags Indicator */}
-                  <div className="pt-3 border-t border-card-border/30">
-                    <div className="text-[11px] font-mono text-slate-400 mb-2 font-bold uppercase tracking-wider">
-                      Tag Teks Terdeteksi ({adminDetectedPlaceholders.length}):
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {adminDetectedPlaceholders.map((tag) => (
-                        <span
-                          key={tag}
-                          className="px-2.5 py-0.5 rounded-full bg-accent-cyan/10 border border-accent-cyan/30 text-accent-cyan font-mono text-[11px]"
-                        >
-                          {"{" + tag + "}"}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                </Card>
+            {syncNotice && (
+              <div className="p-4 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-xs font-mono flex items-center justify-between">
+                <span>✓ {syncNotice}</span>
+                <button onClick={() => setSyncNotice(null)} className="text-slate-400 hover:text-white font-bold ml-4">✕</button>
               </div>
+            )}
 
-              {/* Live Preview Panel */}
-              <div className="lg:col-span-5 space-y-4 sticky top-24">
-                <Card glowColor="cyan">
-                  <div className="flex justify-between items-center mb-4 pb-3 border-b border-card-border/30">
-                    <span className="font-mono text-xs font-bold text-accent-cyan uppercase tracking-wider flex items-center space-x-1.5">
-                      <Sparkles className="h-4 w-4" />
-                      <span>Preview Live ID Card Admin</span>
-                    </span>
+            {/* Google Drive Parent Folder & Group Count Configuration */}
+            <div className="glass rounded-2xl p-6 border border-accent-cyan/30">
+              <h3 className="font-display font-bold text-sm text-accent-cyan uppercase tracking-wider mb-2 flex items-center gap-2">
+                <ExternalLink className="h-4 w-4" />
+                <span>Sumber Google Drive & Parameter Kelompok</span>
+              </h3>
+              <p className="text-xs text-slate-400 mb-4">
+                Atur Link Folder Google Drive Utama dan Jumlah Kelompok (misal: 20 kelompok). Saat menekan <strong>"Sinkronkan Folder Kelompok"</strong>, sistem akan membuat folder dari <strong>Kelompok 1 s/d Kelompok {targetTotalGroups}</strong> sekaligus (folder yang sudah ada tidak dibuat ulang).
+              </p>
+              <form onSubmit={handleSaveGdriveLink} className="space-y-3">
+                <div className="flex flex-col sm:flex-row gap-3 items-stretch">
+                  <div className="flex-grow">
+                    <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Link / ID Folder Induk Google Drive</label>
+                    <input
+                      type="text"
+                      value={gdriveLink}
+                      onChange={(e) => setGdriveLink(e.target.value)}
+                      placeholder="https://drive.google.com/drive/folders/1abc... atau ID Folder"
+                      className="w-full px-4 py-2.5 rounded-xl bg-slate-950/80 border border-card-border text-slate-100 text-xs font-mono focus:border-accent-cyan focus:outline-none"
+                    />
                   </div>
 
-                  {/* Card Preview Container */}
-                  <div className="w-full flex justify-center items-center overflow-hidden py-2">
-                    <div className="w-full max-w-[420px] min-h-[240px] rounded-2xl mx-auto overflow-hidden shadow-2xl border border-card-border/50 flex flex-col justify-center items-center">
-                      <div
-                        className="id-card-preview-scope w-full h-full flex flex-col justify-center items-center"
-                        dangerouslySetInnerHTML={{ __html: renderedAdminPreviewHtml }}
-                      />
-                    </div>
+                  <div className="w-full sm:w-44">
+                    <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Total Kelompok</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={targetTotalGroups}
+                      onChange={(e) => setTargetTotalGroups(Math.max(1, parseInt(e.target.value) || 1))}
+                      placeholder="20"
+                      className="w-full px-4 py-2.5 rounded-xl bg-slate-950/80 border border-card-border text-accent-cyan font-bold text-xs font-mono focus:border-accent-cyan focus:outline-none"
+                    />
                   </div>
-                </Card>
-              </div>
+
+                  <div className="w-full sm:w-56">
+                    <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Target Anggota / Kelompok (Individu)</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={1000}
+                      value={targetMembersPerGroup}
+                      onChange={(e) => setTargetMembersPerGroup(Math.max(1, parseInt(e.target.value) || 1))}
+                      placeholder="10"
+                      className="w-full px-4 py-2.5 rounded-xl bg-slate-950/80 border border-card-border text-accent-purple font-bold text-xs font-mono focus:border-accent-purple focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-1">
+                  <button
+                    type="submit"
+                    disabled={savingGdrive}
+                    className="px-5 py-2.5 rounded-xl bg-accent-cyan text-black font-extrabold text-xs hover:bg-accent-cyan/90 transition flex items-center justify-center space-x-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    <Save className="h-4 w-4" />
+                    <span>{savingGdrive ? "Menyimpan..." : "Simpan Pengaturan"}</span>
+                  </button>
+                </div>
+              </form>
             </div>
+
+            {/* Tasks List */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-display font-bold text-base text-slate-200">
+                  Daftar Tugas Kelompok ({tasks.length})
+                </h3>
+                <span className="text-[11px] text-slate-400 font-mono">
+                  Urutan tampil: Berdasarkan Abjad Nama Tugas
+                </span>
+              </div>
+
+              {tasks.length === 0 ? (
+                <div className="glass rounded-2xl p-8 border border-card-border/40 text-center">
+                  <p className="text-sm text-slate-400 font-sans">Belum ada tugas kelompok yang ditambahkan.</p>
+                  <button
+                    onClick={() => setShowAddTaskModal(true)}
+                    className="mt-3 inline-flex items-center text-xs font-bold text-accent-cyan hover:underline cursor-pointer"
+                  >
+                    + Tambah Tugas Pertama Sekarang
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {tasks.map((task, index) => (
+                    <div
+                      key={task.id}
+                      className="glass rounded-2xl p-5 border border-card-border/40 flex flex-col justify-between hover:border-accent-cyan/40 transition"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-[10px] font-mono uppercase bg-slate-900 px-2.5 py-0.5 rounded-full border border-card-border/40 text-accent-purple font-bold">
+                            #{index + 1} • Tugas Kelompok
+                          </span>
+                          <button
+                            onClick={() => handleToggleTaskActive(task.id, task.is_active)}
+                            className={`text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full border cursor-pointer ${
+                              task.is_active
+                                ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/40"
+                                : "bg-slate-800 text-slate-500 border-slate-700"
+                            }`}
+                          >
+                            {task.is_active ? "Aktif" : "Nonaktif"}
+                          </button>
+                        </div>
+
+                        <h3 className="font-display font-bold text-base text-slate-100">{task.name}</h3>
+                        
+                        <div className="mt-3 p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80">
+                          <span className="text-[10px] font-mono text-slate-400 uppercase block mb-1">
+                            Keyword Deteksi Nama File:
+                          </span>
+                          <code className="text-xs font-mono text-accent-cyan font-bold bg-accent-cyan/10 px-2 py-0.5 rounded border border-accent-cyan/20">
+                            {task.keyword}
+                          </code>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-end space-x-2 border-t border-card-border/30 pt-3 mt-4">
+                        <button
+                          onClick={() => setEditingTask(task)}
+                          className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs font-bold hover:bg-slate-700 transition cursor-pointer"
+                        >
+                          <Edit2 className="h-3.5 w-3.5" />
+                          <span>Edit</span>
+                        </button>
+                        <button
+                          onClick={() => handleDeleteTask(task.id)}
+                          className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/30 text-xs font-bold hover:bg-rose-500 hover:text-white transition cursor-pointer"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          <span>Hapus</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Individual Tasks List */}
+            <div className="space-y-4 pt-6 border-t border-card-border/40">
+              <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
+                <div>
+                  <h3 className="font-display font-bold text-base text-accent-purple flex items-center gap-2">
+                    <User className="h-5 w-5" />
+                    <span>Daftar Penugasan Individu ({individuTaskDefs.length})</span>
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Definisikan jenis tugas individu yang wajib dikumpulkan per anggota kelompok.
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => setShowAddIndividuModal(true)}>
+                  <Plus className="h-4 w-4 mr-1.5 text-accent-purple" />
+                  <span>Tambah Tugas Individu Baru</span>
+                </Button>
+              </div>
+
+              {individuTaskDefs.length === 0 ? (
+                <div className="glass rounded-2xl p-8 border border-card-border/40 text-center">
+                  <p className="text-sm text-slate-400 font-sans">Belum ada tugas individu yang ditambahkan.</p>
+                  <button
+                    onClick={() => setShowAddIndividuModal(true)}
+                    className="mt-3 inline-flex items-center text-xs font-bold text-accent-purple hover:underline cursor-pointer"
+                  >
+                    + Tambah Tugas Individu Pertama
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {individuTaskDefs.map((task, index) => (
+                    <div
+                      key={task.id}
+                      className="glass rounded-2xl p-5 border border-accent-purple/30 flex flex-col justify-between hover:border-accent-purple/60 transition"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-[10px] font-mono uppercase bg-slate-900 px-2.5 py-0.5 rounded-full border border-accent-purple/30 text-accent-cyan font-bold">
+                            #{index + 1} • Tugas Individu
+                          </span>
+                          <button
+                            onClick={() => handleToggleIndividuTaskActive(task.id)}
+                            className={`text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full border cursor-pointer ${
+                              task.is_active !== false
+                                ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/40"
+                                : "bg-slate-800 text-slate-500 border-slate-700"
+                            }`}
+                          >
+                            {task.is_active !== false ? "Aktif" : "Nonaktif"}
+                          </button>
+                        </div>
+
+                        <h3 className="font-display font-bold text-base text-slate-100">{task.name}</h3>
+                        
+                        <div className="mt-3 p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80">
+                          <span className="text-[10px] font-mono text-slate-400 uppercase block mb-1">
+                            Keyword Deteksi di Nama File:
+                          </span>
+                          <code className="text-xs font-mono text-accent-purple font-bold bg-accent-purple/10 px-2 py-0.5 rounded border border-accent-purple/20">
+                            {task.keyword}
+                          </code>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-end space-x-2 border-t border-card-border/30 pt-3 mt-4">
+                        <button
+                          onClick={() => setEditingIndividuTask(task)}
+                          className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs font-bold hover:bg-slate-700 transition cursor-pointer"
+                        >
+                          <Edit2 className="h-3.5 w-3.5" />
+                          <span>Edit</span>
+                        </button>
+                        <button
+                          onClick={() => handleDeleteIndividuTask(task.id)}
+                          className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/30 text-xs font-bold hover:bg-rose-500 hover:text-white transition cursor-pointer"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          <span>Hapus</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
           </div>
         )}
       </main>
@@ -983,6 +1711,240 @@ export default function AdminDashboardPage() {
                 </button>
                 <Button variant="primary" size="sm" type="submit">
                   Publikasikan Artikel
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showAddTaskModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="glass rounded-2xl p-6 border border-accent-cyan/40 max-w-md w-full">
+            <h3 className="font-display font-bold text-lg text-slate-100 mb-4">Tambah Tugas Kelompok Baru</h3>
+            <form onSubmit={handleCreateTask} className="space-y-4 text-xs font-sans">
+              <div>
+                <label className="block text-slate-400 uppercase font-mono mb-1">Nama Tugas</label>
+                <input
+                  type="text"
+                  required
+                  value={newTask.name}
+                  onChange={(e) => setNewTask({ ...newTask, name: e.target.value })}
+                  placeholder="Contoh: Video Yel-Yel Kelompok"
+                  className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-card-border text-slate-100 text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 uppercase font-mono mb-1">Keyword Deteksi Nama File</label>
+                <input
+                  type="text"
+                  required
+                  value={newTask.keyword}
+                  onChange={(e) => setNewTask({ ...newTask, keyword: e.target.value })}
+                  placeholder="Contoh: yel-yel"
+                  className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-card-border text-accent-cyan text-sm font-mono"
+                />
+                <p className="text-[10px] text-slate-500 mt-1">
+                  Sistem akan menganggap tugas selesai jika ada file di folder kelompok yang mengandung kata ini (case-insensitive).
+                </p>
+              </div>
+
+              <div className="flex items-center pt-2">
+                <label className="flex items-center space-x-2 cursor-pointer text-slate-300 font-mono text-xs">
+                  <input
+                    type="checkbox"
+                    checked={newTask.is_active}
+                    onChange={(e) => setNewTask({ ...newTask, is_active: e.target.checked })}
+                    className="rounded bg-slate-950 border-card-border text-accent-cyan focus:ring-0 h-4 w-4"
+                  />
+                  <span>Tugas Langsung Aktif</span>
+                </label>
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddTaskModal(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-300 text-xs cursor-pointer"
+                >
+                  Batal
+                </button>
+                <Button variant="primary" size="sm" type="submit" disabled={syncingFolders}>
+                  {syncingFolders ? "Menyimpan & Membuat Folder..." : "Simpan Tugas & Buat Folder"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {editingTask && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="glass rounded-2xl p-6 border border-accent-purple/40 max-w-md w-full">
+            <h3 className="font-display font-bold text-lg text-slate-100 mb-4">Edit Tugas Kelompok</h3>
+            <form onSubmit={handleUpdateTask} className="space-y-4 text-xs font-sans">
+              <div>
+                <label className="block text-slate-400 uppercase font-mono mb-1">Nama Tugas</label>
+                <input
+                  type="text"
+                  required
+                  value={editingTask.name}
+                  onChange={(e) => setEditingTask({ ...editingTask, name: e.target.value })}
+                  className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-card-border text-slate-100 text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 uppercase font-mono mb-1">Keyword Deteksi Nama File</label>
+                <input
+                  type="text"
+                  required
+                  value={editingTask.keyword}
+                  onChange={(e) => setEditingTask({ ...editingTask, keyword: e.target.value })}
+                  className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-card-border text-accent-cyan text-sm font-mono"
+                />
+              </div>
+
+              <div className="flex items-center pt-2">
+                <label className="flex items-center space-x-2 cursor-pointer text-slate-300 font-mono text-xs">
+                  <input
+                    type="checkbox"
+                    checked={editingTask.is_active}
+                    onChange={(e) => setEditingTask({ ...editingTask, is_active: e.target.checked })}
+                    className="rounded bg-slate-950 border-card-border text-accent-purple focus:ring-0 h-4 w-4"
+                  />
+                  <span>Tugas Aktif</span>
+                </label>
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingTask(null)}
+                  className="px-4 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-300 text-xs cursor-pointer"
+                >
+                  Batal
+                </button>
+                <Button variant="primary" size="sm" type="submit">
+                  Perbarui Tugas
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showAddIndividuModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="glass rounded-2xl p-6 border border-accent-purple/40 max-w-md w-full">
+            <h3 className="font-display font-bold text-lg text-slate-100 mb-4">Tambah Tugas Individu Baru</h3>
+            <form onSubmit={handleCreateIndividuTask} className="space-y-4 text-xs font-sans">
+              <div>
+                <label className="block text-slate-400 uppercase font-mono mb-1">Nama Tugas Individu</label>
+                <input
+                  type="text"
+                  required
+                  value={newIndividuTask.name}
+                  onChange={(e) => setNewIndividuTask({ ...newIndividuTask, name: e.target.value })}
+                  placeholder="Contoh: Jurnal Harian & Resume"
+                  className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-card-border text-slate-100 text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 uppercase font-mono mb-1">Keyword Deteksi Nama File</label>
+                <input
+                  type="text"
+                  required
+                  value={newIndividuTask.keyword}
+                  onChange={(e) => setNewIndividuTask({ ...newIndividuTask, keyword: e.target.value })}
+                  placeholder="Contoh: jurnal"
+                  className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-card-border text-accent-purple text-sm font-mono"
+                />
+                <p className="text-[10px] text-slate-500 mt-1">
+                  Sistem akan menganggap tugas individu selesai jika berkas milik anggota mengandung kata ini.
+                </p>
+              </div>
+
+              <div className="flex items-center pt-2">
+                <label className="flex items-center space-x-2 cursor-pointer text-slate-300 font-mono text-xs">
+                  <input
+                    type="checkbox"
+                    checked={newIndividuTask.is_active}
+                    onChange={(e) => setNewIndividuTask({ ...newIndividuTask, is_active: e.target.checked })}
+                    className="rounded bg-slate-950 border-card-border text-accent-purple focus:ring-0 h-4 w-4"
+                  />
+                  <span>Tugas Langsung Aktif</span>
+                </label>
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddIndividuModal(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-300 text-xs cursor-pointer"
+                >
+                  Batal
+                </button>
+                <Button variant="primary" size="sm" type="submit">
+                  Simpan Tugas Individu
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {editingIndividuTask && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="glass rounded-2xl p-6 border border-accent-purple/40 max-w-md w-full">
+            <h3 className="font-display font-bold text-lg text-slate-100 mb-4">Edit Tugas Individu</h3>
+            <form onSubmit={handleUpdateIndividuTask} className="space-y-4 text-xs font-sans">
+              <div>
+                <label className="block text-slate-400 uppercase font-mono mb-1">Nama Tugas Individu</label>
+                <input
+                  type="text"
+                  required
+                  value={editingIndividuTask.name}
+                  onChange={(e) => setEditingIndividuTask({ ...editingIndividuTask, name: e.target.value })}
+                  className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-card-border text-slate-100 text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 uppercase font-mono mb-1">Keyword Deteksi Nama File</label>
+                <input
+                  type="text"
+                  required
+                  value={editingIndividuTask.keyword}
+                  onChange={(e) => setEditingIndividuTask({ ...editingIndividuTask, keyword: e.target.value })}
+                  className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-card-border text-accent-purple text-sm font-mono"
+                />
+              </div>
+
+              <div className="flex items-center pt-2">
+                <label className="flex items-center space-x-2 cursor-pointer text-slate-300 font-mono text-xs">
+                  <input
+                    type="checkbox"
+                    checked={editingIndividuTask.is_active !== false}
+                    onChange={(e) => setEditingIndividuTask({ ...editingIndividuTask, is_active: e.target.checked })}
+                    className="rounded bg-slate-950 border-card-border text-accent-purple focus:ring-0 h-4 w-4"
+                  />
+                  <span>Tugas Aktif</span>
+                </label>
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingIndividuTask(null)}
+                  className="px-4 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-300 text-xs cursor-pointer"
+                >
+                  Batal
+                </button>
+                <Button variant="primary" size="sm" type="submit">
+                  Perbarui Tugas Individu
                 </Button>
               </div>
             </form>

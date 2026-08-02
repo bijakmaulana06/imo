@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -15,20 +15,81 @@ import {
   Users
 } from "lucide-react";
 import ImoLogo from "./ImoLogo";
+import { createClient } from "@/utils/supabase/client";
+
+interface NavItem {
+  id: string;
+  name: string;
+  label: string;
+  href: string;
+  icon: any;
+  enabled: boolean;
+}
+
+const DEFAULT_NAV: NavItem[] = [
+  { id: "guide", name: "Panduan", label: "Panduan & Artikel", href: "/guide", icon: BookOpen, enabled: true },
+  { id: "hub", name: "Penjelajahan", label: "Pusat Hub", href: "/hub", icon: Compass, enabled: true },
+  { id: "info", name: "Status Tugas", label: "Scanner Drive", href: "/info", icon: CheckCircle2, enabled: true },
+  { id: "id-card", name: "ID Card", label: "Generator Card", href: "/id-card", icon: QrCode, enabled: true },
+  { id: "documents", name: "Auto Form", label: "Doc Generator", href: "/documents", icon: FileEdit, enabled: true },
+  { id: "contact", name: "Kontak LO", label: "Pendamping", href: "/contact", icon: Users, enabled: true },
+];
 
 export default function Navbar() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
+  const [siteYear, setSiteYear] = useState("2026");
+  const [navigation, setNavigation] = useState<NavItem[]>(DEFAULT_NAV);
 
-  const navigation = [
-    { name: "Panduan", label: "Panduan & Artikel", href: "/guide", icon: BookOpen },
-    { name: "Penjelajahan", label: "Pusat Hub", href: "/hub", icon: Compass },
-    { name: "Status Tugas", label: "Scanner Drive", href: "/info", icon: CheckCircle2 },
-    { name: "ID Card", label: "Generator Card", href: "/id-card", icon: QrCode },
-    { name: "Auto Form", label: "Doc Generator", href: "/documents", icon: FileEdit },
-    { name: "Kontak LO", label: "Pendamping", href: "/contact", icon: Users },
-  ];
+  useEffect(() => {
+    const fetchConfigs = async () => {
+      try {
+        const supabase = createClient();
+        const { data } = await supabase
+          .from("system_settings")
+          .select("key, value")
+          .in("key", ["brand_config", "feature_flags"]);
 
+        if (data) {
+          data.forEach((row: any) => {
+            if (row.key === "brand_config" && row.value) {
+              try {
+                const cfg = JSON.parse(row.value);
+                if (cfg.siteYear) setSiteYear(cfg.siteYear);
+              } catch {}
+            }
+            if (row.key === "feature_flags" && row.value) {
+              try {
+                const flags = JSON.parse(row.value);
+                if (flags.navItems && Array.isArray(flags.navItems)) {
+                  const enabledMap: Record<string, boolean> = {};
+                  flags.navItems.forEach((n: any) => { enabledMap[n.id] = n.enabled; });
+                  setNavigation(prev =>
+                    prev.map(item => ({
+                      ...item,
+                      enabled: enabledMap[item.id] !== undefined ? enabledMap[item.id] : true,
+                    }))
+                  );
+                }
+              } catch {}
+            }
+          });
+        }
+      } catch {}
+    };
+    fetchConfigs();
+
+    // Listen for live theme updates from settings
+    const handleThemeLoaded = (e: CustomEvent) => {
+      if (e.detail?.siteYear) setSiteYear(e.detail.siteYear);
+    };
+    window.addEventListener("imo-theme-loaded", handleThemeLoaded as EventListener);
+    return () => {
+      window.removeEventListener("imo-theme-loaded", handleThemeLoaded as EventListener);
+    };
+  }, []);
+
+  const visibleNav = navigation.filter(item => item.enabled);
   const isActive = (path: string) => pathname === path;
 
   return (
@@ -47,14 +108,14 @@ export default function Navbar() {
               </div>
               <div className="flex items-center space-x-2">
                 <ImoLogo height={38} className="h-8 md:h-9 filter drop-shadow-[0_0_12px_rgba(255,255,255,0.9)]" />
-                <span className="font-display font-black text-accent-purple text-base md:text-lg tracking-wider glow-text-purple">2026</span>
+                <span className="font-display font-black text-accent-purple text-base md:text-lg tracking-wider glow-text-purple">{siteYear}</span>
               </div>
             </Link>
           </div>
 
-          {/* Desktop Navigation Links with Icon & Small Text Underneath */}
+          {/* Desktop Navigation Links */}
           <div className="hidden md:flex items-center space-x-2">
-            {navigation.map((item) => {
+            {visibleNav.map((item) => {
               const Icon = item.icon;
               const active = isActive(item.href);
 
@@ -94,11 +155,11 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* Mobile Drawer (Compact Grid with Icon & Text) */}
+      {/* Mobile Drawer */}
       {isOpen && (
         <div className="md:hidden relative z-[110] glass border-t border-card-border/60 animate-in slide-in-from-top duration-300">
           <div className="p-4 grid grid-cols-3 gap-2 bg-[#020510]/98 backdrop-blur-2xl">
-            {navigation.map((item) => {
+            {visibleNav.map((item) => {
               const Icon = item.icon;
               const active = isActive(item.href);
 
