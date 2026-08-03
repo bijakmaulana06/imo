@@ -71,10 +71,10 @@ function CSSStarfieldFallback() {
         }}
       />
       {/* Volumetric Nebula Glow Clouds */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] rounded-full bg-[radial-gradient(circle,rgba(125,249,255,0.18)_0%,rgba(180,140,255,0.1)_35%,transparent_70%)] filter blur-3xl animate-pulse" />
-      <div className="absolute bottom-1/4 right-1/4 w-[600px] h-[600px] rounded-full bg-[radial-gradient(circle,rgba(255,113,206,0.15)_0%,rgba(0,240,255,0.08)_45%,transparent_70%)] filter blur-3xl animate-pulse" style={{ animationDuration: "6s" }} />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] rounded-full bg-[radial-gradient(circle,rgba(125,249,255,0.12)_0%,rgba(180,140,255,0.08)_35%,transparent_70%)] filter blur-3xl" />
+      <div className="absolute bottom-1/4 right-1/4 w-[600px] h-[600px] rounded-full bg-[radial-gradient(circle,rgba(255,113,206,0.1)_0%,rgba(0,240,255,0.05)_45%,transparent_70%)] filter blur-3xl" />
       {/* Dark Vignette Contrast Overlay */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_30%,rgba(2,5,16,0.85)_100%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_25%,rgba(2,5,16,0.85)_100%)]" />
     </div>
   );
 }
@@ -90,8 +90,8 @@ function createSoftGlowTexture() {
 
   const gradient = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
   gradient.addColorStop(0, "rgba(255, 255, 255, 1)");
-  gradient.addColorStop(0.2, "rgba(255, 255, 255, 0.8)");
-  gradient.addColorStop(0.5, "rgba(255, 255, 255, 0.2)");
+  gradient.addColorStop(0.25, "rgba(255, 255, 255, 0.7)");
+  gradient.addColorStop(0.6, "rgba(255, 255, 255, 0.15)");
   gradient.addColorStop(1, "rgba(255, 255, 255, 0)");
 
   ctx.fillStyle = gradient;
@@ -121,15 +121,15 @@ function GalaxyParticles() {
     const sz = new Float32Array(PARTICLE_COUNT);
     const offsets = new Float32Array(PARTICLE_COUNT);
 
-    const colorCore = new THREE.Color("#fff5e6");
-    const colorMid = new THREE.Color("#7df9ff");
+    const colorCore = new THREE.Color("#7df9ff");
+    const colorMid = new THREE.Color("#00f0ff");
     const colorOuter = new THREE.Color("#b48cff");
     const colorDust = new THREE.Color("#ff71ce");
     const colorCyan = new THREE.Color("#00f0ff");
 
     for (let i = 0; i < PARTICLE_COUNT; i++) {
       const i3 = i * 3;
-      const isCore = Math.random() < 0.25;
+      const isCore = Math.random() < 0.22;
 
       let x: number, y: number, z: number;
       const mixColor = new THREE.Color();
@@ -141,8 +141,8 @@ function GalaxyParticles() {
         z = Math.sin(theta) * r;
         y = (Math.random() - 0.5) * GALAXY_THICKNESS * 0.6;
 
-        mixColor.lerpColors(colorCore, colorMid, Math.random() * 0.4);
-        sz[i] = Math.random() * 2.8 + 1.2;
+        mixColor.lerpColors(colorCore, colorMid, Math.random() * 0.5);
+        sz[i] = Math.random() * 2.5 + 1.0;
       } else {
         const armIndex = Math.floor(Math.random() * ARMS);
         const armAngle = (armIndex / ARMS) * Math.PI * 2;
@@ -228,8 +228,8 @@ function GalaxyParticles() {
 
             float core = 1.0 - smoothstep(0.0, 0.12, dist);
 
-            vec3 finalColor = vColor * strength + vec3(1.0) * core * 0.6;
-            float alpha = strength * vAlpha * 0.9;
+            vec3 finalColor = vColor * strength + vec3(0.5, 0.8, 1.0) * core * 0.3;
+            float alpha = strength * vAlpha * 0.85;
 
             gl_FragColor = vec4(finalColor, alpha);
           }
@@ -245,7 +245,7 @@ function GalaxyParticles() {
   useFrame((state) => {
     const elapsed = state.clock.elapsedTime;
     if (pointsRef.current) {
-      pointsRef.current.rotation.y = elapsed * 0.018;
+      pointsRef.current.rotation.y = elapsed * 0.055;
     }
     if (shaderMaterial.uniforms) {
       shaderMaterial.uniforms.uTime.value = elapsed;
@@ -270,7 +270,7 @@ function OrganicNebulaClouds() {
   const glowTexture = useMemo(() => createSoftGlowTexture(), []);
 
   const { positions, colors, sizes } = useMemo(() => {
-    const COUNT = 250;
+    const COUNT = 220;
     const pos = new Float32Array(COUNT * 3);
     const col = new Float32Array(COUNT * 3);
     const sz = new Float32Array(COUNT);
@@ -284,20 +284,20 @@ function OrganicNebulaClouds() {
 
     for (let i = 0; i < COUNT; i++) {
       const i3 = i * 3;
-      const r = Math.random() * 22;
+      const r = Math.random() * 20;
       const theta = Math.random() * Math.PI * 2;
-      const y = (Math.random() - 0.5) * 6;
+      const y = (Math.random() - 0.5) * 5;
 
       pos[i3] = Math.cos(theta) * r;
       pos[i3 + 1] = y;
-      pos[i3 + 2] = Math.sin(theta) * r - 5;
+      pos[i3 + 2] = Math.sin(theta) * r;
 
       const baseColor = colorsList[Math.floor(Math.random() * colorsList.length)];
       col[i3] = baseColor.r;
       col[i3 + 1] = baseColor.g;
       col[i3 + 2] = baseColor.b;
 
-      sz[i] = 12 + Math.random() * 18;
+      sz[i] = 12 + Math.random() * 16;
     }
 
     return { positions: pos, colors: col, sizes: sz };
@@ -305,7 +305,7 @@ function OrganicNebulaClouds() {
 
   useFrame((state) => {
     if (pointsRef.current) {
-      pointsRef.current.rotation.y = state.clock.elapsedTime * 0.005;
+      pointsRef.current.rotation.y = state.clock.elapsedTime * 0.025;
     }
   });
 
@@ -334,7 +334,7 @@ function BackgroundStars() {
   const pointsRef = useRef<THREE.Points>(null);
 
   const { positions, colors } = useMemo(() => {
-    const COUNT = 3500;
+    const COUNT = 4000;
     const pos = new Float32Array(COUNT * 3);
     const col = new Float32Array(COUNT * 3);
 
@@ -363,7 +363,7 @@ function BackgroundStars() {
 
   useFrame((state) => {
     if (pointsRef.current) {
-      pointsRef.current.rotation.y = state.clock.elapsedTime * 0.003;
+      pointsRef.current.rotation.y = state.clock.elapsedTime * 0.015;
     }
   });
 
@@ -373,7 +373,7 @@ function BackgroundStars() {
         <bufferAttribute attach="attributes-position" args={[positions, 3]} />
         <bufferAttribute attach="attributes-color" args={[colors, 3]} />
       </bufferGeometry>
-      <pointsMaterial vertexColors size={0.18} sizeAttenuation transparent opacity={0.8} blending={THREE.AdditiveBlending} depthWrite={false} />
+      <pointsMaterial vertexColors size={0.22} sizeAttenuation transparent opacity={0.85} blending={THREE.AdditiveBlending} depthWrite={false} />
     </points>
   );
 }
@@ -381,12 +381,51 @@ function BackgroundStars() {
 /* ─────────────────────── 4. Camera Rig ─────────────────────── */
 function CameraRig() {
   const { camera } = useThree();
+  const targetScrollY = useRef(0);
+  const currentScrollY = useRef(0);
 
-  useFrame((state) => {
+  useEffect(() => {
+    const handleScroll = () => {
+      const maxScroll = Math.max(document.documentElement.scrollHeight - window.innerHeight, 1);
+      targetScrollY.current = Math.min(Math.max(window.scrollY / maxScroll, 0), 1);
+    };
+    
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("resize", handleScroll, { passive: true });
+    handleScroll();
+    
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", handleScroll);
+    };
+  }, []);
+
+  useFrame((state, delta) => {
+    // Smooth out scroll step jumps to eliminate wheel tick jitter
+    currentScrollY.current = THREE.MathUtils.damp(currentScrollY.current, targetScrollY.current, 4, delta);
+
     const t = state.clock.elapsedTime;
-    camera.position.x = Math.sin(t * 0.05) * 1.8;
-    camera.position.y = 9 + Math.sin(t * 0.03) * 0.8;
-    camera.position.z = 20 + Math.cos(t * 0.04) * 1.2;
+    
+    const pointerX = state.pointer.x * 2.2;
+    const pointerY = state.pointer.y * 1.5;
+
+    const idleX = Math.sin(t * 0.15) * 2.0 + pointerX;
+    const idleY = 9 + Math.sin(t * 0.12) * 1.2 + pointerY;
+    const idleZ = 20 + Math.cos(t * 0.1) * 1.5;
+
+    const scrollZ = currentScrollY.current * -10; 
+    const scrollX = Math.sin(currentScrollY.current * Math.PI) * 4;
+    const scrollY_pos = currentScrollY.current * -2;
+
+    const targetX = idleX + scrollX;
+    const targetY = idleY + scrollY_pos;
+    const targetZ = idleZ + scrollZ;
+
+    camera.position.x = THREE.MathUtils.damp(camera.position.x, targetX, 3, delta);
+    camera.position.y = THREE.MathUtils.damp(camera.position.y, targetY, 3, delta);
+    camera.position.z = THREE.MathUtils.damp(camera.position.z, targetZ, 3, delta);
+
+    // KUNCI UTAMA STABILITAS: lookAt murni tanpa manipulasi rotation.z manual yang memicu konflik matriks & getaran
     camera.lookAt(0, 0, 0);
   });
 
@@ -426,7 +465,7 @@ export default function StarfieldBackground() {
           style={{ background: "linear-gradient(180deg, #020510 0%, #050917 50%, #080d1e 100%)" }}
         >
           <CameraRig />
-          <ambientLight intensity={0.3} />
+          <ambientLight intensity={0.4} />
 
           {/* 3D Photorealistic Galaxy Particles */}
           <GalaxyParticles />
@@ -439,8 +478,8 @@ export default function StarfieldBackground() {
         </Canvas>
       </div>
 
-      {/* Brightness Filter & Vignette Overlay Layer */}
-      <div className="fixed inset-0 -z-40 bg-[#020510]/47 bg-[radial-gradient(ellipse_at_center,transparent_30%,rgba(2,5,16,0.9)_100%)] pointer-events-none" />
+      {/* Dark Space Vignette Contrast Overlay */}
+      <div className="fixed inset-0 -z-40 bg-[#020510]/35 bg-[radial-gradient(ellipse_at_center,transparent_20%,rgba(2,5,16,0.85)_100%)] pointer-events-none" />
     </WebGLErrorBoundary>
   );
 }

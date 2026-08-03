@@ -17,7 +17,7 @@ import {
   Calendar,
   ChevronDown,
 } from "lucide-react";
-import Link from "next/link";
+import { Link } from "next-view-transitions";
 import { useRouter } from "next/navigation";
 
 export default function FillDocumentFormPage({
@@ -136,7 +136,7 @@ export default function FillDocumentFormPage({
 
   if (loading) {
     return (
-      <div className="relative min-h-screen bg-[#020510] text-foreground font-sans flex items-center justify-center">
+      <div className="relative min-h-screen z-0 bg-[#020510] text-foreground font-sans flex items-center justify-center">
         <StarfieldBackground />
         <div className="relative z-10 text-center text-slate-400 flex flex-col items-center gap-3">
           <div className="w-10 h-10 border-4 border-accent-cyan/30 border-t-accent-cyan rounded-full animate-spin" />
@@ -148,7 +148,7 @@ export default function FillDocumentFormPage({
 
   if (errorMsg && !template) {
     return (
-      <div className="relative min-h-screen bg-[#020510] text-foreground font-sans pt-28">
+      <div className="relative min-h-screen z-0 bg-[#020510] text-foreground font-sans pt-28">
         <StarfieldBackground />
         <Navbar />
         <main className="relative z-10 max-w-xl mx-auto px-4">
@@ -166,7 +166,7 @@ export default function FillDocumentFormPage({
   }
 
   return (
-    <div className="relative min-h-screen bg-[#020510] text-foreground font-sans pb-20">
+    <div className="relative min-h-screen flex flex-col z-0 bg-[#020510] text-foreground font-sans pb-20">
       <StarfieldBackground />
       <Navbar />
 

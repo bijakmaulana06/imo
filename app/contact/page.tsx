@@ -6,6 +6,7 @@ import StarfieldBackground from "@/components/StarfieldBackground";
 import Card from "@/components/Card";
 import { createClient } from "@/utils/supabase/client";
 import { MessageSquare, Search, AlertCircle, Users, ExternalLink } from "lucide-react";
+import { useSiteConfig } from "@/components/SiteConfigProvider";
 
 interface ContactPerson {
   id: string;
@@ -32,6 +33,7 @@ const DEFAULT_CONTACTS: ContactPerson[] = [
 ];
 
 export default function ContactPage() {
+  const { config } = useSiteConfig();
   const supabase = createClient();
   const [contacts, setContacts] = useState<ContactPerson[]>(DEFAULT_CONTACTS);
   const [loading, setLoading] = useState(false);
@@ -83,10 +85,10 @@ export default function ContactPage() {
       <main className="flex-grow py-12 px-4 max-w-6xl mx-auto w-full relative z-10">
         <div className="text-center mb-12">
           <h1 className="text-3xl md:text-5xl font-display font-extrabold tracking-wider bg-gradient-to-r from-accent-cyan via-accent-purple to-accent-cyan bg-clip-text text-transparent mb-4">
-            LO & PENDAMPING KELOMPOK
+            {config.contactHeroTitle || "LO & PENDAMPING KELOMPOK"}
           </h1>
           <p className="text-slate-400 text-sm md:text-base max-w-xl mx-auto font-sans leading-relaxed">
-            Temukan pemandu orbit Anda. Cari berdasarkan nama kelompok atau nama LO untuk menghubungi langsung.
+            {config.contactHeroSubtitle || "Temukan pemandu orbit Anda. Cari berdasarkan nama kelompok atau nama LO untuk menghubungi langsung."}
           </p>
         </div>
 

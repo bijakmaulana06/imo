@@ -7,7 +7,7 @@ import Card from "@/components/Card";
 import Button from "@/components/Button";
 import { createClient } from "@/utils/supabase/client";
 import { motion, AnimatePresence } from "framer-motion";
-import Link from "next/link";
+import { Link } from "next-view-transitions";
 import {
   Megaphone,
   Pin,
@@ -35,6 +35,7 @@ import {
   ArrowRight,
   Download
 } from "lucide-react";
+import { useSiteConfig } from "@/components/SiteConfigProvider";
 
 interface Announcement {
   id: string;
@@ -57,6 +58,7 @@ interface ProcessedArticle {
 }
 
 export default function InteractiveGuidePage() {
+  const { config } = useSiteConfig();
   const [articles, setArticles] = useState<ProcessedArticle[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedCategory, setSelectedCategory] = useState<string>("Semua");
@@ -348,11 +350,11 @@ Gunakan tombol "Buka Generator Autoform Surat" di bawah ini untuk mengisi dan me
           </div>
           
           <h1 className="text-3xl md:text-5xl font-display font-black tracking-wider text-slate-100 mb-2">
-            PANDUAN & <span className="text-accent-cyan">EMBED DOKUMEN</span>
+            {config.guideHeroTitle || "PANDUAN & EMBED DOKUMEN"}
           </h1>
           
           <p className="text-slate-400 text-xs md:text-sm max-w-2xl mx-auto leading-relaxed">
-            Halaman interaktif pengumuman resmi &amp; contoh surat. Tinjau dokumen (Jadwal, Gesang Kendaraan, Contoh Surat) bersandingan dengan petunjuk &amp; tombol langsung ke Auto-Form Generator.
+            {config.guideHeroSubtitle || "Halaman interaktif pengumuman resmi & contoh surat. Tinjau dokumen (Jadwal, Gesang Kendaraan, Contoh Surat) bersandingan dengan petunjuk & tombol langsung ke Auto-Form Generator."}
           </p>
         </div>
 

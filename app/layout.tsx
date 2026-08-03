@@ -3,7 +3,8 @@ import { Josefin_Sans, Montserrat, Cinzel_Decorative, Griffy } from "next/font/g
 import "./globals.css";
 import "cropperjs/dist/cropper.css";
 import PushNotificationManager from "@/components/PushNotificationManager";
-import ThemeProvider from "@/components/ThemeProvider";
+import SiteConfigProvider from "@/components/SiteConfigProvider";
+import { ViewTransitions } from "next-view-transitions";
 
 const josefinSans = Josefin_Sans({
   variable: "--font-josefin",
@@ -40,19 +41,21 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="id"
-      className={`${josefinSans.variable} ${montserrat.variable} ${cinzelDecorative.variable} ${griffy.variable} h-full antialiased dark`}
-    >
-      <body className="min-h-full flex flex-col bg-background text-foreground font-sans">
-        {/* ThemeProvider: injects CSS custom properties from admin brand_config settings */}
-        <ThemeProvider />
-        {children}
-        <PushNotificationManager />
-        {/* Eruda Mobile DevTools Console */}
-        <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
-        <script dangerouslySetInnerHTML={{ __html: "eruda.init();" }} />
-      </body>
-    </html>
+    <ViewTransitions>
+      <html
+        lang="id"
+        className={`${josefinSans.variable} ${montserrat.variable} ${cinzelDecorative.variable} ${griffy.variable} h-full antialiased dark`}
+      >
+        <body className="min-h-full flex flex-col bg-background text-foreground font-sans">
+          <SiteConfigProvider>
+            {children}
+            <PushNotificationManager />
+          </SiteConfigProvider>
+          {/* Eruda Mobile DevTools Console */}
+          <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
+          <script dangerouslySetInnerHTML={{ __html: "eruda.init();" }} />
+        </body>
+      </html>
+    </ViewTransitions>
   );
 }

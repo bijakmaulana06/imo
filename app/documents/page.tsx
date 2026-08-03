@@ -8,7 +8,7 @@ import Navbar from "@/components/Navbar";
 import { createClient } from "@/utils/supabase/client";
 import { DocumentTemplate } from "@/types/document";
 import { FileText, ArrowRight, Sparkles, FileEdit, CheckCircle2 } from "lucide-react";
-import Link from "next/link";
+import { Link } from "next-view-transitions";
 
 export default function PublicDocumentsCatalogPage() {
   const [templates, setTemplates] = useState<DocumentTemplate[]>([]);
@@ -39,7 +39,7 @@ export default function PublicDocumentsCatalogPage() {
   };
 
   return (
-    <div className="relative min-h-screen bg-[#020510] text-foreground font-sans pb-20">
+    <div className="relative min-h-screen flex flex-col z-0 bg-[#020510] text-foreground font-sans pb-20">
       <StarfieldBackground />
       <Navbar />
 

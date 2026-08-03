@@ -5,7 +5,7 @@ import webpush from "web-push";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { title, message, url, icon, tag } = body;
+    const { title, message, url, icon, tag, isTest, testEndpoint } = body;
 
     if (!title || !message) {
       return NextResponse.json(
@@ -95,6 +95,19 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    if (isTest && testEndpoint) {
+      // Find the specific subscription for test
+      subscriptions = subscriptions.filter(s => s.endpoint === testEndpoint);
+      if (subscriptions.length === 0) {
+        // If not found in DB but provided in request, construct a temp subscription object
+        // Note: We need keys for this to work, so the testEndpoint must exist in DB.
+        return NextResponse.json({
+          error: "Perangkat penguji belum berlangganan notifikasi. Harap aktifkan notifikasi di browser Anda terlebih dahulu.",
+          status: 404
+        });
+      }
+    }
+
     if (subscriptions.length === 0) {
       return NextResponse.json({
         success: true,
@@ -109,7 +122,7 @@ export async function POST(request: NextRequest) {
       body: message,
       url: url || "/info",
       icon: icon || "/favicon.ico",
-      tag: tag || "imo-push"
+      tag: tag || (isTest ? "imo-test-push" : "imo-push")
     });
 
     let successCount = 0;

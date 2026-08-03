@@ -313,7 +313,7 @@ export default function CreateDocumentTemplatePage() {
   };
 
   return (
-    <div className="relative min-h-screen bg-[#020510] text-foreground font-sans pb-20">
+    <div className="relative min-h-screen flex flex-col z-0 bg-[#020510] text-foreground font-sans pb-20">
       <StarfieldBackground />
       <Navbar />
 

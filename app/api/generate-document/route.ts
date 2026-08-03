@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
           .replace(/<w:proofWarning[^>]*\/>/g, "")
           .replace(/<w:noProof[^>]*\/>/g, "")
           .replace(/<w:lang[^>]*\/>/g, "");
-
+        
         // Auto-repair tag mistyped seperti {prodi), {tag) menjadi {prodi} {tag}
         cleanedXml = cleanedXml.replace(/\{([a-zA-Z0-9_\-\s]+)\)[,\s]*/g, "{$1} ");
         zip.file(fileName, cleanedXml);

@@ -32,6 +32,7 @@
     "lucide-react": "^1.25.0",
     "mammoth": "^1.12.0",
     "next": "16.2.10",
+    "next-view-transitions": "^0.3.5",
     "opentype.js": "^2.0.0",
     "pg": "^8.22.0",
     "pizzip": "^3.2.0",

@@ -7,6 +7,8 @@ import Button from "@/components/Button";
 import ImoLogo from "@/components/ImoLogo";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
+import { Link } from "next-view-transitions";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Layers,
   Users,
@@ -26,10 +28,14 @@ import {
   Upload,
   ListChecks,
   Edit2,
+  FileText,
+  Download,
+  XCircle,
+  CheckCircle,
 } from "lucide-react";
 import { DEFAULT_ID_CARD_TEMPLATE } from "@/lib/defaultTemplate";
 
-type ActiveTab = "links" | "contacts" | "announcements" | "templates" | "tasks";
+type ActiveTab = "links" | "contacts" | "announcements" | "templates" | "tasks" | "doc_templates";
 
 const DEFAULT_ADMIN_HTML_TEMPLATE = DEFAULT_ID_CARD_TEMPLATE;
 
@@ -43,6 +49,7 @@ export default function AdminDashboardPage() {
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [templates, setTemplates] = useState<any[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
+  const [docTemplates, setDocTemplates] = useState<any[]>([]);
   const [gdriveLink, setGdriveLink] = useState<string>("");
   const [targetTotalGroups, setTargetTotalGroups] = useState<number>(20);
   const [targetMembersPerGroup, setTargetMembersPerGroup] = useState<number>(10);
@@ -301,6 +308,9 @@ export default function AdminDashboardPage() {
       const { data: taskData } = await supabase.from("task_definitions").select("*").order("name", { ascending: true });
       setTasks(taskData || []);
 
+      const { data: docData } = await supabase.from("document_templates").select("*").order("created_at", { ascending: false });
+      setDocTemplates(docData || []);
+
       const { data: settingData } = await supabase.from("system_settings").select("key, value").in("key", ["gdrive_parent_folder", "total_groups_count", "target_members_per_group", "task_definitions_individu"]);
       if (settingData) {
         const folderSetting = settingData.find((s: any) => s.key === "gdrive_parent_folder");
@@ -328,6 +338,30 @@ export default function AdminDashboardPage() {
       console.error("Dashboard Load Error:", err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleToggleDocTemplateActive = async (id: string, currentActive: boolean) => {
+    try {
+      const { error } = await supabase
+        .from("document_templates")
+        .update({ is_active: !currentActive, updated_at: new Date().toISOString() })
+        .eq("id", id);
+      if (error) throw error;
+      loadData();
+    } catch (err: any) {
+      alert("Gagal mengubah status template: " + err.message);
+    }
+  };
+
+  const handleDeleteDocTemplate = async (id: string) => {
+    if (!confirm("Apakah Anda yakin ingin menghapus template dokumen ini?")) return;
+    try {
+      const { error } = await supabase.from("document_templates").delete().eq("id", id);
+      if (error) throw error;
+      loadData();
+    } catch (err: any) {
+      alert("Gagal menghapus template: " + err.message);
     }
   };
 
@@ -765,111 +799,324 @@ export default function AdminDashboardPage() {
       </header>
 
       <main className="flex-grow max-w-6xl mx-auto w-full px-4 py-10 relative z-10">
-        <div className="flex flex-wrap gap-3 mb-8 border-b border-card-border/30 pb-4 items-center justify-between">
-          <div className="flex flex-wrap gap-3">
+        {/* Simple Node Map UI with Connected Circuit SVG */}
+        <div className="relative flex flex-col items-center py-6 w-full mb-8 border-b border-card-border/30">
+          
+          {/* Quick Actions floating at top right */}
+          <div className="absolute top-2 right-2 z-20">
+            <Link href="/admin/settings" className="flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-mono font-bold bg-accent-purple/10 text-accent-purple border border-accent-purple/30 hover:bg-accent-purple hover:text-black hover:shadow-[0_0_15px_rgba(179,136,255,0.4)] transition duration-300">
+              <Sparkles className="h-4 w-4" />
+              <span className="hidden sm:inline">Pengaturan Web & Push</span>
+            </Link>
+          </div>
+
+          {/* Central Hub IMO Node */}
+          <div className="relative z-20 flex flex-col items-center">
+            <motion.div 
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.4, type: "spring" }}
+              className="h-20 w-20 bg-slate-900 border-2 border-accent-cyan/60 rounded-3xl flex items-center justify-center shadow-[0_0_35px_rgba(125,249,255,0.25)] relative group cursor-pointer"
+            >
+              <ImoLogo height={42} />
+              <span className="absolute -inset-1 rounded-3xl border border-accent-cyan/40 animate-ping opacity-20 pointer-events-none"></span>
+            </motion.div>
+            <h1 className="mt-3 text-sm font-display font-extrabold text-accent-cyan tracking-widest uppercase">Admin Dashboard</h1>
+            <p className="text-[10px] text-slate-400 font-mono">Pusat Kendali Data</p>
+          </div>
+
+          {/* Connected Circuit Lines Canvas (Desktop) */}
+          <div className="relative w-full max-w-4xl h-16 my-1 hidden sm:block pointer-events-none">
+            <svg className="w-full h-full overflow-visible" viewBox="0 0 1000 70" preserveAspectRatio="none">
+              {/* Central Vertical Trunk Line coming down from IMO Logo (x=500, y=0 to y=35) */}
+              <line x1="500" y1="0" x2="500" y2="35" stroke="#7df9ff" strokeWidth="2.5" strokeDasharray="5 3" className="animate-pulse" />
+              <circle cx="500" cy="35" r="4" fill="#7df9ff" className="shadow-[0_0_12px_#7df9ff]" />
+
+              {/* Horizontal Bus Line across all 6 nodes (y=35, x=65 to x=935) */}
+              <line x1="65" y1="35" x2="935" y2="35" stroke="rgba(125,249,255,0.35)" strokeWidth="2" />
+
+              {/* Vertical Drop Lines to 6 Nodes */}
+              {[65, 239, 413, 587, 761, 935].map((x, idx) => {
+                const nodeIds: ActiveTab[] = ["links", "contacts", "announcements", "templates", "tasks", "doc_templates"];
+                const isSelected = activeTab === nodeIds[idx];
+                return (
+                  <g key={idx}>
+                    <line 
+                      x1={x} 
+                      y1="35" 
+                      x2={x} 
+                      y2="70" 
+                      stroke={isSelected ? "#7df9ff" : "rgba(255,255,255,0.25)"} 
+                      strokeWidth={isSelected ? "3" : "1.5"} 
+                    />
+                    <circle 
+                      cx={x} 
+                      cy="35" 
+                      r={isSelected ? "4" : "2.5"} 
+                      fill={isSelected ? "#7df9ff" : "rgba(255,255,255,0.4)"} 
+                    />
+                  </g>
+                );
+              })}
+            </svg>
+          </div>
+
+          {/* Node Buttons Bar (Desktop - 6 Nodes) */}
+          <div className="relative w-full max-w-4xl flex justify-between items-start mt-2 z-10 hidden sm:flex">
             {[
-              { id: "links", label: "Grid Menu Links (/hub)", icon: Layers, count: links.length },
-              { id: "contacts", label: "Kontak LO (/contact)", icon: Users, count: contacts.length },
-              { id: "announcements", label: "Pengumuman Misi", icon: Megaphone, count: announcements.length },
-              { id: "templates", label: "Template ID Card", icon: CreditCard, count: templates.length },
-              { id: "tasks", label: "Penugasan Kelompok", icon: ListChecks, count: tasks.length },
+              { id: "links", label: "Menu Links", icon: Layers, count: links.length, color: "text-blue-400", border: "border-blue-500/50", shadow: "shadow-[0_0_20px_rgba(59,130,246,0.3)]" },
+              { id: "contacts", label: "Kontak LO", icon: Users, count: contacts.length, color: "text-emerald-400", border: "border-emerald-500/50", shadow: "shadow-[0_0_20px_rgba(16,185,129,0.3)]" },
+              { id: "announcements", label: "Pengumuman", icon: Megaphone, count: announcements.length, color: "text-amber-400", border: "border-amber-500/50", shadow: "shadow-[0_0_20px_rgba(245,158,11,0.3)]" },
+              { id: "templates", label: "Template ID", icon: CreditCard, count: templates.length, color: "text-purple-400", border: "border-purple-500/50", shadow: "shadow-[0_0_20px_rgba(168,85,247,0.3)]" },
+              { id: "tasks", label: "Penugasan", icon: ListChecks, count: tasks.length, color: "text-rose-400", border: "border-rose-500/50", shadow: "shadow-[0_0_20px_rgba(244,63,114,0.3)]" },
+              { id: "doc_templates", label: "Auto-Form", icon: FileCode2, count: docTemplates.length, color: "text-cyan-400", border: "border-cyan-500/50", shadow: "shadow-[0_0_20px_rgba(125,249,255,0.3)]" },
             ].map((t) => {
               const Icon = t.icon;
               const isCurrent = activeTab === t.id;
+              
               return (
-                <button
-                  key={t.id}
-                  onClick={() => setActiveTab(t.id as ActiveTab)}
-                  className={`flex items-center space-x-2 px-5 py-2.5 rounded-2xl text-xs font-bold transition duration-300 cursor-pointer ${
-                    isCurrent
-                      ? "bg-accent-cyan text-black font-extrabold shadow-[0_0_20px_rgba(125,249,255,0.35)]"
-                      : "bg-slate-900/80 text-slate-300 hover:bg-slate-800 border border-card-border/40"
-                  }`}
-                >
-                  <Icon className="h-4 w-4" />
-                  <span>{t.label}</span>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono ${isCurrent ? "bg-black/30 text-black" : "bg-slate-800 text-slate-400"}`}>
-                    {t.count}
-                  </span>
-                </button>
+                <div key={t.id} className="relative flex flex-col items-center group cursor-pointer" onClick={() => setActiveTab(t.id as ActiveTab)}>
+                  <motion.div 
+                    whileHover={{ scale: 1.08 }}
+                    whileTap={{ scale: 0.95 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                    className={`h-16 w-16 flex flex-col items-center justify-center rounded-2xl border transition-all duration-300 z-10 ${
+                      isCurrent 
+                        ? `bg-slate-800 ${t.border} ${t.shadow} scale-110 ring-2 ring-white/10` 
+                        : `bg-slate-900/90 border-card-border/50 group-hover:border-slate-500`
+                    }`}
+                  >
+                    <Icon className={`h-6 w-6 mb-1 transition-colors ${isCurrent ? t.color : 'text-slate-400 group-hover:text-slate-200'}`} />
+                    <span className="text-[9px] font-mono font-bold bg-black/40 px-1.5 rounded text-slate-300">{t.count}</span>
+                  </motion.div>
+                  <span className={`mt-3 text-[11px] font-bold tracking-wider text-center ${isCurrent ? t.color : 'text-slate-400 group-hover:text-slate-200'} transition-colors`}>{t.label}</span>
+                </div>
               );
             })}
           </div>
 
-          <div className="flex items-center space-x-2">
-            <a
-              href="/admin/settings"
-              className="flex items-center space-x-2 px-4 py-2.5 rounded-2xl text-xs font-mono font-bold bg-accent-purple/20 text-accent-purple border border-accent-purple/40 hover:bg-accent-purple hover:text-black transition duration-300 shadow-[0_0_15px_rgba(179,136,255,0.3)]"
-            >
-              <Sparkles className="h-4 w-4" />
-              <span>Pengaturan Web & Push Notif</span>
-            </a>
-
-            <a
-              href="/admin/document-templates"
-              className="flex items-center space-x-2 px-4 py-2.5 rounded-2xl text-xs font-mono font-bold bg-slate-900 border border-white/10 text-slate-300 hover:text-accent-cyan transition"
-            >
-              <FileCode2 className="h-4 w-4 text-accent-cyan" />
-              <span>Auto-Form Generator</span>
-            </a>
+          {/* Mobile Node Buttons Grid */}
+          <div className="w-full grid grid-cols-3 sm:hidden gap-3 mt-6 px-2">
+             {[
+              { id: "links", label: "Menu", icon: Layers, count: links.length, color: "text-blue-400", border: "border-blue-500/50" },
+              { id: "contacts", label: "Kontak", icon: Users, count: contacts.length, color: "text-emerald-400", border: "border-emerald-500/50" },
+              { id: "announcements", label: "Pengumuman", icon: Megaphone, count: announcements.length, color: "text-amber-400", border: "border-amber-500/50" },
+              { id: "templates", label: "Template", icon: CreditCard, count: templates.length, color: "text-purple-400", border: "border-purple-500/50" },
+              { id: "tasks", label: "Tugas", icon: ListChecks, count: tasks.length, color: "text-rose-400", border: "border-rose-500/50" },
+              { id: "doc_templates", label: "Auto-Form", icon: FileCode2, count: docTemplates.length, color: "text-cyan-400", border: "border-cyan-500/50" },
+            ].map((t) => {
+              const Icon = t.icon;
+              const isCurrent = activeTab === t.id;
+              
+              return (
+                <div key={t.id} className="relative flex flex-col items-center cursor-pointer" onClick={() => setActiveTab(t.id as ActiveTab)}>
+                  <div className={`h-12 w-12 flex flex-col items-center justify-center rounded-xl border transition-all duration-300 z-10 ${
+                      isCurrent 
+                        ? `bg-slate-800 ${t.border} scale-105 ring-1 ring-white/20` 
+                        : `bg-slate-900/90 border-card-border/50`
+                    }`}
+                  >
+                    <Icon className={`h-5 w-5 mb-0.5 ${isCurrent ? t.color : 'text-slate-400'}`} />
+                    <span className="text-[8px] font-mono font-bold bg-black/40 px-1 rounded text-slate-300">{t.count}</span>
+                  </div>
+                  <span className={`mt-1.5 text-[10px] font-bold text-center ${isCurrent ? t.color : 'text-slate-400'}`}>{t.label}</span>
+                </div>
+              );
+            })}
           </div>
         </div>
 
-        {activeTab === "links" && (
-          <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-              <div>
-                <h2 className="font-display font-black text-xl text-slate-100">Kelola Grid Menu (/hub)</h2>
-                <p className="text-xs text-slate-400">Tambah, ubah, atau hapus kartu menu navigasi cepat di halaman Mission Control.</p>
-              </div>
-              <Button variant="primary" size="sm" onClick={() => setShowAddLinkModal(true)}>
-                <Plus className="h-4 w-4 mr-1.5" />
-                <span>Tambah Tautan Baru</span>
-              </Button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {links.map((link) => (
-                <div key={link.id} className="glass rounded-2xl p-5 border border-card-border/40 flex flex-col justify-between">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+          >
+            {activeTab === "links" && (
+              <div className="space-y-6">
+                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                   <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-[10px] font-mono uppercase bg-slate-900 px-2.5 py-0.5 rounded-full border border-card-border/40 text-accent-cyan font-bold">
-                        {link.category}
-                      </span>
-                      <button
-                        onClick={() => handleToggleLinkActive(link.id, link.is_active)}
-                        className={`text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full border cursor-pointer ${
-                          link.is_active
-                            ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/40"
-                            : "bg-slate-800 text-slate-500 border-slate-700"
-                        }`}
-                      >
-                        {link.is_active ? "Aktif" : "Nonaktif"}
-                      </button>
-                    </div>
-
-                    <h3 className="font-display font-bold text-base text-slate-100">{link.label}</h3>
-                    <p className="text-xs text-slate-400 font-sans mt-1 line-clamp-2">{link.description || "Tidak ada deskripsi."}</p>
-                    <a href={link.url} target="_blank" rel="noreferrer" className="text-[11px] text-accent-cyan font-mono hover:underline mt-2 inline-flex items-center space-x-1">
-                      <span>{link.url}</span>
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
+                    <h2 className="font-display font-black text-xl text-slate-100">Kelola Grid Menu (/hub)</h2>
+                    <p className="text-xs text-slate-400">Tambah, ubah, atau hapus kartu menu navigasi cepat di halaman Mission Control.</p>
                   </div>
-
-                  <div className="flex justify-end space-x-2 pt-4 mt-4 border-t border-card-border/20">
-                    <button
-                      onClick={() => handleDeleteLink(link.id)}
-                      className="p-2 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-400 hover:bg-rose-500 hover:text-white transition cursor-pointer"
-                      title="Hapus Link"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
+                  <Button variant="primary" size="sm" onClick={() => setShowAddLinkModal(true)}>
+                    <Plus className="h-4 w-4 mr-1.5" />
+                    <span>Tambah Tautan Baru</span>
+                  </Button>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {links.map((link) => (
+                    <div key={link.id} className="glass rounded-2xl p-5 border border-card-border/40 flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[10px] font-mono uppercase bg-slate-900 px-2.5 py-0.5 rounded-full border border-card-border/40 text-accent-cyan font-bold">
+                            {link.category}
+                          </span>
+                          <button
+                            onClick={() => handleToggleLinkActive(link.id, link.is_active)}
+                            className={`text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full border cursor-pointer ${
+                              link.is_active
+                                ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/40"
+                                : "bg-slate-800 text-slate-500 border-slate-700"
+                            }`}
+                          >
+                            {link.is_active ? "Aktif" : "Nonaktif"}
+                          </button>
+                        </div>
+
+                        <h3 className="font-display font-bold text-lg text-slate-100">{link.label}</h3>
+                        <p className="text-xs text-slate-400 font-sans mt-1 line-clamp-2">{link.description || "Tidak ada deskripsi."}</p>
+                        <a href={link.url} target="_blank" rel="noreferrer" className="text-[11px] text-accent-cyan font-mono hover:underline mt-2 inline-flex items-center space-x-1">
+                          <span>{link.url}</span>
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      </div>
+
+                      <div className="flex items-center justify-end space-x-2 border-t border-card-border/30 pt-3 mt-4">
+                        <button
+                          onClick={() => handleDeleteLink(link.id)}
+                          className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/30 text-xs font-bold hover:bg-rose-500 hover:text-white transition cursor-pointer"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          <span>Hapus</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {activeTab === "doc_templates" && (
+              <div className="space-y-6">
+                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                  <div>
+                    <h2 className="font-display font-black text-xl text-accent-cyan flex items-center gap-2">
+                      <FileCode2 className="h-6 w-6" />
+                      <span>Kelola Auto-Form Generator (.docx)</span>
+                    </h2>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Kelola template dokumen Word (.docx) dan tag pengisian otomatis dinamis seperti &#123;nama&#125;, &#123;nim&#125;.
+                    </p>
+                  </div>
+                  <Link href="/admin/document-templates/create">
+                    <Button variant="galaxy" size="sm">
+                      <Plus className="h-4 w-4 mr-1.5" />
+                      <span>Tambah Template Baru</span>
+                    </Button>
+                  </Link>
+                </div>
+
+                {docTemplates.length === 0 ? (
+                  <div className="glass rounded-2xl p-12 border border-card-border/40 text-center">
+                    <FileText className="w-12 h-12 mx-auto text-accent-cyan/50 mb-3 animate-pulse" />
+                    <h3 className="text-lg font-bold text-slate-200">Belum Ada Template Dokumen</h3>
+                    <p className="text-slate-400 text-xs max-w-md mx-auto mt-1 mb-4">
+                      Unggah file .docx pertama Anda berisi tag seperti &#123;nama&#125; untuk mengaktifkan Auto-Form generator.
+                    </p>
+                    <Link href="/admin/document-templates/create">
+                      <Button variant="primary" size="sm">
+                        <Plus className="h-4 w-4 mr-1.5" /> Unggah .docx
+                      </Button>
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {docTemplates.map((tpl) => (
+                      <div key={tpl.id} className="glass rounded-2xl p-5 border border-card-border/40 flex flex-col justify-between hover:border-accent-cyan/40 transition">
+                        <div>
+                          <div className="flex items-start justify-between gap-2 mb-3">
+                            <div className="p-2.5 rounded-xl bg-slate-900/90 border border-accent-cyan/30 text-accent-cyan">
+                              <FileText className="w-5 h-5" />
+                            </div>
+
+                            <button
+                              onClick={() => handleToggleDocTemplateActive(tpl.id, tpl.is_active)}
+                              className={`px-2.5 py-0.5 text-[10px] font-mono rounded-full border transition flex items-center gap-1 cursor-pointer ${
+                                tpl.is_active
+                                  ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
+                                  : "bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700"
+                              }`}
+                            >
+                              {tpl.is_active ? (
+                                <>
+                                  <CheckCircle className="w-3 h-3" /> Aktif
+                                </>
+                              ) : (
+                                <>
+                                  <XCircle className="w-3 h-3" /> Non-aktif
+                                </>
+                              )}
+                            </button>
+                          </div>
+
+                          <h3 className="text-base font-bold text-white mb-1 line-clamp-1">{tpl.title}</h3>
+                          <p className="text-slate-400 text-xs line-clamp-2 mb-3">{tpl.description || "Tidak ada deskripsi"}</p>
+
+                          <div className="space-y-1.5 mb-4">
+                            <div className="text-[10px] font-mono text-slate-400 flex items-center justify-between">
+                              <span>Jumlah Tag/Field:</span>
+                              <span className="text-accent-cyan font-bold">
+                                {Array.isArray(tpl.fields_config) ? tpl.fields_config.length : 0} Field
+                              </span>
+                            </div>
+                            <div className="flex flex-wrap gap-1 pt-1">
+                              {Array.isArray(tpl.fields_config) &&
+                                tpl.fields_config.slice(0, 4).map((f: any, idx: number) => (
+                                  <span
+                                    key={idx}
+                                    className="px-2 py-0.5 text-[10px] font-mono bg-slate-950 text-accent-cyan border border-accent-cyan/20 rounded-md"
+                                  >
+                                    &#123;{f.tag}&#125;
+                                  </span>
+                                ))}
+                              {Array.isArray(tpl.fields_config) && tpl.fields_config.length > 4 && (
+                                <span className="px-2 py-0.5 text-[10px] font-mono text-slate-400 bg-slate-900/50 rounded-md">
+                                  +{tpl.fields_config.length - 4} lagi
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-3 border-t border-card-border/30 gap-2">
+                          <a
+                            href={tpl.file_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="p-1.5 text-slate-400 hover:text-accent-cyan transition rounded-lg hover:bg-slate-900"
+                            title="Unduh Master Docx"
+                          >
+                            <Download className="w-4 h-4" />
+                          </a>
+
+                          <div className="flex items-center gap-2">
+                            <Link
+                              href={`/documents/${tpl.id}`}
+                              target="_blank"
+                              className="px-2.5 py-1 text-xs font-mono rounded-lg bg-accent-cyan/10 border border-accent-cyan/30 text-accent-cyan hover:bg-accent-cyan/20 transition"
+                            >
+                              Uji Form
+                            </Link>
+
+                            <button
+                              onClick={() => handleDeleteDocTemplate(tpl.id)}
+                              className="p-1.5 text-rose-400 hover:bg-rose-500/10 rounded-lg border border-rose-500/20 transition"
+                              title="Hapus Template"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
         {activeTab === "contacts" && (
           <div className="space-y-6">
@@ -1443,6 +1690,8 @@ export default function AdminDashboardPage() {
 
           </div>
         )}
+          </motion.div>
+        </AnimatePresence>
       </main>
 
       {showAddLinkModal && (

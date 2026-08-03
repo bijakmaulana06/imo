@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import Link from "next/link";
+import React, { useState } from "react";
+import { Link } from "next-view-transitions";
 import { usePathname } from "next/navigation";
 import {
   Menu,
@@ -15,89 +15,28 @@ import {
   Users
 } from "lucide-react";
 import ImoLogo from "./ImoLogo";
-import { createClient } from "@/utils/supabase/client";
-
-interface NavItem {
-  id: string;
-  name: string;
-  label: string;
-  href: string;
-  icon: any;
-  enabled: boolean;
-}
-
-const DEFAULT_NAV: NavItem[] = [
-  { id: "guide", name: "Panduan", label: "Panduan & Artikel", href: "/guide", icon: BookOpen, enabled: true },
-  { id: "hub", name: "Penjelajahan", label: "Pusat Hub", href: "/hub", icon: Compass, enabled: true },
-  { id: "info", name: "Status Tugas", label: "Scanner Drive", href: "/info", icon: CheckCircle2, enabled: true },
-  { id: "id-card", name: "ID Card", label: "Generator Card", href: "/id-card", icon: QrCode, enabled: true },
-  { id: "documents", name: "Auto Form", label: "Doc Generator", href: "/documents", icon: FileEdit, enabled: true },
-  { id: "contact", name: "Kontak LO", label: "Pendamping", href: "/contact", icon: Users, enabled: true },
-];
+import { useSiteConfig } from "@/components/SiteConfigProvider";
 
 export default function Navbar() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
-  const [siteYear, setSiteYear] = useState("2026");
-  const [navigation, setNavigation] = useState<NavItem[]>(DEFAULT_NAV);
+  const { config } = useSiteConfig();
 
-  useEffect(() => {
-    const fetchConfigs = async () => {
-      try {
-        const supabase = createClient();
-        const { data } = await supabase
-          .from("system_settings")
-          .select("key, value")
-          .in("key", ["brand_config", "feature_flags"]);
+  const navigation = [
+    { name: "Panduan", label: "Panduan & Artikel", href: "/guide", icon: BookOpen },
+    { name: "Penjelajahan", label: "Pusat Hub", href: "/hub", icon: Compass },
+    { name: "Status Tugas", label: "Scanner Drive", href: "/info", icon: CheckCircle2 },
+    { name: "ID Card", label: "Generator Card", href: "/id-card", icon: QrCode },
+    { name: "Auto Form", label: "Doc Generator", href: "/documents", icon: FileEdit },
+    { name: "Kontak LO", label: "Pendamping", href: "/contact", icon: Users },
+  ];
 
-        if (data) {
-          data.forEach((row: any) => {
-            if (row.key === "brand_config" && row.value) {
-              try {
-                const cfg = JSON.parse(row.value);
-                if (cfg.siteYear) setSiteYear(cfg.siteYear);
-              } catch {}
-            }
-            if (row.key === "feature_flags" && row.value) {
-              try {
-                const flags = JSON.parse(row.value);
-                if (flags.navItems && Array.isArray(flags.navItems)) {
-                  const enabledMap: Record<string, boolean> = {};
-                  flags.navItems.forEach((n: any) => { enabledMap[n.id] = n.enabled; });
-                  setNavigation(prev =>
-                    prev.map(item => ({
-                      ...item,
-                      enabled: enabledMap[item.id] !== undefined ? enabledMap[item.id] : true,
-                    }))
-                  );
-                }
-              } catch {}
-            }
-          });
-        }
-      } catch {}
-    };
-    fetchConfigs();
-
-    // Listen for live theme updates from settings
-    const handleThemeLoaded = (e: CustomEvent) => {
-      if (e.detail?.siteYear) setSiteYear(e.detail.siteYear);
-    };
-    window.addEventListener("imo-theme-loaded", handleThemeLoaded as EventListener);
-    return () => {
-      window.removeEventListener("imo-theme-loaded", handleThemeLoaded as EventListener);
-    };
-  }, []);
-
-  const visibleNav = navigation.filter(item => item.enabled);
   const isActive = (path: string) => pathname === path;
 
   return (
-    <nav className="sticky top-0 z-[100] relative w-full glass border-b border-card-border/60 bg-[#020510]/90 backdrop-blur-2xl touch-manipulation select-none">
-      {/* Top Accent Laser Line */}
-      <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-accent-cyan to-transparent shadow-[0_0_10px_rgba(125,249,255,0.8)] pointer-events-none" />
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+    <div className="sticky top-4 md:top-6 z-[100] w-full px-4 sm:px-6 lg:px-8 pointer-events-none flex justify-center">
+      <nav className="relative w-full max-w-5xl glass rounded-full touch-manipulation select-none pointer-events-auto transition-all duration-300">
+        <div className="mx-auto px-4 sm:px-6 relative z-10">
         <div className="flex items-center justify-between h-16">
           
           {/* Logo Brand */}
@@ -108,14 +47,16 @@ export default function Navbar() {
               </div>
               <div className="flex items-center space-x-2">
                 <ImoLogo height={38} className="h-8 md:h-9 filter drop-shadow-[0_0_12px_rgba(255,255,255,0.9)]" />
-                <span className="font-display font-black text-accent-purple text-base md:text-lg tracking-wider glow-text-purple">{siteYear}</span>
+                <span className="font-display font-semibold text-accent-purple text-base md:text-lg tracking-tight glow-text-purple">
+                  {config.siteYear || "2026"}
+                </span>
               </div>
             </Link>
           </div>
 
-          {/* Desktop Navigation Links */}
+          {/* Desktop Navigation Links with Icon & Small Text Underneath */}
           <div className="hidden md:flex items-center space-x-2">
-            {visibleNav.map((item) => {
+            {navigation.map((item) => {
               const Icon = item.icon;
               const active = isActive(item.href);
 
@@ -125,8 +66,8 @@ export default function Navbar() {
                   href={item.href}
                   className={`group flex flex-col items-center justify-center px-3.5 py-1.5 rounded-xl transition-all duration-300 cursor-pointer border ${
                     active
-                      ? "bg-accent-cyan/15 border-accent-cyan/50 text-accent-cyan shadow-[0_0_15px_rgba(125,249,255,0.3)] glow-text-cyan"
-                      : "border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-900/60 hover:border-card-border/40"
+                      ? "bg-white/10 border-white/20 text-accent-cyan shadow-[0_4px_12px_rgba(0,0,0,0.1)] glow-text-cyan"
+                      : "border-transparent text-slate-400 hover:text-slate-200 hover:bg-white/5 hover:border-white/10"
                   }`}
                 >
                   <Icon
@@ -155,11 +96,11 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* Mobile Drawer */}
+      {/* Mobile Drawer (Compact Grid with Icon & Text) */}
       {isOpen && (
         <div className="md:hidden relative z-[110] glass border-t border-card-border/60 animate-in slide-in-from-top duration-300">
           <div className="p-4 grid grid-cols-3 gap-2 bg-[#020510]/98 backdrop-blur-2xl">
-            {visibleNav.map((item) => {
+            {navigation.map((item) => {
               const Icon = item.icon;
               const active = isActive(item.href);
 
@@ -170,8 +111,8 @@ export default function Navbar() {
                   onClick={() => setIsOpen(false)}
                   className={`flex flex-col items-center justify-center p-3 rounded-2xl transition-all touch-manipulation cursor-pointer border text-center ${
                     active
-                      ? "bg-accent-cyan/20 text-accent-cyan border-accent-cyan/60 shadow-[0_0_15px_rgba(125,249,255,0.3)]"
-                      : "bg-slate-950/60 text-slate-300 border-card-border/40 hover:bg-slate-900 hover:text-accent-cyan"
+                      ? "bg-white/10 text-accent-cyan border-white/20 shadow-[0_4px_12px_rgba(0,0,0,0.1)]"
+                      : "bg-transparent text-slate-400 border-transparent hover:bg-white/5 hover:text-slate-200"
                   }`}
                 >
                   <Icon className={`h-5 w-5 mb-1.5 ${active ? "text-accent-cyan" : "text-slate-400"}`} />
@@ -184,6 +125,7 @@ export default function Navbar() {
           </div>
         </div>
       )}
-    </nav>
+      </nav>
+    </div>
   );
 }

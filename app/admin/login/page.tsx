@@ -7,7 +7,7 @@ import Button from "@/components/Button";
 import ImoLogo from "@/components/ImoLogo";
 import { createClient } from "@/utils/supabase/client";
 import { ShieldAlert, LogIn, Key, Mail, ArrowLeft, AlertCircle } from "lucide-react";
-import Link from "next/link";
+import { Link } from "next-view-transitions";
 import { useRouter } from "next/navigation";
 
 export default function AdminLoginPage() {

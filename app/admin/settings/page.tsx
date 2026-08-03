@@ -1,767 +1,824 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
-import StarfieldBackground from "@/components/StarfieldBackground";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { createClient } from "@/utils/supabase/client";
+import { useSiteConfig, DEFAULT_SITE_CONFIG } from "@/components/SiteConfigProvider";
 import {
-  Settings, Palette, FileText, Cpu, ToggleLeft, ToggleRight,
-  Save, RefreshCw, CheckCircle2, AlertTriangle, ChevronDown, ChevronRight,
-  Globe, Layers, Image, Type, Layout, Sliders, Shield, Wrench,
-  Bell, Star, Eye, EyeOff, LogOut, HardDrive, Zap
+  Globe,
+  Palette,
+  ShieldAlert,
+  Type,
+  HardDrive,
+  Bell,
+  Send,
+  Save,
+  CheckCircle2,
+  AlertTriangle,
+  RefreshCw,
+  Activity,
+  TerminalSquare,
+  Lock,
+  Cpu,
+  RefreshCcw,
+  WifiOff,
+  X,
+  Code,
+  Sparkles,
+  LayoutGrid,
+  ChevronUp,
+  ChevronDown
 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { Link } from "next-view-transitions";
+import ImoLogo from "@/components/ImoLogo";
+import StarfieldBackground from "@/components/StarfieldBackground";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Types
-// ─────────────────────────────────────────────────────────────────────────────
+type TabId = "root_system" | "push" | "security" | "theme" | "branding" | "copywriting" | "drive" | "status" | "home_nodes";
 
-interface BrandConfig {
-  logoUrl: string;
-  siteName: string;
-  siteYear: string;
-  taglineMotto: string;
-  accentCyan: string;
-  accentPurple: string;
-  accentYellow: string;
-  bgColor: string;
-}
+// Organic offsets & distinct custom routing styles for PCB Circuit Constellation
+const NODES = [
+  { id: "root_system" as TabId, label: "Next.js Engine", icon: Cpu, angleOffset: -6, radiusOffset: 45, routeType: "v_first", cornerRatio: 0.7, color: "from-blue-500/20 to-cyan-500/20 border-cyan-500/50 text-cyan-300" },
+  { id: "push" as TabId, label: "Push & VAPID", icon: Bell, angleOffset: 14, radiusOffset: -25, routeType: "h_first", cornerRatio: 0.45, color: "from-amber-500/20 to-orange-500/20 border-amber-500/50 text-amber-300" },
+  { id: "security" as TabId, label: "API Security", icon: Lock, angleOffset: -12, radiusOffset: 60, routeType: "double_hv", cornerRatio: 0.5, color: "from-rose-500/20 to-pink-500/20 border-rose-500/50 text-rose-300" },
+  { id: "theme" as TabId, label: "Theme Engine", icon: Palette, angleOffset: 18, radiusOffset: -35, routeType: "v_first", cornerRatio: 0.85, color: "from-purple-500/20 to-indigo-500/20 border-purple-500/50 text-purple-300" },
+  { id: "branding" as TabId, label: "Branding & SEO", icon: Globe, angleOffset: -8, radiusOffset: 40, routeType: "h_first", cornerRatio: 0.65, color: "from-emerald-500/20 to-teal-500/20 border-emerald-500/50 text-emerald-300" },
+  { id: "copywriting" as TabId, label: "Localizations", icon: Type, angleOffset: 10, radiusOffset: -20, routeType: "double_vh", cornerRatio: 0.55, color: "from-cyan-500/20 to-blue-500/20 border-cyan-500/50 text-cyan-300" },
+  { id: "drive" as TabId, label: "Google Drive", icon: HardDrive, angleOffset: -15, radiusOffset: 50, routeType: "h_first", cornerRatio: 0.35, color: "from-indigo-500/20 to-blue-500/20 border-indigo-500/50 text-indigo-300" },
+  { id: "status" as TabId, label: "System Modes", icon: ShieldAlert, angleOffset: 8, radiusOffset: -40, routeType: "double_hv", cornerRatio: 0.6, color: "from-rose-600/20 to-red-500/20 border-rose-400/50 text-rose-300" },
+  { id: "home_nodes" as TabId, label: "Menu Beranda", icon: LayoutGrid, angleOffset: -20, radiusOffset: 25, routeType: "v_first", cornerRatio: 0.75, color: "from-teal-500/20 to-emerald-500/20 border-teal-500/50 text-teal-300" },
+];
 
-interface PageContent {
-  // Home
-  homeBadge: string;
-  homeHeroPrefix: string;
-  homeTagline: string;
-  homeDescription: string;
-  homeCtaLabel: string;
-  homeCard1Title: string; homeCard1Desc: string;
-  homeCard2Title: string; homeCard2Desc: string;
-  homeCard3Title: string; homeCard3Desc: string;
-  // Info
-  infoHeroTitle: string;
-  infoSubtitle: string;
-  infoBanner: string;
-  // Hub
-  hubBadge: string;
-  hubTitle: string;
-  hubDescription: string;
-  // Guide
-  guideBadge: string;
-  guideTitle: string;
-  guideDescription: string;
-  // Contact
-  contactTitle: string;
-  contactDescription: string;
-  // Footer
-  footerCopyright: string;
-  footerTagline: string;
-}
-
-interface FeatureFlags {
-  enablePushNotif: boolean;
-  enableIdCard: boolean;
-  enableDocuments: boolean;
-  enableGuide: boolean;
-  enableContact: boolean;
-  enableStarfield: boolean;
-  maintenanceMode: boolean;
-  maintenanceMessage: string;
-}
-
-interface TechConfig {
-  gdriveParentFolder: string;
-  totalGroups: number;
-  membersPerGroup: number;
-  seoTitle: string;
-  seoDescription: string;
-  seoKeywords: string;
-}
-
-type TabId = "brand" | "content" | "features" | "technical";
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Defaults
-// ─────────────────────────────────────────────────────────────────────────────
-
-const DEFAULT_BRAND: BrandConfig = {
-  logoUrl: "",
-  siteName: "IMO 2026",
-  siteYear: "2026",
-  taglineMotto: "Different Minds, Different Stories, One Generation Chasing Glories.",
-  accentCyan: "#7df9ff",
-  accentPurple: "#b48cff",
-  accentYellow: "#ffd166",
-  bgColor: "#020510",
-};
-
-const DEFAULT_CONTENT: PageContent = {
-  homeBadge: "Innovative Minds Outclass",
-  homeHeroPrefix: "SELAMAT DATANG DI",
-  homeTagline: '"Different Minds, Different Stories, One Generation Chasing Glories."',
-  homeDescription: "Persiapkan diri Anda untuk lepas landas! Ini adalah portal penjelajahan resmi bagi seluruh Mahasiswa Baru. Temukan semua petunjuk arah, jadwal navigasi, dan koordinat LO Anda di sini.",
-  homeCtaLabel: "Mulai Penjelajahan",
-  homeCard1Title: "Summary Tugas Kelompok",
-  homeCard1Desc: "Periksa kelengkapan pengumpulan tugas kelompok Anda yang terverifikasi otomatis dari repositori Google Drive IMO 2026.",
-  homeCard2Title: "ID Card Generator",
-  homeCard2Desc: "Kustomisasi & unduh tanda pengenal resmi IMO 2026. Diproses instan murni pada perangkat Anda.",
-  homeCard3Title: "Hubungi LO",
-  homeCard3Desc: "Kehilangan arah? Hubungi LO/Pendamping kelompok Anda secara langsung melalui satu tombol WhatsApp.",
-  infoHeroTitle: "Status Hub & Pengumpulan",
-  infoSubtitle: "Verifikasi kelengkapan pengumpulan tugas kelompok dan berkas individu real-time.",
-  infoBanner: "Catatan: Jika ingin membuka folder, mohon menunggu loading selesai, Terimakasih.",
-  hubBadge: "Pusat Penjelajahan IMO 2026",
-  hubTitle: "PUSAT PENJELAJAHAN",
-  hubDescription: "Portal pusat navigasi cepat untuk mengakses semua panduan, tools generator, saluran media resmi, dan pusat berkas IMO 2026.",
-  guideBadge: "Interactive Document & Note Center",
-  guideTitle: "PANDUAN & EMBED DOKUMEN",
-  guideDescription: "Halaman interaktif pengumuman resmi & contoh surat. Tinjau dokumen bersandingan dengan petunjuk & tombol langsung ke Auto-Form Generator.",
-  contactTitle: "LO & PENDAMPING KELOMPOK",
-  contactDescription: "Temukan pemandu orbit Anda. Cari berdasarkan nama kelompok atau nama LO untuk menghubungi langsung.",
-  footerCopyright: "IMO 2026. Made with Astro-Physics & Next.js.",
-  footerTagline: "",
-};
-
-const DEFAULT_FEATURES: FeatureFlags = {
-  enablePushNotif: true,
-  enableIdCard: true,
-  enableDocuments: true,
-  enableGuide: true,
-  enableContact: true,
-  enableStarfield: true,
-  maintenanceMode: false,
-  maintenanceMessage: "Sistem sedang dalam pemeliharaan. Silakan coba kembali dalam beberapa saat.",
-};
-
-const DEFAULT_TECH: TechConfig = {
-  gdriveParentFolder: "",
-  totalGroups: 20,
-  membersPerGroup: 10,
-  seoTitle: "IMO 2026 - Innovative Minds Outclass",
-  seoDescription: "Portal Resmi IMO 2026: Different Minds, Different Stories, One Generation Chasing Glories.",
-  seoKeywords: "IMO 2026, mahasiswa baru, orientasi, innovative minds outclass",
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Sub-components
-// ─────────────────────────────────────────────────────────────────────────────
-
-function SettingRow({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
-  return (
-    <div className="flex flex-col sm:flex-row sm:items-start gap-3 py-4 border-b border-white/5 last:border-0">
-      <div className="sm:w-64 flex-shrink-0">
-        <p className="text-xs font-mono font-bold text-slate-200 uppercase tracking-wide">{label}</p>
-        {hint && <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">{hint}</p>}
-      </div>
-      <div className="flex-grow">{children}</div>
-    </div>
-  );
-}
-
-function TextInput({ value, onChange, placeholder, mono = false }: {
-  value: string; onChange: (v: string) => void; placeholder?: string; mono?: boolean;
-}) {
-  return (
-    <input type="text" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-      className={`w-full px-3.5 py-2.5 rounded-xl bg-[#0a1020] border border-white/10 text-slate-100 text-sm focus:outline-none focus:border-accent-cyan/60 focus:shadow-[0_0_0_3px_rgba(125,249,255,0.08)] transition ${mono ? "font-mono text-xs" : ""}`} />
-  );
-}
-
-function TextArea({ value, onChange, rows = 2, placeholder }: {
-  value: string; onChange: (v: string) => void; rows?: number; placeholder?: string;
-}) {
-  return (
-    <textarea rows={rows} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-      className="w-full px-3.5 py-2.5 rounded-xl bg-[#0a1020] border border-white/10 text-slate-100 text-sm focus:outline-none focus:border-accent-cyan/60 focus:shadow-[0_0_0_3px_rgba(125,249,255,0.08)] transition resize-y" />
-  );
-}
-
-function ColorSwatch({ label, value, onChange, preview }: {
-  label: string; value: string; onChange: (v: string) => void; preview?: string;
-}) {
-  return (
-    <div className="flex items-center gap-3 p-3 rounded-xl bg-[#0a1020] border border-white/10">
-      <label className="relative cursor-pointer flex-shrink-0">
-        <div className="h-9 w-9 rounded-lg border-2 border-white/20 shadow-lg transition-transform hover:scale-110"
-          style={{ backgroundColor: value }} />
-        <input type="color" value={value} onChange={e => onChange(e.target.value)}
-          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" />
-      </label>
-      <div className="flex-grow min-w-0">
-        <p className="text-xs font-mono font-bold text-slate-300">{label}</p>
-        <p className="text-[10px] font-mono text-slate-500 mt-0.5">{value}</p>
-      </div>
-      {preview && (
-        <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full"
-          style={{ color: value, border: `1px solid ${value}22`, backgroundColor: `${value}15` }}>
-          {preview}
-        </span>
-      )}
-    </div>
-  );
-}
-
-function FeatureToggle({ label, desc, on, onToggle, warning }: {
-  label: string; desc: string; on: boolean; onToggle: () => void; warning?: boolean;
-}) {
-  return (
-    <div className={`flex items-start justify-between gap-4 p-4 rounded-2xl border transition ${on ? "bg-slate-950/80 border-white/8" : "bg-rose-950/20 border-rose-500/15"
-      } ${warning && !on ? "border-rose-500/30" : ""}`}>
-      <div className="flex-grow">
-        <p className={`text-sm font-bold ${on ? "text-slate-100" : "text-slate-400 line-through"}`}>{label}</p>
-        <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">{desc}</p>
-        {warning && !on && (
-          <p className="text-[10px] text-rose-400 mt-1 font-mono">⚠ Halaman ini akan tampil sebagai 404 saat dinonaktifkan</p>
-        )}
-      </div>
-      <button onClick={onToggle} className={`flex-shrink-0 w-12 h-6 rounded-full transition-all duration-300 relative cursor-pointer ${on ? "bg-accent-cyan shadow-[0_0_10px_rgba(125,249,255,0.4)]" : "bg-slate-700"}`}>
-        <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-md transition-all duration-300 ${on ? "left-6" : "left-0.5"}`} />
-      </button>
-    </div>
-  );
-}
-
-function AccordionSection({ title, icon: Icon, children, defaultOpen = false }: {
-  title: string; icon: any; children: React.ReactNode; defaultOpen?: boolean;
-}) {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <div className="rounded-2xl border border-white/8 overflow-hidden">
-      <button onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between p-4 bg-slate-950/60 hover:bg-slate-900/60 transition cursor-pointer">
-        <div className="flex items-center space-x-3">
-          <span className="p-1.5 rounded-lg bg-accent-cyan/10 border border-accent-cyan/20">
-            <Icon className="h-4 w-4 text-accent-cyan" />
-          </span>
-          <span className="text-sm font-bold text-slate-100 font-mono">{title}</span>
-        </div>
-        {open ? <ChevronDown className="h-4 w-4 text-slate-400" /> : <ChevronRight className="h-4 w-4 text-slate-400" />}
-      </button>
-      {open && (
-        <div className="px-5 pb-5 pt-2 bg-slate-950/40 border-t border-white/5">
-          {children}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Main Page
-// ─────────────────────────────────────────────────────────────────────────────
-
-export default function AdminSettingsPage() {
-  const router = useRouter();
-  const supabase = createClient();
-
-  const [activeTab, setActiveTab] = useState<TabId>("brand");
+export default function AdminSettingsCommandCenter() {
+  const { refreshConfig } = useSiteConfig();
+  const [activeTab, setActiveTab] = useState<TabId | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [saveMsg, setSaveMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
-  const [brand, setBrand] = useState<BrandConfig>(DEFAULT_BRAND);
-  const [content, setContent] = useState<PageContent>(DEFAULT_CONTENT);
-  const [features, setFeatures] = useState<FeatureFlags>(DEFAULT_FEATURES);
-  const [tech, setTech] = useState<TechConfig>(DEFAULT_TECH);
-  const [syncing, setSyncing] = useState(false);
+  // Layout calculations
+  const [baseRadius, setBaseRadius] = useState(320);
 
-  // ── Load ─────────────────────────────────────────────────────────────────
+  // System Core Settings State
+  const [coreConfig, setCoreConfig] = useState(DEFAULT_SITE_CONFIG);
+  const [gdriveParentFolder, setGdriveParentFolder] = useState("");
+  const [totalGroupsCount, setTotalGroupsCount] = useState(20);
+  const [targetMembersPerGroup, setTargetMembersPerGroup] = useState(10);
+  const [notificationSettings, setNotificationSettings] = useState({
+    enableNewTaskNotif: true,
+    enableAnnouncementNotif: true,
+    enableDeadlineNotif: true,
+    vapidPublicKey: "",
+    vapidPrivateKey: "",
+  });
+  const [pushSubscribersCount, setPushSubscribersCount] = useState(0);
+  
+  const [broadcastTitle, setBroadcastTitle] = useState("");
+  const [broadcastMessage, setBroadcastMessage] = useState("");
+  const [broadcastTargetUrl, setBroadcastTargetUrl] = useState("/info");
+  const [sendingPush, setSendingPush] = useState(false);
+  const [pushResultMsg, setPushResultMsg] = useState<string | null>(null);
+  const [testEndpoint, setTestEndpoint] = useState("");
+  const [testingPush, setTestingPush] = useState(false);
+  const [purgingCache, setPurgingCache] = useState(false);
 
-  const loadAll = useCallback(async () => {
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 768) {
+        setBaseRadius(160);
+      } else if (window.innerWidth < 1024) {
+        setBaseRadius(250);
+      } else {
+        setBaseRadius(330);
+      }
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.ready.then(async (registration) => {
+        const sub = await registration.pushManager.getSubscription();
+        if (sub) {
+          setTestEndpoint(sub.endpoint);
+        }
+      });
+    }
+    fetchSettings();
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  const fetchSettings = async () => {
     setLoading(true);
     try {
-      const { data } = await supabase.from("system_settings").select("key, value");
-      if (!data) return;
-      const map: Record<string, string> = {};
-      data.forEach((r: any) => { map[r.key] = r.value; });
-
-      if (map.brand_config) {
-        try { setBrand({ ...DEFAULT_BRAND, ...JSON.parse(map.brand_config) }); } catch { }
-      }
-      if (map.page_content) {
-        try { setContent({ ...DEFAULT_CONTENT, ...JSON.parse(map.page_content) }); } catch { }
-      }
-      if (map.feature_flags) {
-        try { setFeatures({ ...DEFAULT_FEATURES, ...JSON.parse(map.feature_flags) }); } catch { }
-      }
-      if (map.tech_config) {
-        try { setTech({ ...DEFAULT_TECH, ...JSON.parse(map.tech_config) }); } catch { }
-      } else {
-        // Migrate from older keys
-        if (map.gdrive_parent_folder) setTech(t => ({ ...t, gdriveParentFolder: map.gdrive_parent_folder }));
-        if (map.total_groups_count) setTech(t => ({ ...t, totalGroups: Number(map.total_groups_count) }));
-        if (map.target_members_per_group) setTech(t => ({ ...t, membersPerGroup: Number(map.target_members_per_group) }));
+      const res = await fetch("/api/admin/settings");
+      if (res.ok) {
+        const data = await res.json();
+        setCoreConfig({ ...DEFAULT_SITE_CONFIG, ...data });
+        setGdriveParentFolder(data.gdriveParentFolder || "");
+        setTotalGroupsCount(data.totalGroupsCount || 20);
+        setTargetMembersPerGroup(data.targetMembersPerGroup || 10);
+        if (data.notificationSettings) {
+          setNotificationSettings(data.notificationSettings);
+        }
+        setPushSubscribersCount(data.pushSubscribersCount || 0);
       }
     } catch (err) {
-      console.error("Failed to load settings:", err);
+      console.error("Gagal memuat pengaturan teknis:", err);
     } finally {
       setLoading(false);
     }
-  }, []);
-
-  useEffect(() => { loadAll(); }, [loadAll]);
-
-  // ── Save ─────────────────────────────────────────────────────────────────
-
-  const handleSave = async () => {
-    setSaving(true);
-    setSaveMsg(null);
-    try {
-      const rows = [
-        { key: "brand_config", value: JSON.stringify(brand), description: "Brand identity & tema visual web", updated_at: new Date().toISOString() },
-        { key: "page_content", value: JSON.stringify(content), description: "Konten teks semua halaman web (CMS)", updated_at: new Date().toISOString() },
-        { key: "feature_flags", value: JSON.stringify(features), description: "Toggle on/off fitur & modul web", updated_at: new Date().toISOString() },
-        { key: "tech_config", value: JSON.stringify(tech), description: "Konfigurasi teknis: Drive, SEO, dsb.", updated_at: new Date().toISOString() },
-        // Keep old keys in sync for backward compat
-        { key: "gdrive_parent_folder", value: tech.gdriveParentFolder, description: "Google Drive parent folder ID", updated_at: new Date().toISOString() },
-        { key: "total_groups_count", value: String(tech.totalGroups), description: "Total kelompok", updated_at: new Date().toISOString() },
-        { key: "target_members_per_group", value: String(tech.membersPerGroup), description: "Anggota per kelompok", updated_at: new Date().toISOString() },
-        // Sync ui_customizations for /info page backward compat
-        { key: "ui_customizations", value: JSON.stringify({ heroTitle: content.infoHeroTitle, heroSubtitle: content.infoSubtitle, announcementBanner: content.infoBanner }), description: "UI kustomisasi", updated_at: new Date().toISOString() },
-        // Sync home_customizations for /page.tsx backward compat
-        { key: "home_customizations", value: JSON.stringify({ siteName: brand.siteName, siteYear: brand.siteYear, missionBadge: content.homeBadge, tagline: content.homeTagline, description: content.homeDescription, ctaLabel: content.homeCtaLabel, footerText: content.footerCopyright, homeCard1Title: content.homeCard1Title, homeCard1Desc: content.homeCard1Desc, homeCard2Title: content.homeCard2Title, homeCard2Desc: content.homeCard2Desc, homeCard3Title: content.homeCard3Title, homeCard3Desc: content.homeCard3Desc }), description: "Home customizations", updated_at: new Date().toISOString() },
-      ];
-
-      const { error } = await supabase.from("system_settings").upsert(rows, { onConflict: "key" });
-      if (error) throw new Error(error.message);
-
-      setSaveMsg({ type: "ok", text: "✅ Semua pengaturan berhasil disimpan & diterapkan ke web!" });
-
-      // Apply theme immediately in this tab
-      const root = document.documentElement;
-      root.style.setProperty("--accent-cyan", brand.accentCyan);
-      root.style.setProperty("--accent-purple", brand.accentPurple);
-      root.style.setProperty("--accent-yellow", brand.accentYellow);
-      root.style.setProperty("--background", brand.bgColor);
-
-    } catch (err: any) {
-      setSaveMsg({ type: "err", text: "❌ Gagal: " + err.message });
-    } finally {
-      setSaving(false);
-      setTimeout(() => setSaveMsg(null), 5000);
-    }
   };
 
-  // ── Sync Drive ───────────────────────────────────────────────────────────
+  const handleSaveAll = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setSaving(true);
+    setSaveSuccess(null);
+    setSaveError(null);
 
-  const handleSyncDrive = async () => {
-    setSyncing(true);
     try {
-      const res = await fetch("/api/drive-sync-folders", {
+      const res = await fetch("/api/admin/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ totalGroups: tech.totalGroups }),
+        body: JSON.stringify({
+          siteCoreConfig: coreConfig,
+          gdriveParentFolder,
+          totalGroupsCount,
+          targetMembersPerGroup,
+          notificationSettings,
+        }),
       });
-      const d = await res.json();
-      setSaveMsg({ type: res.ok ? "ok" : "err", text: res.ok ? ("✅ " + (d.message || "Sync berhasil!")) : ("❌ " + (d.error || "Gagal")) });
-    } catch (e: any) {
-      setSaveMsg({ type: "err", text: "❌ " + e.message });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        setSaveSuccess("System root configurations updated successfully!");
+        await refreshConfig();
+        setTimeout(() => setSaveSuccess(null), 5000);
+      } else {
+        setSaveError(data.error || "Gagal menyimpan pengaturan.");
+      }
+    } catch (err: any) {
+      setSaveError("Terjadi kesalahan sistem: " + err.message);
+    } finally {
+      setSaving(false);
     }
-    setSyncing(false);
-    setTimeout(() => setSaveMsg(null), 5000);
   };
 
-  // ── Tab definitions ──────────────────────────────────────────────────────
+  const handlePurgeCache = async () => {
+    setPurgingCache(true);
+    setSaveSuccess(null);
+    setSaveError(null);
+    try {
+      const res = await fetch("/api/admin/purge-cache", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: "/", type: "layout" }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSaveSuccess("Next.js Cache successfully purged! Clients will receive fresh data.");
+        setTimeout(() => setSaveSuccess(null), 5000);
+      } else {
+        setSaveError(data.error || "Failed to purge cache.");
+      }
+    } catch (err: any) {
+      setSaveError("System Error: " + err.message);
+    } finally {
+      setPurgingCache(false);
+    }
+  };
 
-  const tabs: { id: TabId; label: string; icon: any; badge?: string }[] = [
-    { id: "brand", label: "Brand & Tema", icon: Palette },
-    { id: "content", label: "Konten Halaman", icon: FileText },
-    { id: "features", label: "Fitur & Modul", icon: Zap },
-    { id: "technical", label: "Teknis & SEO", icon: Cpu },
-  ];
+  const handleRegenerateVapid = async () => {
+    if (!window.confirm("WARNING: Regenerating VAPID keys will invalidate ALL existing push subscriptions. Users will need to re-subscribe. Are you sure you want to proceed?")) return;
+    
+    setSaving(true);
+    try {
+      const res = await fetch("/api/admin/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "regenerate_vapid" }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert("VAPID Keys regenerated successfully.");
+        fetchSettings();
+      } else {
+        alert("Failed to regenerate VAPID: " + data.error);
+      }
+    } catch (e: any) {
+      alert("Error: " + e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Render
-  // ─────────────────────────────────────────────────────────────────────────
+  const handleSendPushBroadcast = async (e: React.FormEvent, isTest: boolean = false) => {
+    e.preventDefault();
+    if (!broadcastTitle || !broadcastMessage) {
+      alert("Judul dan pesan notifikasi wajib diisi!");
+      return;
+    }
+
+    if (isTest) setTestingPush(true);
+    else setSendingPush(true);
+    
+    setPushResultMsg(null);
+
+    try {
+      const res = await fetch("/api/push/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: broadcastTitle,
+          message: broadcastMessage,
+          url: broadcastTargetUrl,
+          isTest,
+          testEndpoint: isTest ? testEndpoint : undefined
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setPushResultMsg(data.message || (isTest ? "Test ping sent successfully!" : `Berhasil mengirim ke ${data.sentCount} perangkat!`));
+        if (!isTest) {
+          setBroadcastTitle("");
+          setBroadcastMessage("");
+        }
+      } else {
+        setPushResultMsg("Gagal: " + (data.error || "Gagal mengirim notifikasi"));
+      }
+    } catch (err: any) {
+      setPushResultMsg("Error: " + err.message);
+    } finally {
+      if (isTest) setTestingPush(false);
+      else setSendingPush(false);
+    }
+  };
+
+  const getCoordinates = (index: number) => {
+    const node = NODES[index];
+    const baseAngle = (index * 45) - 90;
+    const finalAngleDeg = baseAngle + (node.angleOffset || 0);
+    const angleRad = (finalAngleDeg * Math.PI) / 180;
+    const nodeRadius = baseRadius + (node.radiusOffset || 0);
+    
+    const x = Math.cos(angleRad) * nodeRadius;
+    const y = Math.sin(angleRad) * nodeRadius;
+    return { x, y };
+  };
 
   return (
-    <div className="relative min-h-screen bg-[#020510] text-slate-100 font-sans overflow-hidden">
-      <StarfieldBackground />
+    <div className="min-h-screen bg-[#020510] text-slate-300 flex overflow-hidden font-mono relative">
+      {/* Dimmed Starfield Background for Settings Page */}
+      <div className="opacity-35 filter brightness-75 pointer-events-none">
+        <StarfieldBackground />
+      </div>
+      
+      {/* ALERTS */}
+      <AnimatePresence>
+        {saveSuccess && (
+          <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            className="absolute top-6 right-6 z-50 px-4 py-3 rounded-lg bg-emerald-950/90 border border-emerald-500/40 text-emerald-300 text-xs shadow-[0_0_25px_rgba(16,185,129,0.4)] flex items-center space-x-2 backdrop-blur-md"
+          >
+            <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+            <span>{saveSuccess}</span>
+          </motion.div>
+        )}
+        {saveError && (
+          <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            className="absolute top-6 right-6 z-50 px-4 py-3 rounded-lg bg-rose-950/90 border border-rose-500/40 text-rose-300 text-xs shadow-[0_0_25px_rgba(244,63,94,0.4)] flex items-center space-x-2 backdrop-blur-md"
+          >
+            <AlertTriangle className="h-4 w-4 text-rose-400" />
+            <span>{saveError}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* Top Admin Bar */}
-      <header className="sticky top-0 z-50 w-full glass border-b border-white/10 backdrop-blur-2xl">
-        <div className="max-w-6xl mx-auto px-5 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <div className="p-1.5 rounded-lg bg-accent-cyan/10 border border-accent-cyan/20">
-                <Settings className="h-4 w-4 text-accent-cyan" />
-              </div>
-              <div>
-                <p className="text-xs font-mono font-extrabold text-accent-cyan tracking-wider uppercase">Site Settings</p>
-                <p className="text-[10px] text-slate-500 font-mono">Konfigurasi teknis web IMO 2026</p>
-              </div>
-            </div>
-          </div>
-
+      <main className="flex-1 flex flex-col h-screen relative z-10">
+        <header className="absolute top-0 left-0 right-0 h-16 border-b border-slate-800/40 bg-[#020510]/60 backdrop-blur-md flex items-center justify-between px-6 shrink-0 z-20">
           <div className="flex items-center space-x-3">
-            <AnimatePresence>
-              {saveMsg && (
-                <motion.div initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}
-                  className={`px-3 py-1.5 rounded-full text-xs font-mono font-bold flex items-center space-x-1.5 ${saveMsg.type === "ok" ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30" : "bg-rose-500/15 text-rose-300 border border-rose-500/30"
-                    }`}>
-                  <span>{saveMsg.text}</span>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            <button onClick={handleSave} disabled={saving || loading}
-              className="px-5 py-2 rounded-xl bg-accent-cyan text-black font-mono font-extrabold text-xs hover:bg-cyan-300 transition shadow-[0_0_15px_rgba(125,249,255,0.3)] flex items-center space-x-2 cursor-pointer disabled:opacity-60">
-              {saving ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-              <span>{saving ? "Menyimpan..." : "Simpan & Terapkan"}</span>
-            </button>
-
-            <button onClick={() => router.push("/admin/dashboard")}
-              className="px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-slate-400 hover:text-slate-200 text-xs font-mono transition cursor-pointer">
-              ← Dashboard
-            </button>
+            <Link href="/admin/dashboard" className="text-slate-500 hover:text-cyan-400 transition">
+              <TerminalSquare className="w-5 h-5" />
+            </Link>
+            <div className="h-4 w-[1px] bg-slate-700" />
+            <span className="text-xs font-bold text-cyan-400 tracking-[0.2em] uppercase glow-text-cyan flex items-center space-x-2">
+              <Sparkles className="w-3.5 h-3.5 animate-pulse" />
+              <span>IMO_CIRCUIT_CONSTELLATION</span>
+            </span>
           </div>
-        </div>
-      </header>
+          <button
+            onClick={() => handleSaveAll()}
+            disabled={saving || loading}
+            className="px-4 py-1.5 rounded-lg bg-cyan-600/20 border border-cyan-500/50 hover:bg-cyan-500/40 text-cyan-300 text-xs font-bold transition flex items-center space-x-2 disabled:opacity-50 shadow-[0_0_20px_rgba(34,211,238,0.2)]"
+          >
+            <Save className="h-3.5 w-3.5" />
+            <span>{saving ? "SYNCING..." : "SAVE ALL SETTINGS"}</span>
+          </button>
+        </header>
 
-      <div className="max-w-6xl mx-auto px-5 py-8 relative z-10">
-        {/* Tab Navigation - Sidebar style */}
-        <div className="flex gap-6">
+        {/* --- RADIAL CONSTELLATION NODE CANVAS --- */}
+        <div className="flex-1 w-full h-full relative overflow-hidden bg-[radial-gradient(ellipse_at_center,rgba(34,211,238,0.06)_0%,rgba(2,5,16,1)_75%)]">
+          {loading ? (
+            <div className="absolute inset-0 flex items-center justify-center text-cyan-500">
+              <RefreshCw className="h-8 w-8 animate-spin" />
+            </div>
+          ) : (
+            <>
+              {/* Sci-Fi Background Tech Grid & Rings */}
+              <div className="absolute inset-0 bg-[url('/noise.png')] bg-repeat opacity-[0.03] pointer-events-none mix-blend-overlay" />
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[550px] h-[550px] border border-cyan-500/10 rounded-full border-dashed animate-[spin_80s_linear_infinite] pointer-events-none" />
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[750px] h-[750px] border border-blue-500/10 rounded-full animate-[spin_140s_linear_infinite_reverse] pointer-events-none" />
 
-          {/* Left sidebar nav */}
-          <aside className="w-52 flex-shrink-0">
-            <nav className="space-y-1 sticky top-24">
-              {tabs.map(tab => {
-                const Icon = tab.icon;
-                const active = activeTab === tab.id;
+              {/* SQUARED (PCB CIRCUIT STEPPED) CONNECTING LINES SVG */}
+              <svg className="absolute inset-0 w-full h-full pointer-events-none">
+                <g style={{ transform: "translate(50%, 50%)" }}>
+                  {NODES.map((node, i) => {
+                    const { x, y } = getCoordinates(i);
+                    const isActive = activeTab === node.id;
+                    
+                    // Exit port on central core border
+                    const baseAngle = (i * 45) - 90;
+                    const finalAngleDeg = baseAngle + (node.angleOffset || 0);
+                    const angleRad = (finalAngleDeg * Math.PI) / 180;
+                    const CORE_RADIUS = 55;
+                    const startX = Math.cos(angleRad) * CORE_RADIUS;
+                    const startY = Math.sin(angleRad) * CORE_RADIUS;
+
+                    // Sector-bounded step out to guarantee zero line collisions across quadrants
+                    const sectorDist = 65;
+                    const sectorX = startX + Math.cos(angleRad) * sectorDist;
+                    const sectorY = startY + Math.sin(angleRad) * sectorDist;
+
+                    const isMoreVertical = Math.abs(Math.sin(angleRad)) > Math.abs(Math.cos(angleRad));
+                    
+                    let pathData = "";
+                    const joints: { cx: number; cy: number }[] = [
+                      { cx: sectorX, cy: sectorY }
+                    ];
+
+                    if (isMoreVertical) {
+                      pathData = `M ${startX} ${startY} L ${sectorX} ${sectorY} L ${sectorX} ${y} L ${x} ${y}`;
+                      joints.push({ cx: sectorX, cy: y });
+                    } else {
+                      pathData = `M ${startX} ${startY} L ${sectorX} ${sectorY} L ${x} ${sectorY} L ${x} ${y}`;
+                      joints.push({ cx: x, cy: sectorY });
+                    }
+
+                    return (
+                      <g key={`circuit-group-${node.id}`}>
+                        {/* Start Port Dot at Core Border */}
+                        <circle cx={startX} cy={startY} r={isActive ? 3 : 2} fill={isActive ? "#22d3ee" : "#475569"} />
+
+                        {/* Sector-Bounded Non-Colliding 90-degree Path */}
+                        <motion.path
+                          d={pathData}
+                          fill="none"
+                          stroke={isActive ? "#22d3ee" : "rgba(51, 65, 85, 0.6)"}
+                          strokeWidth={isActive ? 2.5 : 1.5}
+                          strokeDasharray={isActive ? "none" : "5,5"}
+                          initial={{ pathLength: 0 }}
+                          animate={{ pathLength: 1 }}
+                          transition={{ duration: 1, delay: i * 0.08 }}
+                        />
+
+                        {/* Joint Dots at Sector Bends */}
+                        {joints.map((j, idx) => (
+                          <circle key={idx} cx={j.cx} cy={j.cy} r={isActive ? 3.5 : 2} fill={isActive ? "#22d3ee" : "#334155"} />
+                        ))}
+
+                        {/* Terminal Node Dot at Target Node */}
+                        <circle cx={x} cy={y} r={isActive ? 4 : 2.5} fill={isActive ? "#22d3ee" : "#334155"} />
+                      </g>
+                    );
+                  })}
+                </g>
+              </svg>
+
+              {/* THE CENTER CORE (IMO LOGO) */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center">
+                <motion.div 
+                  className="relative flex items-center justify-center p-7 bg-[#070b16]/90 rounded-full border-2 border-cyan-500/60 shadow-[0_0_60px_rgba(34,211,238,0.3)] backdrop-blur-xl cursor-pointer group"
+                  animate={{ 
+                    boxShadow: ["0 0 35px rgba(34,211,238,0.3)", "0 0 70px rgba(34,211,238,0.6)", "0 0 35px rgba(34,211,238,0.3)"] 
+                  }}
+                  transition={{ repeat: Infinity, duration: 3.5, ease: "easeInOut" }}
+                  onClick={() => setActiveTab(null)}
+                >
+                  <ImoLogo className="h-14 w-auto filter drop-shadow-[0_0_12px_rgba(255,255,255,0.9)] opacity-95 group-hover:scale-105 transition-transform" />
+                  
+                  {/* Outer spinning ring for core */}
+                  <div className="absolute inset-[-12px] rounded-full border-t-2 border-b-2 border-cyan-400 blur-[1px] animate-[spin_5s_linear_infinite]" />
+                </motion.div>
+                <div className="mt-4 px-3 py-1 bg-cyan-950/60 border border-cyan-500/30 rounded-full text-[10px] font-bold tracking-[0.3em] text-cyan-400 uppercase backdrop-blur-md">
+                  IMO SYSTEM CORE
+                </div>
+              </div>
+
+              {/* ORGANIC SATELLITE NODE CARDS */}
+              {NODES.map((node, i) => {
+                const { x, y } = getCoordinates(i);
+                const isActive = activeTab === node.id;
+                
                 return (
-                  <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                    className={`w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs font-bold font-mono transition-all cursor-pointer text-left ${active
-                        ? "bg-accent-cyan text-black shadow-[0_0_15px_rgba(125,249,255,0.25)]"
-                        : "text-slate-400 hover:text-slate-200 hover:bg-slate-900/60"
-                      }`}>
-                    <Icon className={`h-4 w-4 flex-shrink-0 ${active ? "text-black" : "text-slate-500"}`} />
-                    <span>{tab.label}</span>
-                  </button>
-                );
-              })}
-
-              <div className="pt-4 border-t border-white/8 mt-4">
-                <p className="text-[10px] font-mono text-slate-600 uppercase tracking-wider px-3 mb-2">Akses Cepat</p>
-                <button onClick={() => router.push("/admin/dashboard")}
-                  className="w-full flex items-center space-x-3 px-3.5 py-2 rounded-xl text-xs font-mono text-slate-500 hover:text-slate-300 hover:bg-slate-900/40 transition cursor-pointer text-left">
-                  <Layers className="h-4 w-4" /><span>Dashboard</span>
-                </button>
-                <a href="/" target="_blank" rel="noreferrer"
-                  className="w-full flex items-center space-x-3 px-3.5 py-2 rounded-xl text-xs font-mono text-slate-500 hover:text-slate-300 hover:bg-slate-900/40 transition cursor-pointer text-left">
-                  <Eye className="h-4 w-4" /><span>Lihat Web</span>
-                </a>
-              </div>
-            </nav>
-          </aside>
-
-          {/* Main content */}
-          <main className="flex-grow min-w-0">
-            {loading ? (
-              <div className="rounded-3xl border border-white/8 bg-slate-950/60 p-16 text-center">
-                <RefreshCw className="h-8 w-8 text-accent-cyan mx-auto mb-3 animate-spin" />
-                <p className="text-slate-400 text-sm font-mono">Memuat konfigurasi web...</p>
-              </div>
-            ) : (
-              <AnimatePresence mode="wait">
-                <motion.div key={activeTab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
-
-                  {/* ══════════════════════════════════════════════════════
-                      TAB 1: BRAND & TEMA
-                  ══════════════════════════════════════════════════════ */}
-                  {activeTab === "brand" && (
-                    <div className="space-y-5">
-                      {/* Identity card */}
-                      <section className="rounded-2xl border border-white/8 bg-slate-950/60 overflow-hidden">
-                        <div className="px-5 py-4 border-b border-white/8 bg-slate-900/40">
-                          <div className="flex items-center space-x-2">
-                            <Globe className="h-4 w-4 text-accent-cyan" />
-                            <h2 className="text-sm font-bold text-slate-100">Identitas Web</h2>
-                          </div>
-                          <p className="text-[11px] text-slate-500 mt-0.5">Nama, tahun, logo, dan motto utama yang muncul di seluruh web.</p>
-                        </div>
-                        <div className="px-5">
-                          <SettingRow label="URL Logo Kustom" hint={`Kosongkan = gunakan logo SVG default (/Brighton.svg). Isi URL gambar untuk mengganti logo di semua halaman.`}>
-                            <div className="space-y-2">
-                              <TextInput value={brand.logoUrl} onChange={v => setBrand({ ...brand, logoUrl: v })} placeholder="https://..." mono />
-                              {brand.logoUrl && (
-                                <div className="flex items-center space-x-2 p-2 rounded-lg bg-slate-900 border border-white/10">
-                                  <img src={brand.logoUrl} alt="Logo Preview" className="h-8 object-contain" onError={e => (e.currentTarget.style.display = "none")} />
-                                  <span className="text-[10px] text-slate-400 font-mono">Preview logo</span>
-                                </div>
-                              )}
-                              <p className="text-[10px] text-slate-600 font-mono">Path lokal: /public/Brighton.svg (ganti file tersebut untuk mengganti logo default)</p>
-                            </div>
-                          </SettingRow>
-                          <SettingRow label="Nama Event / Site" hint="Muncul di browser tab, footer, dan meta SEO">
-                            <TextInput value={brand.siteName} onChange={v => setBrand({ ...brand, siteName: v })} placeholder="IMO 2026" />
-                          </SettingRow>
-                          <SettingRow label="Tahun Event" hint="Ditampilkan besar di samping logo pada halaman utama">
-                            <TextInput value={brand.siteYear} onChange={v => setBrand({ ...brand, siteYear: v })} placeholder="2026" />
-                          </SettingRow>
-                          <SettingRow label="Tagline / Motto Utama" hint="Kutipan brand yang muncul di hero halaman utama (dalam tanda kutip italic)">
-                            <TextArea value={brand.taglineMotto} onChange={v => setBrand({ ...brand, taglineMotto: v })} />
-                          </SettingRow>
-                        </div>
-                      </section>
-
-                      {/* Color palette */}
-                      <section className="rounded-2xl border border-white/8 bg-slate-950/60 overflow-hidden">
-                        <div className="px-5 py-4 border-b border-white/8 bg-slate-900/40">
-                          <div className="flex items-center space-x-2">
-                            <Palette className="h-4 w-4 text-accent-purple" />
-                            <h2 className="text-sm font-bold text-slate-100">Palet Warna Tema</h2>
-                          </div>
-                          <p className="text-[11px] text-slate-500 mt-0.5">Warna-warna ini disuntikkan sebagai CSS custom property (<code className="text-accent-cyan">--accent-cyan</code>, dll.) ke seluruh web secara real-time.</p>
-                        </div>
-                        <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <ColorSwatch label="--accent-cyan (Warna Utama)" value={brand.accentCyan} onChange={v => setBrand({ ...brand, accentCyan: v })} preview="Cyan" />
-                          <ColorSwatch label="--accent-purple (Warna Sekunder)" value={brand.accentPurple} onChange={v => setBrand({ ...brand, accentPurple: v })} preview="Purple" />
-                          <ColorSwatch label="--accent-yellow (Warna Aksen)" value={brand.accentYellow} onChange={v => setBrand({ ...brand, accentYellow: v })} preview="Yellow" />
-                          <ColorSwatch label="--background (Warna Latar)" value={brand.bgColor} onChange={v => setBrand({ ...brand, bgColor: v })} preview="BG" />
-                        </div>
-
-                        {/* Live preview bar */}
-                        <div className="px-5 pb-5">
-                          <p className="text-[10px] font-mono text-slate-500 mb-2 uppercase tracking-wide">Preview Warna:</p>
-                          <div className="flex items-center gap-2 p-3 rounded-xl border border-white/8"
-                            style={{ backgroundColor: brand.bgColor }}>
-                            <div className="h-3 w-3 rounded-full" style={{ backgroundColor: brand.accentCyan, boxShadow: `0 0 8px ${brand.accentCyan}` }} />
-                            <div className="h-3 w-3 rounded-full" style={{ backgroundColor: brand.accentPurple, boxShadow: `0 0 8px ${brand.accentPurple}` }} />
-                            <div className="h-3 w-3 rounded-full" style={{ backgroundColor: brand.accentYellow, boxShadow: `0 0 8px ${brand.accentYellow}` }} />
-                            <span className="text-xs font-mono ml-2" style={{ color: brand.accentCyan }}>Pratinjau tema langsung</span>
-                            <span className="ml-auto text-[10px] font-mono text-slate-600">BG: {brand.bgColor}</span>
-                          </div>
-                        </div>
-                      </section>
-                    </div>
-                  )}
-
-                  {/* ══════════════════════════════════════════════════════
-                      TAB 2: KONTEN HALAMAN (CMS)
-                  ══════════════════════════════════════════════════════ */}
-                  {activeTab === "content" && (
-                    <div className="space-y-3">
-                      <div className="px-1 mb-4">
-                        <p className="text-xs text-slate-400 font-mono">Edit teks yang ditampilkan di setiap halaman. Perubahan akan langsung tercermin setelah disimpan.</p>
+                  <motion.div
+                    key={node.id}
+                    className="absolute top-1/2 left-1/2 z-20 flex flex-col items-center justify-center cursor-pointer"
+                    initial={{ x: "-50%", y: "-50%", opacity: 0, scale: 0.5 }}
+                    animate={{ 
+                      x: `calc(-50% + ${x}px)`, 
+                      y: `calc(-50% + ${y}px)`, 
+                      opacity: 1, 
+                      scale: 1 
+                    }}
+                    transition={{ type: "spring", stiffness: 180, damping: 18, delay: i * 0.08 }}
+                    onClick={() => setActiveTab(node.id)}
+                  >
+                    <motion.div
+                      whileHover={{ scale: 1.08, y: -4 }}
+                      whileTap={{ scale: 0.95 }}
+                      className={`
+                        relative px-5 py-3.5 rounded-2xl border bg-gradient-to-br backdrop-blur-xl shadow-xl transition-all duration-300 flex items-center space-x-3 min-w-[150px] md:min-w-[185px]
+                        ${isActive ? "border-cyan-400 bg-cyan-950/80 text-white shadow-[0_0_35px_rgba(34,211,238,0.5)] scale-110" : `${node.color} bg-[#0b0f19]/90 hover:border-cyan-400 hover:shadow-[0_0_20px_rgba(34,211,238,0.25)]`}
+                      `}
+                    >
+                      <div className={`p-2 rounded-xl bg-black/40 border border-white/10 ${isActive ? "text-cyan-300 animate-pulse" : ""}`}>
+                        <node.icon className="w-5 h-5 md:w-6 md:h-6" />
+                      </div>
+                      
+                      <div className="flex flex-col text-left">
+                        <span className="text-[11px] md:text-xs font-bold tracking-wider uppercase text-slate-100 whitespace-nowrap">
+                          {node.label}
+                        </span>
+                        <span className="text-[9px] text-slate-400 font-mono tracking-tight">
+                          {isActive ? "ACTIVE NODE" : "CLICK TO CONFIG"}
+                        </span>
                       </div>
 
-                      <AccordionSection title="/ — Halaman Utama (Home)" icon={Layout} defaultOpen>
-                        <div className="space-y-0">
-                          <SettingRow label="Badge Atas" hint='Teks kecil bertanda di atas judul. Misal: "Innovative Minds Outclass"'>
-                            <TextInput value={content.homeBadge} onChange={v => setContent({ ...content, homeBadge: v })} />
-                          </SettingRow>
-                          <SettingRow label="Teks Awalan Hero" hint='Muncul di atas logo, misal: "SELAMAT DATANG DI"'>
-                            <TextInput value={content.homeHeroPrefix} onChange={v => setContent({ ...content, homeHeroPrefix: v })} />
-                          </SettingRow>
-                          <SettingRow label="Tagline Kutipan (italic)">
-                            <TextArea value={content.homeTagline} onChange={v => setContent({ ...content, homeTagline: v })} />
-                          </SettingRow>
-                          <SettingRow label="Deskripsi Portal (paragraf)">
-                            <TextArea value={content.homeDescription} onChange={v => setContent({ ...content, homeDescription: v })} rows={3} />
-                          </SettingRow>
-                          <SettingRow label="Label Tombol CTA">
-                            <TextInput value={content.homeCtaLabel} onChange={v => setContent({ ...content, homeCtaLabel: v })} placeholder="Mulai Penjelajahan" />
-                          </SettingRow>
-                          <div className="pt-3 border-t border-white/5 mt-3">
-                            <p className="text-[10px] font-mono text-slate-500 uppercase tracking-wide mb-3">3 Kartu Fitur</p>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                              {([
-                                { t: "homeCard1Title" as const, d: "homeCard1Desc" as const, label: "Kartu 1 (Tugas)" },
-                                { t: "homeCard2Title" as const, d: "homeCard2Desc" as const, label: "Kartu 2 (ID Card)" },
-                                { t: "homeCard3Title" as const, d: "homeCard3Desc" as const, label: "Kartu 3 (Kontak)" },
-                              ]).map(c => (
-                                <div key={c.label} className="space-y-2 p-3 rounded-xl bg-[#0a1020] border border-white/8">
-                                  <p className="text-[10px] font-mono text-accent-cyan uppercase">{c.label}</p>
-                                  <TextInput value={content[c.t]} onChange={v => setContent({ ...content, [c.t]: v })} placeholder="Judul..." />
-                                  <TextArea value={content[c.d]} onChange={v => setContent({ ...content, [c.d]: v })} rows={3} placeholder="Deskripsi..." />
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      </AccordionSection>
+                      {/* Active glowing ring indicator */}
+                      {isActive && (
+                        <div className="absolute inset-[-4px] rounded-2xl border border-cyan-400/60 animate-ping pointer-events-none" />
+                      )}
+                    </motion.div>
+                  </motion.div>
+                );
+              })}
+            </>
+          )}
+        </div>
+      </main>
 
-                      <AccordionSection title="/info — Halaman Penugasan" icon={Star}>
-                        <SettingRow label="Judul Hero"><TextInput value={content.infoHeroTitle} onChange={v => setContent({ ...content, infoHeroTitle: v })} /></SettingRow>
-                        <SettingRow label="Sub-judul"><TextArea value={content.infoSubtitle} onChange={v => setContent({ ...content, infoSubtitle: v })} /></SettingRow>
-                        <SettingRow label="Banner Peringatan / Catatan" hint="Tampil sebagai banner kuning di atas daftar tugas">
-                          <TextArea value={content.infoBanner} onChange={v => setContent({ ...content, infoBanner: v })} />
-                        </SettingRow>
-                      </AccordionSection>
+      {/* --- CENTERED MODAL POP-UP OVERLAY --- */}
+      <AnimatePresence>
+        {activeTab && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-6 overflow-hidden">
+            {/* Dark Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setActiveTab(null)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-md"
+            />
 
-                      <AccordionSection title="/hub — Pusat Penjelajahan" icon={Layers}>
-                        <SettingRow label="Teks Badge"><TextInput value={content.hubBadge} onChange={v => setContent({ ...content, hubBadge: v })} /></SettingRow>
-                        <SettingRow label="Judul Halaman"><TextInput value={content.hubTitle} onChange={v => setContent({ ...content, hubTitle: v })} /></SettingRow>
-                        <SettingRow label="Deskripsi"><TextArea value={content.hubDescription} onChange={v => setContent({ ...content, hubDescription: v })} /></SettingRow>
-                      </AccordionSection>
+            {/* Centered Modal Window */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="relative z-10 max-w-2xl w-full max-h-[85vh] bg-[#0a0d14]/95 border-2 border-cyan-500/40 rounded-2xl shadow-[0_0_60px_rgba(34,211,238,0.25)] flex flex-col backdrop-blur-xl overflow-hidden font-mono"
+            >
+              {/* Modal Header */}
+              <div className="p-5 border-b border-slate-800/80 flex items-center justify-between bg-black/50">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
+                    <Code className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-xs font-bold text-cyan-400 tracking-[0.2em] uppercase glow-text-cyan">
+                      NODE_CONFIG :: {activeTab.toUpperCase()}
+                    </h2>
+                    <p className="text-[10px] text-slate-500 font-sans">Modify parameters for this system node.</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setActiveTab(null)} 
+                  className="p-2 text-slate-400 hover:text-cyan-400 hover:bg-slate-800/60 rounded-xl transition border border-transparent hover:border-slate-700"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
 
-                      <AccordionSection title="/guide — Panduan & Artikel" icon={FileText}>
-                        <SettingRow label="Teks Badge"><TextInput value={content.guideBadge} onChange={v => setContent({ ...content, guideBadge: v })} /></SettingRow>
-                        <SettingRow label="Judul Halaman"><TextInput value={content.guideTitle} onChange={v => setContent({ ...content, guideTitle: v })} /></SettingRow>
-                        <SettingRow label="Deskripsi"><TextArea value={content.guideDescription} onChange={v => setContent({ ...content, guideDescription: v })} /></SettingRow>
-                      </AccordionSection>
-
-                      <AccordionSection title="/contact — Kontak LO" icon={Type}>
-                        <SettingRow label="Judul Halaman"><TextInput value={content.contactTitle} onChange={v => setContent({ ...content, contactTitle: v })} /></SettingRow>
-                        <SettingRow label="Deskripsi"><TextArea value={content.contactDescription} onChange={v => setContent({ ...content, contactDescription: v })} /></SettingRow>
-                      </AccordionSection>
-
-                      <AccordionSection title="Footer (semua halaman)" icon={Layout}>
-                        <SettingRow label="Teks Copyright" hint='Muncul di footer semua halaman. Misal: "IMO 2026. Made with Next.js."'>
-                          <TextInput value={content.footerCopyright} onChange={v => setContent({ ...content, footerCopyright: v })} />
-                        </SettingRow>
-                        <SettingRow label="Tagline Footer (opsional)">
-                          <TextInput value={content.footerTagline} onChange={v => setContent({ ...content, footerTagline: v })} placeholder="Biarkan kosong jika tidak diperlukan" />
-                        </SettingRow>
-                      </AccordionSection>
-                    </div>
-                  )}
-
-                  {/* ══════════════════════════════════════════════════════
-                      TAB 3: FITUR & MODUL
-                  ══════════════════════════════════════════════════════ */}
-                  {activeTab === "features" && (
-                    <div className="space-y-5">
-                      <section className="rounded-2xl border border-white/8 bg-slate-950/60 overflow-hidden">
-                        <div className="px-5 py-4 border-b border-white/8 bg-slate-900/40">
-                          <div className="flex items-center space-x-2">
-                            <Zap className="h-4 w-4 text-accent-yellow" />
-                            <h2 className="text-sm font-bold text-slate-100">Toggle Modul Web</h2>
-                          </div>
-                          <p className="text-[11px] text-slate-500 mt-0.5">Aktifkan atau nonaktifkan fitur/halaman tertentu di web. Perubahan berlaku setelah disimpan.</p>
-                        </div>
-                        <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-3">
-                          <FeatureToggle label="Push Notification" desc="Sistem notifikasi push ke perangkat user. Nonaktifkan untuk menutup prompt izin notifikasi." on={features.enablePushNotif} onToggle={() => setFeatures(f => ({ ...f, enablePushNotif: !f.enablePushNotif }))} />
-                          <FeatureToggle label="Background Starfield" desc="Animasi partikel bintang 3D di background. Nonaktifkan untuk performa lebih baik di perangkat lemah." on={features.enableStarfield} onToggle={() => setFeatures(f => ({ ...f, enableStarfield: !f.enableStarfield }))} />
-                          <FeatureToggle label="ID Card Generator (/id-card)" desc="Fitur generator kartu identitas peserta IMO 2026." on={features.enableIdCard} onToggle={() => setFeatures(f => ({ ...f, enableIdCard: !f.enableIdCard }))} warning />
-                          <FeatureToggle label="Document Generator (/documents)" desc="Fitur auto-form generator dokumen PDF." on={features.enableDocuments} onToggle={() => setFeatures(f => ({ ...f, enableDocuments: !f.enableDocuments }))} warning />
-                          <FeatureToggle label="Halaman Panduan (/guide)" desc="Halaman artikel, pengumuman, dan embed dokumen Google Drive." on={features.enableGuide} onToggle={() => setFeatures(f => ({ ...f, enableGuide: !f.enableGuide }))} warning />
-                          <FeatureToggle label="Halaman Kontak (/contact)" desc="Direktori kontak WhatsApp LO & pendamping kelompok." on={features.enableContact} onToggle={() => setFeatures(f => ({ ...f, enableContact: !f.enableContact }))} warning />
-                        </div>
-                      </section>
-
-                      <section className="rounded-2xl border border-rose-500/20 bg-rose-950/10 overflow-hidden">
-                        <div className="px-5 py-4 border-b border-rose-500/15 bg-rose-950/20">
-                          <div className="flex items-center space-x-2">
-                            <Shield className="h-4 w-4 text-rose-400" />
-                            <h2 className="text-sm font-bold text-rose-200">Mode Maintenance</h2>
-                          </div>
-                          <p className="text-[11px] text-rose-400/70 mt-0.5">Saat aktif, semua halaman publik menampilkan pesan maintenance. Hanya admin yang bisa mengakses.</p>
-                        </div>
-                        <div className="p-5 space-y-4">
-                          <div className="flex items-center justify-between p-4 rounded-xl bg-slate-950/60 border border-rose-500/20">
-                            <div>
-                              <p className={`text-sm font-bold ${features.maintenanceMode ? "text-rose-300" : "text-slate-400"}`}>
-                                {features.maintenanceMode ? "🔒 MAINTENANCE MODE AKTIF" : "🟢 Web Berjalan Normal"}
-                              </p>
-                              <p className="text-[11px] text-slate-500 mt-0.5">Semua halaman publik akan menampilkan pesan di bawah</p>
-                            </div>
-                            <button onClick={() => setFeatures(f => ({ ...f, maintenanceMode: !f.maintenanceMode }))}
-                              className={`flex-shrink-0 w-12 h-6 rounded-full transition-all duration-300 relative cursor-pointer ${features.maintenanceMode ? "bg-rose-500 shadow-[0_0_10px_rgba(239,68,68,0.4)]" : "bg-slate-700"}`}>
-                              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-md transition-all duration-300 ${features.maintenanceMode ? "left-6" : "left-0.5"}`} />
-                            </button>
-                          </div>
-                          <div>
-                            <label className="block text-xs font-mono text-slate-400 uppercase mb-1.5">Pesan Maintenance</label>
-                            <TextArea value={features.maintenanceMessage} onChange={v => setFeatures(f => ({ ...f, maintenanceMessage: v }))} rows={3} placeholder="Sistem sedang dalam pemeliharaan..." />
-                          </div>
-                        </div>
-                      </section>
-                    </div>
-                  )}
-
-                  {/* ══════════════════════════════════════════════════════
-                      TAB 4: TEKNIS & SEO
-                  ══════════════════════════════════════════════════════ */}
-                  {activeTab === "technical" && (
-                    <div className="space-y-5">
-                      {/* Drive Config */}
-                      <section className="rounded-2xl border border-white/8 bg-slate-950/60 overflow-hidden">
-                        <div className="px-5 py-4 border-b border-white/8 bg-slate-900/40">
-                          <div className="flex items-center space-x-2">
-                            <HardDrive className="h-4 w-4 text-accent-cyan" />
-                            <h2 className="text-sm font-bold text-slate-100">Google Drive Integration</h2>
-                          </div>
-                          <p className="text-[11px] text-slate-500 mt-0.5">Konfigurasi folder Google Drive untuk sistem pengecekan tugas kelompok & individu.</p>
-                        </div>
-                        <div className="px-5">
-                          <SettingRow label="Parent Folder ID" hint="ID folder Google Drive induk. Bisa ID saja (dari URL) atau full URL.">
-                            <TextInput value={tech.gdriveParentFolder} onChange={v => setTech({ ...tech, gdriveParentFolder: v })} placeholder="11xRuReiU4Eyuw5lBOWgn30IMBoWKElGI" mono />
-                          </SettingRow>
-                          <SettingRow label="Total Kelompok" hint="Jumlah kelompok yang akan dibuatkan folder di Drive">
-                            <input type="number" min={1} max={300} value={tech.totalGroups}
-                              onChange={e => setTech({ ...tech, totalGroups: Number(e.target.value) })}
-                              className="w-32 px-3.5 py-2.5 rounded-xl bg-[#0a1020] border border-white/10 text-slate-100 text-sm font-mono focus:outline-none focus:border-accent-cyan/60 transition" />
-                          </SettingRow>
-                          <SettingRow label="Anggota per Kelompok" hint="Digunakan untuk menghitung % kelengkapan tugas individu">
-                            <input type="number" min={1} max={100} value={tech.membersPerGroup}
-                              onChange={e => setTech({ ...tech, membersPerGroup: Number(e.target.value) })}
-                              className="w-32 px-3.5 py-2.5 rounded-xl bg-[#0a1020] border border-white/10 text-slate-100 text-sm font-mono focus:outline-none focus:border-accent-cyan/60 transition" />
-                          </SettingRow>
-                        </div>
-                        <div className="px-5 pb-5">
-                          <button onClick={handleSyncDrive} disabled={syncing}
-                            className="flex items-center space-x-2 px-4 py-2 rounded-xl bg-accent-cyan/10 border border-accent-cyan/30 text-accent-cyan text-xs font-mono font-bold hover:bg-accent-cyan/20 transition cursor-pointer disabled:opacity-60">
-                            <RefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} />
-                            <span>{syncing ? "Menyinkronkan..." : "Sinkronisasi Folder Drive Sekarang"}</span>
+              {/* Modal Content Scrollable Area */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-[url('/noise.png')] bg-repeat opacity-[0.98]">
+                {activeTab === "root_system" && (
+                  <div className="space-y-6">
+                    <div className="bg-black/50 border border-slate-800/80 rounded-xl p-5">
+                      <h3 className="text-xs font-bold text-slate-300 mb-4 flex items-center space-x-2 tracking-wider">
+                        <Cpu className="h-4 w-4 text-cyan-400" />
+                        <span>NEXT.JS CACHE PROTOCOL</span>
+                      </h3>
+                      <div className="space-y-5">
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">Force Purge Data Caches</label>
+                          <p className="text-[10px] text-slate-500 mb-3 leading-relaxed">
+                            Clear all Server-Side Rendering (SSR) and Static Generation (SSG) caches globally.
+                          </p>
+                          <button onClick={handlePurgeCache} disabled={purgingCache} className="w-full justify-center py-2.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-xl text-[11px] font-bold tracking-wider transition flex items-center space-x-2 disabled:opacity-50">
+                            <RefreshCcw className={`h-3.5 w-3.5 ${purgingCache ? "animate-spin" : ""}`} />
+                            <span>{purgingCache ? "EXECUTING PURGE..." : "EXECUTE GLOBAL PURGE"}</span>
                           </button>
                         </div>
-                      </section>
-
-                      {/* SEO */}
-                      <section className="rounded-2xl border border-white/8 bg-slate-950/60 overflow-hidden">
-                        <div className="px-5 py-4 border-b border-white/8 bg-slate-900/40">
-                          <div className="flex items-center space-x-2">
-                            <Globe className="h-4 w-4 text-accent-purple" />
-                            <h2 className="text-sm font-bold text-slate-100">SEO & Metadata</h2>
-                          </div>
-                          <p className="text-[11px] text-slate-500 mt-0.5">Metadata yang muncul di browser tab, Google Search, dan saat link dibagikan di media sosial.</p>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">API Cache TTL (Seconds)</label>
+                          <input type="number" value={coreConfig.cacheTtl} onChange={(e) => setCoreConfig({ ...coreConfig, cacheTtl: Number(e.target.value) })} className="w-full px-3 py-2 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition" />
                         </div>
-                        <div className="px-5">
-                          <SettingRow label="Title Tag (Browser Tab)" hint="Muncul di tab browser dan hasil pencarian Google. Maks ~60 karakter">
-                            <TextInput value={tech.seoTitle} onChange={v => setTech({ ...tech, seoTitle: v })} placeholder="IMO 2026 - Innovative Minds Outclass" />
-                          </SettingRow>
-                          <SettingRow label="Meta Description" hint="Deskripsi singkat di hasil pencarian Google. Maks ~160 karakter">
-                            <TextArea value={tech.seoDescription} onChange={v => setTech({ ...tech, seoDescription: v })} />
-                          </SettingRow>
-                          <SettingRow label="Meta Keywords" hint="Kata kunci terpisah koma (opsional, tidak terlalu penting untuk SEO modern)">
-                            <TextInput value={tech.seoKeywords} onChange={v => setTech({ ...tech, seoKeywords: v })} placeholder="IMO 2026, mahasiswa baru, orientasi" />
-                          </SettingRow>
-                        </div>
-                      </section>
-
-                      {/* System Info - readonly */}
-                      <section className="rounded-2xl border border-white/8 bg-slate-950/40 overflow-hidden">
-                        <div className="px-5 py-4 border-b border-white/8 bg-slate-900/30">
-                          <div className="flex items-center space-x-2">
-                            <Cpu className="h-4 w-4 text-slate-400" />
-                            <h2 className="text-sm font-bold text-slate-300">Informasi Sistem (Readonly)</h2>
-                          </div>
-                        </div>
-                        <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-3">
-                          {[
-                            { label: "Framework", value: "Next.js 16.2.10 (Turbopack)" },
-                            { label: "Database", value: "Supabase (PostgreSQL)" },
-                            { label: "Runtime", value: "Vercel Edge / Node.js" },
-                            { label: "Env", value: process.env.NODE_ENV || "production" },
-                            { label: "Repo", value: "bijakmaulana06/imo" },
-                            { label: "Logo Asset", value: "/public/Brighton.svg" },
-                          ].map(item => (
-                            <div key={item.label} className="flex items-center justify-between p-3 rounded-xl bg-[#0a1020] border border-white/6">
-                              <span className="text-[10px] font-mono text-slate-500 uppercase tracking-wide">{item.label}</span>
-                              <span className="text-xs font-mono text-slate-300">{item.value}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </section>
+                      </div>
                     </div>
-                  )}
 
-                </motion.div>
-              </AnimatePresence>
-            )}
-          </main>
-        </div>
-      </div>
+                    <div className="bg-black/50 border border-slate-800/80 rounded-xl p-5">
+                      <h3 className="text-xs font-bold text-slate-300 mb-4 flex items-center space-x-2 tracking-wider">
+                        <WifiOff className="h-4 w-4 text-amber-400" />
+                        <span>SERVICE WORKER PWA ROOT</span>
+                      </h3>
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">SW Cache Manifest Version</label>
+                          <input type="text" value={coreConfig.swCacheVersion} onChange={(e) => setCoreConfig({ ...coreConfig, swCacheVersion: e.target.value })} className="w-full px-3 py-2 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition" />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">SW Kill Switch Signal</label>
+                          <button onClick={() => setCoreConfig({ ...coreConfig, killServiceWorker: !coreConfig.killServiceWorker })} className={`w-full py-2.5 rounded-xl text-[11px] font-bold tracking-wider transition ${coreConfig.killServiceWorker ? "bg-rose-500/20 text-rose-400 border border-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.2)]" : "bg-black/70 text-slate-400 border border-slate-800"}`}>
+                            {coreConfig.killServiceWorker ? "KILL SIGNAL ACTIVE" : "SIGNAL OFFLINE (NORMAL)"}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === "push" && (
+                  <div className="space-y-6">
+                    <div className="bg-black/50 border border-slate-800/80 rounded-xl p-5">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-xs font-bold text-slate-300 flex items-center space-x-2 tracking-wider">
+                          <Lock className="h-4 w-4 text-emerald-400" />
+                          <span>VAPID CRYPTO ENGINE</span>
+                        </h3>
+                        <span className="text-[9px] font-bold bg-emerald-500/10 text-emerald-400 px-2 py-1 rounded-full border border-emerald-500/20 uppercase tracking-widest">
+                          {pushSubscribersCount} Active
+                        </span>
+                      </div>
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Public Signature</label>
+                          <code className="block w-full p-2.5 bg-black/70 border border-slate-800 rounded-lg text-[10px] text-slate-300 break-all">{notificationSettings.vapidPublicKey || "NULL"}</code>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Private Key (Hidden)</label>
+                          <code className="block w-full p-2.5 bg-black/70 border border-slate-800 rounded-lg text-[10px] text-slate-500 break-all">{notificationSettings.vapidPrivateKey ? "*******************************************" : "NULL"}</code>
+                        </div>
+                        <div className="pt-2">
+                          <button onClick={handleRegenerateVapid} className="w-full justify-center py-2.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-xl text-[10px] tracking-wider font-bold transition flex items-center space-x-2">
+                            <RefreshCw className="h-3.5 w-3.5" />
+                            <span>RE-ROLL VAPID KEYS</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-black/50 border border-slate-800/80 rounded-xl p-5">
+                      <h3 className="text-xs font-bold text-slate-300 mb-4 flex items-center space-x-2 tracking-wider">
+                        <Activity className="h-4 w-4 text-cyan-400" />
+                        <span>BROADCAST TERMINAL</span>
+                      </h3>
+                      <div className="space-y-4 mb-4">
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Alert Title</label>
+                          <input type="text" value={broadcastTitle} onChange={(e) => setBroadcastTitle(e.target.value)} className="w-full px-3 py-2 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition" />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Payload Body</label>
+                          <textarea rows={2} value={broadcastMessage} onChange={(e) => setBroadcastMessage(e.target.value)} className="w-full px-3 py-2 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition" />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Target Directory (URL)</label>
+                          <input type="text" value={broadcastTargetUrl} onChange={(e) => setBroadcastTargetUrl(e.target.value)} className="w-full px-3 py-2 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition" />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-slate-800/50">
+                        <button onClick={(e) => handleSendPushBroadcast(e, false)} disabled={sendingPush || testingPush} className="w-full justify-center py-2.5 bg-cyan-600/20 border border-cyan-500/50 hover:bg-cyan-500/40 text-cyan-300 rounded-xl text-[10px] tracking-wider font-bold transition flex items-center space-x-2 disabled:opacity-50">
+                          <Send className="h-3.5 w-3.5" />
+                          <span>{sendingPush ? "UPLOADING..." : "BROADCAST TO ALL"}</span>
+                        </button>
+                        <button onClick={(e) => handleSendPushBroadcast(e, true)} disabled={testingPush || sendingPush || !testEndpoint} className="w-full justify-center py-2.5 bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 border border-slate-700 rounded-xl text-[10px] tracking-wider transition flex items-center space-x-2 disabled:opacity-50">
+                          <Activity className="h-3.5 w-3.5" />
+                          <span>{testingPush ? "PINGING..." : "TEST PING (THIS DEVICE)"}</span>
+                        </button>
+                      </div>
+                      {pushResultMsg && (
+                        <div className="mt-4 p-3 bg-cyan-950/40 border border-cyan-800 rounded-xl text-xs text-cyan-300 font-bold">
+                          &gt; {pushResultMsg}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === "security" && (
+                  <div className="space-y-6">
+                    <div className="bg-black/50 border border-slate-800/80 rounded-xl p-5">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-xs font-bold text-slate-300 tracking-wider">FIREWALL PROTOCOL</h3>
+                        <button onClick={() => setCoreConfig({ ...coreConfig, apiLockdown: !coreConfig.apiLockdown })} className={`px-3.5 py-1.5 rounded-xl text-[10px] tracking-widest font-bold transition ${coreConfig.apiLockdown ? "bg-rose-500/20 text-rose-400 border border-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.2)]" : "bg-black/70 text-slate-400 border border-slate-800"}`}>
+                          {coreConfig.apiLockdown ? "LOCKDOWN ACTIVE" : "SECURITY NORMAL"}
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-slate-400 leading-relaxed">Engage this protocol to instantly force all public API endpoints to return 403 Forbidden. Use only during active DDoS attacks or severe data breaches.</p>
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === "status" && (
+                  <div className="space-y-6">
+                    <div className="bg-black/50 border border-slate-800/80 rounded-xl p-5">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-xs font-bold text-slate-300 tracking-wider">CINEMATIC OFFLINE</h3>
+                        <button onClick={() => setCoreConfig({ ...coreConfig, maintenanceMode: !coreConfig.maintenanceMode })} className={`px-3.5 py-1.5 rounded-xl text-[10px] tracking-widest font-bold transition ${coreConfig.maintenanceMode ? "bg-rose-500/20 text-rose-400 border border-rose-500/50 animate-pulse shadow-[0_0_15px_rgba(244,63,94,0.2)]" : "bg-black/70 text-slate-400 border border-slate-800"}`}>
+                          {coreConfig.maintenanceMode ? "ORBIT LOST" : "ORBIT STABLE"}
+                        </button>
+                      </div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Terminal Message</label>
+                      <input type="text" value={coreConfig.maintenanceMessage} onChange={(e) => setCoreConfig({ ...coreConfig, maintenanceMessage: e.target.value })} className="w-full px-3 py-2 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition" />
+                    </div>
+
+                    <div className="bg-black/50 border border-slate-800/80 rounded-xl p-5">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-xs font-bold text-slate-300 tracking-wider">DATA FREEZE</h3>
+                        <button onClick={() => setCoreConfig({ ...coreConfig, taskSubmissionFrozen: !coreConfig.taskSubmissionFrozen })} className={`px-3.5 py-1.5 rounded-xl text-[10px] tracking-widest font-bold transition ${coreConfig.taskSubmissionFrozen ? "bg-amber-500/20 text-amber-400 border border-amber-500/50 shadow-[0_0_15px_rgba(245,158,11,0.2)]" : "bg-black/70 text-slate-400 border border-slate-800"}`}>
+                          {coreConfig.taskSubmissionFrozen ? "SUBMISSIONS HALTED" : "SYSTEM OPEN"}
+                        </button>
+                      </div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Freeze Notice</label>
+                      <input type="text" value={coreConfig.taskFreezeMessage} onChange={(e) => setCoreConfig({ ...coreConfig, taskFreezeMessage: e.target.value })} className="w-full px-3 py-2 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition" />
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === "drive" && (
+                  <div className="space-y-6">
+                    <div className="bg-black/50 border border-slate-800/80 rounded-xl p-5 space-y-4">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">GDrive Root Matrix ID</label>
+                        <input type="text" value={gdriveParentFolder} onChange={(e) => setGdriveParentFolder(e.target.value)} className="w-full px-3 py-2 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">Total Groups</label>
+                          <input type="number" value={totalGroupsCount} onChange={(e) => setTotalGroupsCount(Number(e.target.value))} className="w-full px-3 py-2 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">Members Per Group</label>
+                          <input type="number" value={targetMembersPerGroup} onChange={(e) => setTargetMembersPerGroup(Number(e.target.value))} className="w-full px-3 py-2 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === "theme" && (
+                  <div className="space-y-6">
+                     <div className="bg-black/50 border border-slate-800/80 rounded-xl p-5 space-y-4">
+                       <div>
+                         <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">Cyan Accent (Primary)</label>
+                         <input type="color" value={coreConfig.accentCyan} onChange={(e) => setCoreConfig({ ...coreConfig, accentCyan: e.target.value })} className="h-10 w-full rounded-xl cursor-pointer bg-transparent border-0" />
+                       </div>
+                       <div>
+                         <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">Purple Accent (Secondary)</label>
+                         <input type="color" value={coreConfig.accentPurple} onChange={(e) => setCoreConfig({ ...coreConfig, accentPurple: e.target.value })} className="h-10 w-full rounded-xl cursor-pointer bg-transparent border-0" />
+                       </div>
+                       <div>
+                         <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">Deep Void (Background)</label>
+                         <input type="color" value={coreConfig.backgroundColor} onChange={(e) => setCoreConfig({ ...coreConfig, backgroundColor: e.target.value })} className="h-10 w-full rounded-xl cursor-pointer bg-transparent border-0" />
+                       </div>
+                     </div>
+                  </div>
+                )}
+
+                {activeTab === "branding" && (
+                  <div className="space-y-6">
+                     <div className="bg-black/50 border border-slate-800/80 rounded-xl p-5 space-y-4">
+                       <div>
+                         <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">Platform Name</label>
+                         <input type="text" value={coreConfig.siteName} onChange={(e) => setCoreConfig({ ...coreConfig, siteName: e.target.value })} className="w-full px-3 py-2 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
+                       </div>
+                       <div>
+                         <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">Insignia URL</label>
+                         <input type="text" value={coreConfig.siteLogoUrl} onChange={(e) => setCoreConfig({ ...coreConfig, siteLogoUrl: e.target.value })} className="w-full px-3 py-2 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
+                       </div>
+                     </div>
+                  </div>
+                )}
+
+                {activeTab === "copywriting" && (
+                  <div className="space-y-6">
+                     <div className="bg-black/50 border border-slate-800/80 rounded-xl p-5 space-y-4">
+                       <div>
+                         <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">Root Terminal Slogan</label>
+                         <textarea value={coreConfig.homeTagline} onChange={(e) => setCoreConfig({ ...coreConfig, homeTagline: e.target.value })} className="w-full px-3 py-2 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
+                       </div>
+                     </div>
+                  </div>
+                )}
+
+                {activeTab === "home_nodes" && (
+                  <div className="space-y-6">
+                    <div className="bg-black/50 border border-slate-800/80 rounded-xl p-5">
+                      <h3 className="text-xs font-bold text-slate-300 mb-4 flex items-center space-x-2 tracking-wider">
+                        <LayoutGrid className="h-4 w-4 text-cyan-400" />
+                        <span>URUTAN MENU BERANDA (NODE GRAPH)</span>
+                      </h3>
+                      <p className="text-[10px] text-slate-500 mb-4 leading-relaxed">
+                        Atur urutan fitur yang ditampilkan pada halaman utama. Urutan ini akan memengaruhi jalur konstelasi (node graph) dari atas ke bawah.
+                      </p>
+                      
+                      <div className="space-y-2">
+                        {coreConfig.homeNodesOrder?.map((nodeId, idx) => {
+                           const nodeLabels: Record<string, string> = {
+                             "guide": "Panduan & Embed Dokumen",
+                             "hub": "Pusat Penjelajahan (Hub)",
+                             "info": "Status Tugas Kelompok",
+                             "idcard": "ID Card Generator",
+                             "documents": "Auto-Form Generator",
+                             "contact": "Kontak LO & Pendamping"
+                           };
+                           return (
+                             <div key={nodeId} className="flex items-center justify-between p-3 bg-black/70 border border-slate-800 rounded-lg">
+                               <div className="flex items-center space-x-3">
+                                 <div className="flex flex-col items-center justify-center w-6 h-6 rounded bg-slate-800 text-xs text-slate-400 font-mono">
+                                   {idx + 1}
+                                 </div>
+                                 <span className="text-sm font-semibold text-slate-300">{nodeLabels[nodeId] || nodeId}</span>
+                               </div>
+                               <div className="flex items-center space-x-1">
+                                 <button
+                                   onClick={() => {
+                                      if (idx > 0) {
+                                        const newOrder = [...coreConfig.homeNodesOrder];
+                                        [newOrder[idx - 1], newOrder[idx]] = [newOrder[idx], newOrder[idx - 1]];
+                                        setCoreConfig({ ...coreConfig, homeNodesOrder: newOrder });
+                                      }
+                                   }}
+                                   disabled={idx === 0}
+                                   className="p-1.5 bg-slate-800 hover:bg-cyan-500/20 text-slate-400 hover:text-cyan-400 rounded transition disabled:opacity-30 disabled:hover:bg-slate-800 disabled:hover:text-slate-400"
+                                 >
+                                   <ChevronUp className="w-4 h-4" />
+                                 </button>
+                                 <button
+                                   onClick={() => {
+                                      if (idx < coreConfig.homeNodesOrder.length - 1) {
+                                        const newOrder = [...coreConfig.homeNodesOrder];
+                                        [newOrder[idx + 1], newOrder[idx]] = [newOrder[idx], newOrder[idx + 1]];
+                                        setCoreConfig({ ...coreConfig, homeNodesOrder: newOrder });
+                                      }
+                                   }}
+                                   disabled={idx === coreConfig.homeNodesOrder.length - 1}
+                                   className="p-1.5 bg-slate-800 hover:bg-cyan-500/20 text-slate-400 hover:text-cyan-400 rounded transition disabled:opacity-30 disabled:hover:bg-slate-800 disabled:hover:text-slate-400"
+                                 >
+                                   <ChevronDown className="w-4 h-4" />
+                                 </button>
+                               </div>
+                             </div>
+                           )
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {/* Modal Footer / Save Action */}
+              <div className="p-5 border-t border-slate-800/80 bg-black/60 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab(null)}
+                  className="px-4 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-xs font-bold transition"
+                >
+                  Close
+                </button>
+                <button
+                  onClick={() => handleSaveAll()}
+                  disabled={saving || loading}
+                  className="px-6 py-2.5 rounded-xl bg-cyan-600/20 border border-cyan-500/50 hover:bg-cyan-500/40 text-cyan-300 text-xs tracking-[0.2em] uppercase font-bold transition flex items-center space-x-2 disabled:opacity-50 shadow-[0_0_20px_rgba(34,211,238,0.25)]"
+                >
+                  <Save className="h-4 w-4" />
+                  <span>{saving ? "UPLOADING..." : "SAVE NODE CONFIG"}</span>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+      
     </div>
   );
 }
