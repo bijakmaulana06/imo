@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { Bell, BellOff, Check, X, ShieldAlert, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { usePathname } from "next/navigation";
 
 function urlBase64ToUint8Array(base64String: string) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -20,6 +21,7 @@ function urlBase64ToUint8Array(base64String: string) {
 }
 
 export default function PushNotificationManager() {
+  const pathname = usePathname();
   const [isSupported, setIsSupported] = useState<boolean>(false);
   const [permission, setPermission] = useState<NotificationPermission>("default");
   const [isSubscribed, setIsSubscribed] = useState<boolean>(false);
@@ -40,7 +42,6 @@ export default function PushNotificationManager() {
             if (sub) {
               setIsSubscribed(true);
             } else if (Notification.permission === "default") {
-              // Tampilkan prompt banner untuk perangkat baru secara instant (500ms)
               const timer = setTimeout(() => setShowPromptBanner(true), 500);
               return () => clearTimeout(timer);
             }
@@ -49,6 +50,11 @@ export default function PushNotificationManager() {
         .catch((err) => console.warn("Service Worker registration failed:", err));
     }
   }, []);
+
+  // Do not render floating prompt/badge on admin routes
+  if (pathname?.startsWith("/admin")) {
+    return null;
+  }
 
   const handleSubscribe = async () => {
     if (!isSupported) {

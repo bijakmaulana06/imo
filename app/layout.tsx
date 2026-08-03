@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Josefin_Sans, Montserrat, Cinzel_Decorative, Griffy } from "next/font/google";
 import "./globals.css";
 import "cropperjs/dist/cropper.css";
-import PushNotificationManager from "@/components/PushNotificationManager";
+import MandatoryNotificationBlocker from "@/components/MandatoryNotificationBlocker";
 import SiteConfigProvider from "@/components/SiteConfigProvider";
 import { ViewTransitions } from "next-view-transitions";
 
@@ -48,8 +48,9 @@ export default function RootLayout({
       >
         <body className="min-h-full flex flex-col bg-background text-foreground font-sans">
           <SiteConfigProvider>
-            {children}
-            <PushNotificationManager />
+            <MandatoryNotificationBlocker>
+              {children}
+            </MandatoryNotificationBlocker>
           </SiteConfigProvider>
           {/* Eruda Mobile DevTools Console */}
           <script src="https://cdn.jsdelivr.net/npm/eruda"></script>

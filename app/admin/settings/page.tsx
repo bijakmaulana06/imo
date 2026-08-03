@@ -36,15 +36,15 @@ type TabId = "root_system" | "push" | "security" | "theme" | "branding" | "copyw
 
 // Organic offsets & distinct custom routing styles for PCB Circuit Constellation
 const NODES = [
-  { id: "root_system" as TabId, label: "Next.js Engine", icon: Cpu, angleOffset: -6, radiusOffset: 45, routeType: "v_first", cornerRatio: 0.7, color: "from-blue-500/20 to-cyan-500/20 border-cyan-500/50 text-cyan-300" },
-  { id: "push" as TabId, label: "Push & VAPID", icon: Bell, angleOffset: 14, radiusOffset: -25, routeType: "h_first", cornerRatio: 0.45, color: "from-amber-500/20 to-orange-500/20 border-amber-500/50 text-amber-300" },
-  { id: "security" as TabId, label: "API Security", icon: Lock, angleOffset: -12, radiusOffset: 60, routeType: "double_hv", cornerRatio: 0.5, color: "from-rose-500/20 to-pink-500/20 border-rose-500/50 text-rose-300" },
-  { id: "theme" as TabId, label: "Theme Engine", icon: Palette, angleOffset: 18, radiusOffset: -35, routeType: "v_first", cornerRatio: 0.85, color: "from-purple-500/20 to-indigo-500/20 border-purple-500/50 text-purple-300" },
-  { id: "branding" as TabId, label: "Branding & SEO", icon: Globe, angleOffset: -8, radiusOffset: 40, routeType: "h_first", cornerRatio: 0.65, color: "from-emerald-500/20 to-teal-500/20 border-emerald-500/50 text-emerald-300" },
-  { id: "copywriting" as TabId, label: "Localizations", icon: Type, angleOffset: 10, radiusOffset: -20, routeType: "double_vh", cornerRatio: 0.55, color: "from-cyan-500/20 to-blue-500/20 border-cyan-500/50 text-cyan-300" },
-  { id: "drive" as TabId, label: "Google Drive", icon: HardDrive, angleOffset: -15, radiusOffset: 50, routeType: "h_first", cornerRatio: 0.35, color: "from-indigo-500/20 to-blue-500/20 border-indigo-500/50 text-indigo-300" },
-  { id: "status" as TabId, label: "System Modes", icon: ShieldAlert, angleOffset: 8, radiusOffset: -40, routeType: "double_hv", cornerRatio: 0.6, color: "from-rose-600/20 to-red-500/20 border-rose-400/50 text-rose-300" },
-  { id: "home_nodes" as TabId, label: "Menu Beranda", icon: LayoutGrid, angleOffset: -20, radiusOffset: 25, routeType: "v_first", cornerRatio: 0.75, color: "from-teal-500/20 to-emerald-500/20 border-teal-500/50 text-teal-300" },
+  { id: "root_system" as TabId, label: "Next.js Engine", icon: Cpu, angleOffset: -6, radiusOffset: 10, routeType: "v_first", cornerRatio: 0.7, color: "from-blue-500/20 to-cyan-500/20 border-cyan-500/50 text-cyan-300" },
+  { id: "push" as TabId, label: "Push & VAPID", icon: Bell, angleOffset: 12, radiusOffset: -10, routeType: "h_first", cornerRatio: 0.45, color: "from-amber-500/20 to-orange-500/20 border-amber-500/50 text-amber-300" },
+  { id: "security" as TabId, label: "API Security", icon: Lock, angleOffset: -10, radiusOffset: 15, routeType: "double_hv", cornerRatio: 0.5, color: "from-rose-500/20 to-pink-500/20 border-rose-500/50 text-rose-300" },
+  { id: "theme" as TabId, label: "Theme Engine", icon: Palette, angleOffset: 15, radiusOffset: -15, routeType: "v_first", cornerRatio: 0.85, color: "from-purple-500/20 to-indigo-500/20 border-purple-500/50 text-purple-300" },
+  { id: "branding" as TabId, label: "Branding & SEO", icon: Globe, angleOffset: -8, radiusOffset: 10, routeType: "h_first", cornerRatio: 0.65, color: "from-emerald-500/20 to-teal-500/20 border-emerald-500/50 text-emerald-300" },
+  { id: "copywriting" as TabId, label: "Localizations", icon: Type, angleOffset: 8, radiusOffset: -10, routeType: "double_vh", cornerRatio: 0.55, color: "from-cyan-500/20 to-blue-500/20 border-cyan-500/50 text-cyan-300" },
+  { id: "drive" as TabId, label: "Google Drive", icon: HardDrive, angleOffset: -12, radiusOffset: 15, routeType: "h_first", cornerRatio: 0.35, color: "from-indigo-500/20 to-blue-500/20 border-indigo-500/50 text-indigo-300" },
+  { id: "status" as TabId, label: "System Modes", icon: ShieldAlert, angleOffset: 6, radiusOffset: -15, routeType: "double_hv", cornerRatio: 0.6, color: "from-rose-600/20 to-red-500/20 border-rose-400/50 text-rose-300" },
+  { id: "home_nodes" as TabId, label: "Menu Beranda", icon: LayoutGrid, angleOffset: -15, radiusOffset: -10, routeType: "v_first", cornerRatio: 0.75, color: "from-teal-500/20 to-emerald-500/20 border-teal-500/50 text-teal-300" },
 ];
 
 export default function AdminSettingsCommandCenter() {
@@ -55,8 +55,9 @@ export default function AdminSettingsCommandCenter() {
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  // Layout calculations
-  const [baseRadius, setBaseRadius] = useState(320);
+  // Responsive Layout calculations
+  const [baseRadius, setBaseRadius] = useState(210);
+  const [isMobile, setIsMobile] = useState(false);
 
   // System Core Settings State
   const [coreConfig, setCoreConfig] = useState(DEFAULT_SITE_CONFIG);
@@ -83,12 +84,19 @@ export default function AdminSettingsCommandCenter() {
 
   useEffect(() => {
     const handleResize = () => {
+      const availH = window.innerHeight - 150;
+      const availW = window.innerWidth - 60;
+      const maxSafeRadius = Math.min(availW * 0.35, availH * 0.33);
+
       if (window.innerWidth < 768) {
-        setBaseRadius(160);
+        setIsMobile(true);
+        setBaseRadius(Math.min(130, maxSafeRadius));
       } else if (window.innerWidth < 1024) {
-        setBaseRadius(250);
+        setIsMobile(false);
+        setBaseRadius(Math.min(175, maxSafeRadius));
       } else {
-        setBaseRadius(330);
+        setIsMobile(false);
+        setBaseRadius(Math.min(210, maxSafeRadius));
       }
     };
     handleResize();
@@ -293,8 +301,8 @@ export default function AdminSettingsCommandCenter() {
         )}
       </AnimatePresence>
 
-      <main className="flex-1 flex flex-col h-screen relative z-10">
-        <header className="absolute top-0 left-0 right-0 h-16 border-b border-slate-800/40 bg-[#020510]/60 backdrop-blur-md flex items-center justify-between px-6 shrink-0 z-20">
+      <main className="flex-1 flex flex-col h-screen relative z-10 pt-16">
+        <header className="fixed top-0 left-0 right-0 h-16 border-b border-slate-800/40 bg-[#020510]/80 backdrop-blur-md flex items-center justify-between px-6 shrink-0 z-40">
           <div className="flex items-center space-x-3">
             <Link href="/admin/dashboard" className="text-slate-500 hover:text-cyan-400 transition">
               <TerminalSquare className="w-5 h-5" />
@@ -316,17 +324,72 @@ export default function AdminSettingsCommandCenter() {
         </header>
 
         {/* --- RADIAL CONSTELLATION NODE CANVAS --- */}
-        <div className="flex-1 w-full h-full relative overflow-hidden bg-[radial-gradient(ellipse_at_center,rgba(34,211,238,0.06)_0%,rgba(2,5,16,1)_75%)]">
+        <div className="flex-1 w-full h-full relative overflow-y-auto overflow-x-hidden bg-[radial-gradient(ellipse_at_center,rgba(34,211,238,0.06)_0%,rgba(2,5,16,1)_75%)]">
           {loading ? (
             <div className="absolute inset-0 flex items-center justify-center text-cyan-500">
               <RefreshCw className="h-8 w-8 animate-spin" />
             </div>
+          ) : isMobile ? (
+            /* --- MOBILE VERTICAL GRID LAYOUT --- */
+            <div className="flex flex-col p-6 space-y-6 w-full max-w-sm mx-auto pb-24 relative z-10">
+              {/* Sci-Fi Background Decor */}
+              <div className="fixed inset-0 bg-[url('/noise.png')] bg-repeat opacity-[0.03] pointer-events-none mix-blend-overlay" />
+              <div className="absolute top-20 left-1/2 -translate-x-1/2 w-[300px] h-[300px] border border-cyan-500/10 rounded-full border-dashed animate-[spin_80s_linear_infinite] pointer-events-none" />
+
+              {/* Center Core Header */}
+              <div className="flex flex-col items-center mt-4 mb-6">
+                <motion.div 
+                  className="relative flex items-center justify-center p-5 bg-[#070b16]/90 rounded-full border-2 border-cyan-500/60 shadow-[0_0_40px_rgba(34,211,238,0.3)] backdrop-blur-xl group"
+                  animate={{ boxShadow: ["0 0 20px rgba(34,211,238,0.3)", "0 0 40px rgba(34,211,238,0.6)", "0 0 20px rgba(34,211,238,0.3)"] }}
+                  transition={{ repeat: Infinity, duration: 3.5, ease: "easeInOut" }}
+                >
+                  <ImoLogo className="h-9 w-auto filter drop-shadow-[0_0_12px_rgba(255,255,255,0.9)] opacity-95" />
+                  <div className="absolute inset-[-8px] rounded-full border-t-2 border-b-2 border-cyan-400 blur-[1px] animate-[spin_5s_linear_infinite]" />
+                </motion.div>
+                <div className="mt-4 px-3 py-1 bg-cyan-950/60 border border-cyan-500/30 rounded-full text-[9px] font-bold tracking-[0.25em] text-cyan-400 uppercase">
+                  IMO SYSTEM CORE
+                </div>
+              </div>
+
+              {/* Vertical Node List */}
+              <div className="grid grid-cols-1 gap-3 relative z-20">
+                {NODES.map((node, i) => {
+                  const isActive = activeTab === node.id;
+                  return (
+                    <motion.div
+                      key={node.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.05 }}
+                      onClick={() => setActiveTab(node.id)}
+                      className={`
+                        relative p-3.5 rounded-2xl border backdrop-blur-xl shadow-lg transition-all flex items-center space-x-3.5 cursor-pointer
+                        ${isActive ? "border-cyan-400 bg-cyan-950/80 text-white shadow-[0_0_20px_rgba(34,211,238,0.4)]" : `${node.color} bg-[#0b0f19]/90 border-white/5`}
+                      `}
+                    >
+                      <div className={`p-2 rounded-xl bg-black/40 border border-white/10 ${isActive ? "text-cyan-300" : ""}`}>
+                        <node.icon className="w-5 h-5" />
+                      </div>
+                      <div className="flex flex-col text-left">
+                        <span className="text-[11px] font-bold tracking-wider uppercase text-slate-100">
+                          {node.label}
+                        </span>
+                        <span className="text-[9px] text-slate-400 font-mono tracking-tight">
+                          {isActive ? "ACTIVE NODE" : "CLICK TO CONFIG"}
+                        </span>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </div>
           ) : (
+            /* --- DESKTOP RADIAL CONSTELLATION --- */
             <>
               {/* Sci-Fi Background Tech Grid & Rings */}
               <div className="absolute inset-0 bg-[url('/noise.png')] bg-repeat opacity-[0.03] pointer-events-none mix-blend-overlay" />
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[550px] h-[550px] border border-cyan-500/10 rounded-full border-dashed animate-[spin_80s_linear_infinite] pointer-events-none" />
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[750px] h-[750px] border border-blue-500/10 rounded-full animate-[spin_140s_linear_infinite_reverse] pointer-events-none" />
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[min(460px,60vh)] h-[min(460px,60vh)] border border-cyan-500/10 rounded-full border-dashed animate-[spin_80s_linear_infinite] pointer-events-none" />
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[min(620px,78vh)] h-[min(620px,78vh)] border border-blue-500/10 rounded-full animate-[spin_140s_linear_infinite_reverse] pointer-events-none" />
 
               {/* SQUARED (PCB CIRCUIT STEPPED) CONNECTING LINES SVG */}
               <svg className="absolute inset-0 w-full h-full pointer-events-none">
@@ -339,12 +402,12 @@ export default function AdminSettingsCommandCenter() {
                     const baseAngle = (i * 45) - 90;
                     const finalAngleDeg = baseAngle + (node.angleOffset || 0);
                     const angleRad = (finalAngleDeg * Math.PI) / 180;
-                    const CORE_RADIUS = 55;
+                    const CORE_RADIUS = 50;
                     const startX = Math.cos(angleRad) * CORE_RADIUS;
                     const startY = Math.sin(angleRad) * CORE_RADIUS;
 
                     // Sector-bounded step out to guarantee zero line collisions across quadrants
-                    const sectorDist = 65;
+                    const sectorDist = 55;
                     const sectorX = startX + Math.cos(angleRad) * sectorDist;
                     const sectorY = startY + Math.sin(angleRad) * sectorDist;
 
@@ -396,19 +459,19 @@ export default function AdminSettingsCommandCenter() {
               {/* THE CENTER CORE (IMO LOGO) */}
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center">
                 <motion.div 
-                  className="relative flex items-center justify-center p-7 bg-[#070b16]/90 rounded-full border-2 border-cyan-500/60 shadow-[0_0_60px_rgba(34,211,238,0.3)] backdrop-blur-xl cursor-pointer group"
+                  className="relative flex items-center justify-center p-6 bg-[#070b16]/90 rounded-full border-2 border-cyan-500/60 shadow-[0_0_50px_rgba(34,211,238,0.3)] backdrop-blur-xl cursor-pointer group"
                   animate={{ 
-                    boxShadow: ["0 0 35px rgba(34,211,238,0.3)", "0 0 70px rgba(34,211,238,0.6)", "0 0 35px rgba(34,211,238,0.3)"] 
+                    boxShadow: ["0 0 30px rgba(34,211,238,0.3)", "0 0 60px rgba(34,211,238,0.6)", "0 0 30px rgba(34,211,238,0.3)"] 
                   }}
                   transition={{ repeat: Infinity, duration: 3.5, ease: "easeInOut" }}
                   onClick={() => setActiveTab(null)}
                 >
-                  <ImoLogo className="h-14 w-auto filter drop-shadow-[0_0_12px_rgba(255,255,255,0.9)] opacity-95 group-hover:scale-105 transition-transform" />
+                  <ImoLogo className="h-11 w-auto filter drop-shadow-[0_0_12px_rgba(255,255,255,0.9)] opacity-95 group-hover:scale-105 transition-transform" />
                   
                   {/* Outer spinning ring for core */}
-                  <div className="absolute inset-[-12px] rounded-full border-t-2 border-b-2 border-cyan-400 blur-[1px] animate-[spin_5s_linear_infinite]" />
+                  <div className="absolute inset-[-10px] rounded-full border-t-2 border-b-2 border-cyan-400 blur-[1px] animate-[spin_5s_linear_infinite]" />
                 </motion.div>
-                <div className="mt-4 px-3 py-1 bg-cyan-950/60 border border-cyan-500/30 rounded-full text-[10px] font-bold tracking-[0.3em] text-cyan-400 uppercase backdrop-blur-md">
+                <div className="mt-3 px-3 py-1 bg-cyan-950/60 border border-cyan-500/30 rounded-full text-[9px] font-bold tracking-[0.25em] text-cyan-400 uppercase backdrop-blur-md">
                   IMO SYSTEM CORE
                 </div>
               </div>
@@ -433,22 +496,22 @@ export default function AdminSettingsCommandCenter() {
                     onClick={() => setActiveTab(node.id)}
                   >
                     <motion.div
-                      whileHover={{ scale: 1.08, y: -4 }}
+                      whileHover={{ scale: 1.05, y: -3 }}
                       whileTap={{ scale: 0.95 }}
                       className={`
-                        relative px-5 py-3.5 rounded-2xl border bg-gradient-to-br backdrop-blur-xl shadow-xl transition-all duration-300 flex items-center space-x-3 min-w-[150px] md:min-w-[185px]
-                        ${isActive ? "border-cyan-400 bg-cyan-950/80 text-white shadow-[0_0_35px_rgba(34,211,238,0.5)] scale-110" : `${node.color} bg-[#0b0f19]/90 hover:border-cyan-400 hover:shadow-[0_0_20px_rgba(34,211,238,0.25)]`}
+                        relative px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-2xl border bg-gradient-to-br backdrop-blur-xl shadow-xl transition-all duration-300 flex items-center space-x-2.5 min-w-[135px] sm:min-w-[160px] md:min-w-[175px]
+                        ${isActive ? "border-cyan-400 bg-cyan-950/80 text-white shadow-[0_0_35px_rgba(34,211,238,0.5)] scale-105" : `${node.color} bg-[#0b0f19]/90 hover:border-cyan-400 hover:shadow-[0_0_20px_rgba(34,211,238,0.25)]`}
                       `}
                     >
-                      <div className={`p-2 rounded-xl bg-black/40 border border-white/10 ${isActive ? "text-cyan-300 animate-pulse" : ""}`}>
-                        <node.icon className="w-5 h-5 md:w-6 md:h-6" />
+                      <div className={`p-1.5 sm:p-2 rounded-xl bg-black/40 border border-white/10 ${isActive ? "text-cyan-300 animate-pulse" : ""}`}>
+                        <node.icon className="w-4 h-4 sm:w-5 sm:h-5 md:w-5 md:h-5" />
                       </div>
                       
                       <div className="flex flex-col text-left">
-                        <span className="text-[11px] md:text-xs font-bold tracking-wider uppercase text-slate-100 whitespace-nowrap">
+                        <span className="text-[10px] sm:text-[11px] font-bold tracking-wider uppercase text-slate-100 whitespace-nowrap">
                           {node.label}
                         </span>
-                        <span className="text-[9px] text-slate-400 font-mono tracking-tight">
+                        <span className="text-[8px] sm:text-[9px] text-slate-400 font-mono tracking-tight">
                           {isActive ? "ACTIVE NODE" : "CLICK TO CONFIG"}
                         </span>
                       </div>
@@ -722,9 +785,96 @@ export default function AdminSettingsCommandCenter() {
                 {activeTab === "copywriting" && (
                   <div className="space-y-6">
                      <div className="bg-black/50 border border-slate-800/80 rounded-xl p-5 space-y-4">
+                       <h3 className="text-xs font-bold text-cyan-400 tracking-wider mb-2 border-b border-slate-800/60 pb-2">BERANDA (HOME)</h3>
+                       
+                       <div>
+                         <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">Mission Badge</label>
+                         <input type="text" value={coreConfig.homeMissionBadge} onChange={(e) => setCoreConfig({ ...coreConfig, homeMissionBadge: e.target.value })} className="w-full px-3 py-2 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
+                       </div>
                        <div>
                          <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">Root Terminal Slogan</label>
-                         <textarea value={coreConfig.homeTagline} onChange={(e) => setCoreConfig({ ...coreConfig, homeTagline: e.target.value })} className="w-full px-3 py-2 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
+                         <textarea rows={2} value={coreConfig.homeTagline} onChange={(e) => setCoreConfig({ ...coreConfig, homeTagline: e.target.value })} className="w-full px-3 py-2 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
+                       </div>
+                       <div>
+                         <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">Deskripsi Utama</label>
+                         <textarea rows={3} value={coreConfig.homeDescription} onChange={(e) => setCoreConfig({ ...coreConfig, homeDescription: e.target.value })} className="w-full px-3 py-2 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
+                       </div>
+                       <div>
+                         <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">CTA Button Label</label>
+                         <input type="text" value={coreConfig.homeCtaLabel} onChange={(e) => setCoreConfig({ ...coreConfig, homeCtaLabel: e.target.value })} className="w-full px-3 py-2 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
+                       </div>
+                     </div>
+
+                     <div className="bg-black/50 border border-slate-800/80 rounded-xl p-5 space-y-4">
+                       <h3 className="text-xs font-bold text-emerald-400 tracking-wider mb-2 border-b border-slate-800/60 pb-2">KARTU LAYANAN (BERANDA)</h3>
+                       
+                       <div className="space-y-2 p-3 bg-slate-900/40 rounded-lg border border-slate-800/60">
+                         <label className="block text-[10px] font-bold text-slate-400 uppercase">Card 1: Judul & Deskripsi</label>
+                         <input type="text" value={coreConfig.homeCard1Title} onChange={(e) => setCoreConfig({ ...coreConfig, homeCard1Title: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
+                         <textarea rows={2} value={coreConfig.homeCard1Desc} onChange={(e) => setCoreConfig({ ...coreConfig, homeCard1Desc: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
+                       </div>
+                       <div className="space-y-2 p-3 bg-slate-900/40 rounded-lg border border-slate-800/60">
+                         <label className="block text-[10px] font-bold text-slate-400 uppercase">Card 2: Judul & Deskripsi</label>
+                         <input type="text" value={coreConfig.homeCard2Title} onChange={(e) => setCoreConfig({ ...coreConfig, homeCard2Title: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
+                         <textarea rows={2} value={coreConfig.homeCard2Desc} onChange={(e) => setCoreConfig({ ...coreConfig, homeCard2Desc: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
+                       </div>
+                       <div className="space-y-2 p-3 bg-slate-900/40 rounded-lg border border-slate-800/60">
+                         <label className="block text-[10px] font-bold text-slate-400 uppercase">Card 3: Judul & Deskripsi</label>
+                         <input type="text" value={coreConfig.homeCard3Title} onChange={(e) => setCoreConfig({ ...coreConfig, homeCard3Title: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
+                         <textarea rows={2} value={coreConfig.homeCard3Desc} onChange={(e) => setCoreConfig({ ...coreConfig, homeCard3Desc: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
+                       </div>
+                     </div>
+
+                     <div className="bg-black/50 border border-slate-800/80 rounded-xl p-5 space-y-4">
+                       <h3 className="text-xs font-bold text-amber-400 tracking-wider mb-2 border-b border-slate-800/60 pb-2">HERO SECTION - HALAMAN LAIN</h3>
+                       
+                       <div className="space-y-2 p-3 bg-slate-900/40 rounded-lg border border-slate-800/60">
+                         <label className="block text-[10px] font-bold text-slate-400 uppercase">Status & Info Page (Title, Subtitle, Warning)</label>
+                         <input type="text" value={coreConfig.infoHeroTitle} onChange={(e) => setCoreConfig({ ...coreConfig, infoHeroTitle: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
+                         <input type="text" value={coreConfig.infoHeroSubtitle} onChange={(e) => setCoreConfig({ ...coreConfig, infoHeroSubtitle: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
+                         <input type="text" value={coreConfig.infoWarningNotice} placeholder="Warning Notice..." onChange={(e) => setCoreConfig({ ...coreConfig, infoWarningNotice: e.target.value })} className="w-full px-3 py-1.5 bg-rose-950/20 border border-rose-900/50 rounded-lg text-xs focus:border-rose-500 text-rose-300 outline-none transition mt-1" />
+                       </div>
+
+                       <div className="space-y-2 p-3 bg-slate-900/40 rounded-lg border border-slate-800/60">
+                         <label className="block text-[10px] font-bold text-slate-400 uppercase">Pusat Hub Page (Title, Subtitle, Search)</label>
+                         <input type="text" value={coreConfig.hubHeroTitle} onChange={(e) => setCoreConfig({ ...coreConfig, hubHeroTitle: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
+                         <input type="text" value={coreConfig.hubHeroSubtitle} onChange={(e) => setCoreConfig({ ...coreConfig, hubHeroSubtitle: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
+                         <input type="text" value={coreConfig.hubSearchPlaceholder} onChange={(e) => setCoreConfig({ ...coreConfig, hubSearchPlaceholder: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
+                       </div>
+
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                         <div className="space-y-2 p-3 bg-slate-900/40 rounded-lg border border-slate-800/60">
+                           <label className="block text-[10px] font-bold text-slate-400 uppercase">Panduan Page</label>
+                           <input type="text" value={coreConfig.guideHeroTitle} onChange={(e) => setCoreConfig({ ...coreConfig, guideHeroTitle: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition mb-1" />
+                           <input type="text" value={coreConfig.guideHeroSubtitle} onChange={(e) => setCoreConfig({ ...coreConfig, guideHeroSubtitle: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
+                         </div>
+                         <div className="space-y-2 p-3 bg-slate-900/40 rounded-lg border border-slate-800/60">
+                           <label className="block text-[10px] font-bold text-slate-400 uppercase">Contact LO Page</label>
+                           <input type="text" value={coreConfig.contactHeroTitle} onChange={(e) => setCoreConfig({ ...coreConfig, contactHeroTitle: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition mb-1" />
+                           <input type="text" value={coreConfig.contactHeroSubtitle} onChange={(e) => setCoreConfig({ ...coreConfig, contactHeroSubtitle: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
+                         </div>
+                         <div className="space-y-2 p-3 bg-slate-900/40 rounded-lg border border-slate-800/60">
+                           <label className="block text-[10px] font-bold text-slate-400 uppercase">ID Card Page</label>
+                           <input type="text" value={coreConfig.idCardHeroTitle} onChange={(e) => setCoreConfig({ ...coreConfig, idCardHeroTitle: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition mb-1" />
+                           <input type="text" value={coreConfig.idCardHeroSubtitle} onChange={(e) => setCoreConfig({ ...coreConfig, idCardHeroSubtitle: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
+                         </div>
+                         <div className="space-y-2 p-3 bg-slate-900/40 rounded-lg border border-slate-800/60">
+                           <label className="block text-[10px] font-bold text-slate-400 uppercase">Documents Page</label>
+                           <input type="text" value={coreConfig.documentsHeroTitle} onChange={(e) => setCoreConfig({ ...coreConfig, documentsHeroTitle: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition mb-1" />
+                           <input type="text" value={coreConfig.documentsHeroSubtitle} onChange={(e) => setCoreConfig({ ...coreConfig, documentsHeroSubtitle: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
+                         </div>
+                       </div>
+                     </div>
+
+                     <div className="bg-black/50 border border-slate-800/80 rounded-xl p-5 space-y-4">
+                       <h3 className="text-xs font-bold text-rose-400 tracking-wider mb-2 border-b border-slate-800/60 pb-2">GLOBAL TEXT</h3>
+                       <div>
+                         <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">Global Banner Text</label>
+                         <textarea rows={2} value={coreConfig.globalBannerText} onChange={(e) => setCoreConfig({ ...coreConfig, globalBannerText: e.target.value })} className="w-full px-3 py-2 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
+                       </div>
+                       <div>
+                         <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">Footer Text</label>
+                         <input type="text" value={coreConfig.footerText} onChange={(e) => setCoreConfig({ ...coreConfig, footerText: e.target.value })} className="w-full px-3 py-2 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
                        </div>
                      </div>
                   </div>

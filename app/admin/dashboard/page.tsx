@@ -32,10 +32,11 @@ import {
   Download,
   XCircle,
   CheckCircle,
+  Bell
 } from "lucide-react";
 import { DEFAULT_ID_CARD_TEMPLATE } from "@/lib/defaultTemplate";
 
-type ActiveTab = "links" | "contacts" | "announcements" | "templates" | "tasks" | "doc_templates";
+type ActiveTab = "links" | "contacts" | "announcements" | "templates" | "tasks" | "doc_templates" | "notifications";
 
 const DEFAULT_ADMIN_HTML_TEMPLATE = DEFAULT_ID_CARD_TEMPLATE;
 
@@ -56,6 +57,17 @@ export default function AdminDashboardPage() {
   const [savingGdrive, setSavingGdrive] = useState<boolean>(false);
   const [syncingFolders, setSyncingFolders] = useState<boolean>(false);
   const [syncNotice, setSyncNotice] = useState<string | null>(null);
+
+  const [notifSettings, setNotifSettings] = useState<any>({
+    newTaskTemplate: { title: "Tugas Baru: {taskName}", body: "Ada tugas baru yang perlu dikerjakan. Cek sekarang!" },
+    deadlineTemplate: { title: "Peringatan Deadline: {taskName}", body: "Tugas ini akan segera mencapai tenggat waktu!" },
+    announcementTemplate: { title: "Pengumuman: {title}", body: "Ada pengumuman baru dari panitia." },
+    linktreeTemplate: { title: "Tautan Baru: {label}", body: "Tautan baru telah ditambahkan ke pusat informasi." },
+    deadlineReminderHours: 24,
+  });
+  const [savingNotif, setSavingNotif] = useState(false);
+  const [customPush, setCustomPush] = useState({ title: "", body: "", url: "/info" });
+  const [sendingCustomPush, setSendingCustomPush] = useState(false);
 
   // State Penugasan Individu
   const [individuTaskDefs, setIndividuTaskDefs] = useState<any[]>([
@@ -311,7 +323,7 @@ export default function AdminDashboardPage() {
       const { data: docData } = await supabase.from("document_templates").select("*").order("created_at", { ascending: false });
       setDocTemplates(docData || []);
 
-      const { data: settingData } = await supabase.from("system_settings").select("key, value").in("key", ["gdrive_parent_folder", "total_groups_count", "target_members_per_group", "task_definitions_individu"]);
+      const { data: settingData } = await supabase.from("system_settings").select("key, value").in("key", ["gdrive_parent_folder", "total_groups_count", "target_members_per_group", "task_definitions_individu", "notification_settings"]);
       if (settingData) {
         const folderSetting = settingData.find((s: any) => s.key === "gdrive_parent_folder");
         if (folderSetting) setGdriveLink(folderSetting.value || "");
@@ -330,6 +342,13 @@ export default function AdminDashboardPage() {
             if (Array.isArray(parsed) && parsed.length > 0) {
               setIndividuTaskDefs(parsed);
             }
+          } catch {}
+        }
+        const notifSetting = settingData.find((s: any) => s.key === "notification_settings");
+        if (notifSetting && notifSetting.value) {
+          try {
+            const parsed = JSON.parse(notifSetting.value);
+            setNotifSettings((prev: any) => ({ ...prev, ...parsed }));
           } catch {}
         }
       }
@@ -382,6 +401,34 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const handleSendCustomPush = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customPush.title || !customPush.body) {
+      alert("Judul dan isi notifikasi wajib diisi!");
+      return;
+    }
+    setSendingCustomPush(true);
+    try {
+      const res = await fetch("/api/push/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: customPush.title,
+          message: customPush.body,
+          url: customPush.url || "/info"
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Gagal mengirim notifikasi.");
+      alert(`Sukses: ${data.message || 'Notifikasi berhasil dikirim!'}`);
+      setCustomPush({ title: "", body: "", url: "/info" });
+    } catch (err: any) {
+      alert("Error: " + err.message);
+    } finally {
+      setSendingCustomPush(false);
+    }
+  };
+
   const handleCreateIndividuTask = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newIndividuTask.name.trim() || !newIndividuTask.keyword.trim()) return;
@@ -393,6 +440,18 @@ export default function AdminDashboardPage() {
     };
     const nextDefs = [...individuTaskDefs, newTaskObj];
     handleSaveIndividuTasks(nextDefs);
+    
+    // Kirim push notifikasi
+    if (notifSettings?.newTaskTemplate) {
+      const title = notifSettings.newTaskTemplate.title.replace(/{taskName}/g, newTaskObj.name);
+      const body = notifSettings.newTaskTemplate.body.replace(/{taskName}/g, newTaskObj.name);
+      fetch("/api/push/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, message: body, url: "/info" })
+      }).catch(e => console.warn("Push error:", e));
+    }
+
     setShowAddIndividuModal(false);
     setNewIndividuTask({ name: "", keyword: "", is_active: true });
   };
@@ -502,6 +561,25 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const handleSaveNotificationSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingNotif(true);
+    try {
+      const res = await fetch("/api/admin/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notificationSettings: notifSettings }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Gagal menyimpan");
+      alert("Pengaturan notifikasi berhasil disimpan!");
+    } catch (err: any) {
+      alert("Gagal menyimpan notifikasi: " + err.message);
+    } finally {
+      setSavingNotif(false);
+    }
+  };
+
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
     setSyncingFolders(true);
@@ -525,6 +603,17 @@ export default function AdminDashboardPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Gagal sinkronisasi folder");
+
+      // Kirim push notifikasi
+      if (notifSettings?.newTaskTemplate) {
+        const title = notifSettings.newTaskTemplate.title.replace(/{taskName}/g, newTask.name);
+        const body = notifSettings.newTaskTemplate.body.replace(/{taskName}/g, newTask.name);
+        fetch("/api/push/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title, message: body, url: "/info" })
+        }).catch(e => console.warn("Push error:", e));
+      }
 
       setSyncNotice(`Tugas "${newTask.name}" berhasil dibuat & folder untuk seluruh kelompok (${targetTotalGroups}) langsung disinkronkan di Google Drive!`);
       loadData();
@@ -599,6 +688,18 @@ export default function AdminDashboardPage() {
     try {
       const { error } = await supabase.from("hub_links").insert([newLink]);
       if (error) throw error;
+      
+      // Kirim push notifikasi
+      if (notifSettings?.linktreeTemplate) {
+        const title = notifSettings.linktreeTemplate.title.replace(/{label}/g, newLink.label);
+        const body = notifSettings.linktreeTemplate.body.replace(/{label}/g, newLink.label);
+        fetch("/api/push/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title, message: body, url: "/hub" })
+        }).catch(e => console.warn("Push error:", e));
+      }
+
       setShowAddLinkModal(false);
       setNewLink({ label: "", url: "", category: "Panduan & Berkas", icon_key: "book", description: "", sort_order: 0 });
       loadData();
@@ -662,7 +763,9 @@ export default function AdminDashboardPage() {
         autoform_url: newAnno.autoform_url,
       });
 
+      const newId = crypto.randomUUID();
       const { error } = await supabase.from("announcements").insert([{
+        id: newId,
         title: newAnno.title,
         content: contentPayload,
         category: newAnno.category,
@@ -670,6 +773,19 @@ export default function AdminDashboardPage() {
       }]);
 
       if (error) throw error;
+
+      // Kirim push notifikasi
+      if (notifSettings?.announcementTemplate) {
+        const targetUrl = `/guide?id=${newId}`;
+        const title = notifSettings.announcementTemplate.title.replace(/{title}/g, newAnno.title);
+        const body = notifSettings.announcementTemplate.body.replace(/{title}/g, newAnno.title);
+        fetch("/api/push/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title, message: body, url: targetUrl })
+        }).catch(e => console.warn("Push error:", e));
+      }
+
       setShowAddAnnoModal(false);
       setNewAnno({ title: "", notes: "", gdrive_url: "", autoform_url: "/documents", category: "Contoh Surat", pinned: false });
       loadData();
@@ -835,9 +951,9 @@ export default function AdminDashboardPage() {
               {/* Horizontal Bus Line across all 6 nodes (y=35, x=65 to x=935) */}
               <line x1="65" y1="35" x2="935" y2="35" stroke="rgba(125,249,255,0.35)" strokeWidth="2" />
 
-              {/* Vertical Drop Lines to 6 Nodes */}
-              {[65, 239, 413, 587, 761, 935].map((x, idx) => {
-                const nodeIds: ActiveTab[] = ["links", "contacts", "announcements", "templates", "tasks", "doc_templates"];
+              {/* Vertical Drop Lines to 7 Nodes */}
+              {[65, 210, 355, 500, 645, 790, 935].map((x, idx) => {
+                const nodeIds: ActiveTab[] = ["links", "contacts", "announcements", "templates", "tasks", "doc_templates", "notifications"];
                 const isSelected = activeTab === nodeIds[idx];
                 return (
                   <g key={idx}>
@@ -870,6 +986,7 @@ export default function AdminDashboardPage() {
               { id: "templates", label: "Template ID", icon: CreditCard, count: templates.length, color: "text-purple-400", border: "border-purple-500/50", shadow: "shadow-[0_0_20px_rgba(168,85,247,0.3)]" },
               { id: "tasks", label: "Penugasan", icon: ListChecks, count: tasks.length, color: "text-rose-400", border: "border-rose-500/50", shadow: "shadow-[0_0_20px_rgba(244,63,114,0.3)]" },
               { id: "doc_templates", label: "Auto-Form", icon: FileCode2, count: docTemplates.length, color: "text-cyan-400", border: "border-cyan-500/50", shadow: "shadow-[0_0_20px_rgba(125,249,255,0.3)]" },
+              { id: "notifications", label: "Notifikasi", icon: Bell, count: 0, color: "text-rose-500", border: "border-rose-500/50", shadow: "shadow-[0_0_20px_rgba(244,63,114,0.3)]" },
             ].map((t) => {
               const Icon = t.icon;
               const isCurrent = activeTab === t.id;
@@ -904,6 +1021,7 @@ export default function AdminDashboardPage() {
               { id: "templates", label: "Template", icon: CreditCard, count: templates.length, color: "text-purple-400", border: "border-purple-500/50" },
               { id: "tasks", label: "Tugas", icon: ListChecks, count: tasks.length, color: "text-rose-400", border: "border-rose-500/50" },
               { id: "doc_templates", label: "Auto-Form", icon: FileCode2, count: docTemplates.length, color: "text-cyan-400", border: "border-cyan-500/50" },
+              { id: "notifications", label: "Notifikasi", icon: Bell, count: 0, color: "text-rose-500", border: "border-rose-500/50" },
             ].map((t) => {
               const Icon = t.icon;
               const isCurrent = activeTab === t.id;
@@ -1688,6 +1806,210 @@ export default function AdminDashboardPage() {
               )}
             </div>
 
+          </div>
+        )}
+
+        {activeTab === "notifications" && (
+          <div className="space-y-8">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+              <div>
+                <h2 className="font-display font-black text-xl text-slate-100 flex items-center gap-2">
+                  <Bell className="h-6 w-6 text-rose-500" />
+                  <span>Pengaturan Notifikasi Push</span>
+                </h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  Atur format template pesan notifikasi untuk berbagai trigger yang akan dikirim ke pengguna.
+                </p>
+              </div>
+            </div>
+
+            <div className="glass rounded-2xl p-6 border border-rose-500/30">
+              <form onSubmit={handleSaveNotificationSettings} className="space-y-6">
+                
+                {/* Tugas Baru Template */}
+                <div className="space-y-3">
+                  <h3 className="font-bold text-sm text-slate-200 border-b border-card-border/50 pb-2">Tugas Baru</h3>
+                  <div className="grid grid-cols-1 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Judul Notifikasi</label>
+                      <input
+                        type="text"
+                        value={notifSettings.newTaskTemplate?.title || ""}
+                        onChange={(e) => setNotifSettings({...notifSettings, newTaskTemplate: {...notifSettings.newTaskTemplate, title: e.target.value}})}
+                        className="w-full px-4 py-2 rounded-xl bg-slate-950/80 border border-card-border text-slate-100 text-xs font-mono focus:border-rose-500 focus:outline-none"
+                        placeholder="Contoh: Tugas Baru: {taskName}"
+                      />
+                      <p className="text-[10px] text-slate-500 mt-1">Variabel tersedia: <code className="text-rose-400">&#123;taskName&#125;</code></p>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Isi Pesan Notifikasi</label>
+                      <textarea
+                        value={notifSettings.newTaskTemplate?.body || ""}
+                        onChange={(e) => setNotifSettings({...notifSettings, newTaskTemplate: {...notifSettings.newTaskTemplate, body: e.target.value}})}
+                        className="w-full px-4 py-2 rounded-xl bg-slate-950/80 border border-card-border text-slate-100 text-xs font-mono focus:border-rose-500 focus:outline-none h-16"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Deadline Template */}
+                <div className="space-y-3 pt-4 border-t border-card-border/30">
+                  <h3 className="font-bold text-sm text-slate-200 border-b border-card-border/50 pb-2">Peringatan Deadline</h3>
+                  <div className="grid grid-cols-1 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Judul Notifikasi</label>
+                      <input
+                        type="text"
+                        value={notifSettings.deadlineTemplate?.title || ""}
+                        onChange={(e) => setNotifSettings({...notifSettings, deadlineTemplate: {...notifSettings.deadlineTemplate, title: e.target.value}})}
+                        className="w-full px-4 py-2 rounded-xl bg-slate-950/80 border border-card-border text-slate-100 text-xs font-mono focus:border-rose-500 focus:outline-none"
+                      />
+                      <p className="text-[10px] text-slate-500 mt-1">Variabel tersedia: <code className="text-rose-400">&#123;taskName&#125;</code></p>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Isi Pesan Notifikasi</label>
+                      <textarea
+                        value={notifSettings.deadlineTemplate?.body || ""}
+                        onChange={(e) => setNotifSettings({...notifSettings, deadlineTemplate: {...notifSettings.deadlineTemplate, body: e.target.value}})}
+                        className="w-full px-4 py-2 rounded-xl bg-slate-950/80 border border-card-border text-slate-100 text-xs font-mono focus:border-rose-500 focus:outline-none h-16"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Ingatkan H-Berapa Jam (Cron Schedule)</label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={notifSettings.deadlineReminderHours || 24}
+                        onChange={(e) => setNotifSettings({...notifSettings, deadlineReminderHours: parseInt(e.target.value) || 24})}
+                        className="w-full max-w-[200px] px-4 py-2 rounded-xl bg-slate-950/80 border border-card-border text-slate-100 text-xs font-mono focus:border-rose-500 focus:outline-none"
+                      />
+                      <p className="text-[10px] text-slate-500 mt-1">Default 24 jam. Vercel cron akan mengecek tugas yang deadlinenya sesuai jam ini.</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pengumuman Template */}
+                <div className="space-y-3 pt-4 border-t border-card-border/30">
+                  <h3 className="font-bold text-sm text-slate-200 border-b border-card-border/50 pb-2">Pengumuman Baru</h3>
+                  <div className="grid grid-cols-1 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Judul Notifikasi</label>
+                      <input
+                        type="text"
+                        value={notifSettings.announcementTemplate?.title || ""}
+                        onChange={(e) => setNotifSettings({...notifSettings, announcementTemplate: {...notifSettings.announcementTemplate, title: e.target.value}})}
+                        className="w-full px-4 py-2 rounded-xl bg-slate-950/80 border border-card-border text-slate-100 text-xs font-mono focus:border-rose-500 focus:outline-none"
+                      />
+                      <p className="text-[10px] text-slate-500 mt-1">Variabel tersedia: <code className="text-rose-400">&#123;title&#125;</code></p>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Isi Pesan Notifikasi</label>
+                      <textarea
+                        value={notifSettings.announcementTemplate?.body || ""}
+                        onChange={(e) => setNotifSettings({...notifSettings, announcementTemplate: {...notifSettings.announcementTemplate, body: e.target.value}})}
+                        className="w-full px-4 py-2 rounded-xl bg-slate-950/80 border border-card-border text-slate-100 text-xs font-mono focus:border-rose-500 focus:outline-none h-16"
+                      />
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Tautan Menu Template */}
+                <div className="space-y-3 pt-4 border-t border-card-border/30">
+                  <h3 className="font-bold text-sm text-slate-200 border-b border-card-border/50 pb-2">Tautan Menu / Linktree Baru</h3>
+                  <div className="grid grid-cols-1 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Judul Notifikasi</label>
+                      <input
+                        type="text"
+                        value={notifSettings.linktreeTemplate?.title || ""}
+                        onChange={(e) => setNotifSettings({...notifSettings, linktreeTemplate: {...notifSettings.linktreeTemplate, title: e.target.value}})}
+                        className="w-full px-4 py-2 rounded-xl bg-slate-950/80 border border-card-border text-slate-100 text-xs font-mono focus:border-rose-500 focus:outline-none"
+                      />
+                      <p className="text-[10px] text-slate-500 mt-1">Variabel tersedia: <code className="text-rose-400">&#123;label&#125;</code></p>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Isi Pesan Notifikasi</label>
+                      <textarea
+                        value={notifSettings.linktreeTemplate?.body || ""}
+                        onChange={(e) => setNotifSettings({...notifSettings, linktreeTemplate: {...notifSettings.linktreeTemplate, body: e.target.value}})}
+                        className="w-full px-4 py-2 rounded-xl bg-slate-950/80 border border-card-border text-slate-100 text-xs font-mono focus:border-rose-500 focus:outline-none h-16"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-4 border-t border-card-border/30">
+                  <button
+                    type="submit"
+                    disabled={savingNotif}
+                    className="px-5 py-2.5 rounded-xl bg-rose-500 text-white font-extrabold text-xs hover:bg-rose-600 transition flex items-center justify-center space-x-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    <Save className="h-4 w-4" />
+                    <span>{savingNotif ? "Menyimpan..." : "Simpan Konfigurasi Notifikasi"}</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* Custom Push Broadcast Form */}
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 pt-6 border-t border-card-border/30 mt-6">
+              <div>
+                <h2 className="font-display font-black text-xl text-slate-100 flex items-center gap-2">
+                  <Megaphone className="h-6 w-6 text-amber-500" />
+                  <span>Kirim Broadcast Custom (Manual)</span>
+                </h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  Kirim notifikasi push langsung ke semua pengguna secara instan tanpa mengaitkan ke fitur tertentu.
+                </p>
+              </div>
+            </div>
+
+            <div className="glass rounded-2xl p-6 border border-amber-500/40 mt-4">
+              <form onSubmit={handleSendCustomPush} className="space-y-4 font-sans text-xs">
+                <div>
+                  <label className="block text-slate-400 uppercase font-mono mb-1">Judul Notifikasi</label>
+                  <input
+                    type="text"
+                    required
+                    value={customPush.title}
+                    onChange={(e) => setCustomPush({ ...customPush, title: e.target.value })}
+                    placeholder="Contoh: Info Mendadak dari Panitia!"
+                    className="w-full px-4 py-2 rounded-xl bg-slate-950/80 border border-card-border text-slate-100 font-mono focus:border-amber-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 uppercase font-mono mb-1">Isi Pesan Notifikasi</label>
+                  <textarea
+                    required
+                    value={customPush.body}
+                    onChange={(e) => setCustomPush({ ...customPush, body: e.target.value })}
+                    placeholder="Isi pemberitahuan..."
+                    className="w-full px-4 py-2 rounded-xl bg-slate-950/80 border border-card-border text-slate-100 font-mono focus:border-amber-500 focus:outline-none h-20"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 uppercase font-mono mb-1">Target URL Saat Diklik</label>
+                  <input
+                    type="text"
+                    required
+                    value={customPush.url}
+                    onChange={(e) => setCustomPush({ ...customPush, url: e.target.value })}
+                    placeholder="/info atau https://..."
+                    className="w-full px-4 py-2 rounded-xl bg-slate-950/80 border border-card-border text-slate-100 font-mono focus:border-amber-500 focus:outline-none"
+                  />
+                </div>
+                <div className="flex justify-end pt-4 border-t border-card-border/30">
+                  <button
+                    type="submit"
+                    disabled={sendingCustomPush}
+                    className="px-5 py-2.5 rounded-xl bg-amber-500 text-black font-extrabold text-xs hover:bg-amber-400 transition flex items-center justify-center space-x-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    <Megaphone className="h-4 w-4" />
+                    <span>{sendingCustomPush ? "Mengirim..." : "Kirim Broadcast Sekarang"}</span>
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         )}
           </motion.div>

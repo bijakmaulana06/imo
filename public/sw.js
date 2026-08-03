@@ -1,27 +1,35 @@
 // Service Worker untuk Push Notification IMO 2026
 
 self.addEventListener('push', function (event) {
-  if (!event.data) return;
+  let title = 'Notifikasi IMO 2026';
+  let options = {
+    body: 'Pemberitahuan baru dari sistem IMO 2026.',
+    icon: '/favicon.ico',
+    badge: '/favicon.ico',
+    data: { url: '/info' },
+    tag: 'imo-notification',
+    renotify: true,
+    vibrate: [200, 100, 200],
+  };
 
-  try {
-    const data = event.data.json();
-    const title = data.title || 'Notifikasi IMO 2026';
-    const options = {
-      body: data.body || 'Pemberitahuan baru dari sistem IMO 2026.',
-      icon: data.icon || '/favicon.ico',
-      badge: data.badge || '/favicon.ico',
-      data: {
-        url: data.url || '/info',
-      },
-      tag: data.tag || 'imo-notification',
-      renotify: true,
-      vibrate: [200, 100, 200],
-    };
-
-    event.waitUntil(self.registration.showNotification(title, options));
-  } catch (err) {
-    console.error('Error handling push event:', err);
+  if (event.data) {
+    try {
+      const data = event.data.json();
+      title = data.title || title;
+      options.body = data.body || options.body;
+      options.icon = data.icon || options.icon;
+      options.badge = data.badge || options.badge;
+      if (data.url) options.data.url = data.url;
+      if (data.tag) options.tag = data.tag;
+    } catch (err) {
+      console.error('Error parsing push data:', err);
+      // Fallback text will be used
+      options.body = event.data.text() || options.body;
+    }
   }
+
+  const notificationPromise = self.registration.showNotification(title, options);
+  event.waitUntil(notificationPromise);
 });
 
 self.addEventListener('notificationclick', function (event) {

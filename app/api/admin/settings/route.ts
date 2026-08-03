@@ -105,6 +105,11 @@ export async function GET() {
         enableDeadlineNotif: true,
         vapidPublicKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "",
         vapidPrivateKey: process.env.VAPID_PRIVATE_KEY || "",
+        newTaskTemplate: { title: "Tugas Baru: {taskName}", body: "Ada tugas baru yang perlu dikerjakan. Cek sekarang!" },
+        deadlineTemplate: { title: "Peringatan Deadline: {taskName}", body: "Tugas ini akan segera mencapai tenggat waktu!" },
+        announcementTemplate: { title: "Pengumuman: {title}", body: "Ada pengumuman baru dari panitia." },
+        linktreeTemplate: { title: "Tautan Baru: {label}", body: "Tautan baru telah ditambahkan ke pusat informasi." },
+        deadlineReminderHours: 24,
       },
       pushSubscribersCount: 0,
     };

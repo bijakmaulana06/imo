@@ -8,6 +8,8 @@ import Button from "@/components/Button";
 import { createClient } from "@/utils/supabase/client";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "next-view-transitions";
+import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import {
   Megaphone,
   Pin,
@@ -210,7 +212,16 @@ Gunakan tombol "Buka Generator Autoform Surat" di bawah ini untuk mengisi dan me
 
         setArticles(processed);
         if (processed.length > 0) {
-          setActiveArticleId(processed[0].id);
+          const searchParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+          const targetId = searchParams ? searchParams.get("id") : null;
+          const targetArticle = targetId ? processed.find((a) => a.id === targetId) : null;
+
+          if (targetArticle) {
+            setSelectedCategory(targetArticle.category);
+            setActiveArticleId(targetArticle.id);
+          } else {
+            setActiveArticleId(processed[0].id);
+          }
         }
       } catch (err) {
         console.error("Error fetching articles:", err);
@@ -221,6 +232,26 @@ Gunakan tombol "Buka Generator Autoform Surat" di bawah ini untuk mengisi dan me
 
     fetchAnnouncements();
   }, []);
+
+  const searchParams = useSearchParams();
+  const idParam = searchParams ? searchParams.get("id") : null;
+
+  useEffect(() => {
+    if (idParam && articles.length > 0) {
+      const found = articles.find((a) => a.id === idParam);
+      if (found) {
+        setSelectedCategory(found.category);
+        setActiveArticleId(found.id);
+        setTimeout(() => {
+          const viewer = document.getElementById("viewer-section");
+          if (viewer) {
+            const y = viewer.getBoundingClientRect().top + window.scrollY - 100;
+            window.scrollTo({ top: y, behavior: "smooth" });
+          }
+        }, 300);
+      }
+    }
+  }, [idParam, articles]);
 
   const categories = ["Semua", ...Array.from(new Set(articles.map((a) => a.category)))];
 
@@ -417,7 +448,7 @@ Gunakan tombol "Buka Generator Autoform Surat" di bawah ini untuk mengisi dan me
           </Card>
         ) : (
           /* MAIN DUAL PANE LAYOUT (EMBEDDED GDRIVE + INTERACTIVE SIDE NOTES) */
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          <div id="viewer-section" className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             
             {/* LEFT PANE: EMBEDDED GOOGLE DRIVE DOCUMENT VIEWER */}
             <div className="lg:col-span-7 space-y-4">
