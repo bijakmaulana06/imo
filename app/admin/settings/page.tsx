@@ -36,15 +36,15 @@ type TabId = "root_system" | "push" | "security" | "theme" | "branding" | "copyw
 
 // Organic offsets & distinct custom routing styles for PCB Circuit Constellation
 const NODES = [
-  { id: "root_system" as TabId, label: "Next.js Engine", icon: Cpu, angleOffset: -6, radiusOffset: 10, routeType: "v_first", cornerRatio: 0.7, color: "from-blue-500/20 to-cyan-500/20 border-cyan-500/50 text-cyan-300" },
-  { id: "push" as TabId, label: "Push & VAPID", icon: Bell, angleOffset: 12, radiusOffset: -10, routeType: "h_first", cornerRatio: 0.45, color: "from-amber-500/20 to-orange-500/20 border-amber-500/50 text-amber-300" },
-  { id: "security" as TabId, label: "API Security", icon: Lock, angleOffset: -10, radiusOffset: 15, routeType: "double_hv", cornerRatio: 0.5, color: "from-rose-500/20 to-pink-500/20 border-rose-500/50 text-rose-300" },
-  { id: "theme" as TabId, label: "Theme Engine", icon: Palette, angleOffset: 15, radiusOffset: -15, routeType: "v_first", cornerRatio: 0.85, color: "from-purple-500/20 to-indigo-500/20 border-purple-500/50 text-purple-300" },
-  { id: "branding" as TabId, label: "Branding & SEO", icon: Globe, angleOffset: -8, radiusOffset: 10, routeType: "h_first", cornerRatio: 0.65, color: "from-emerald-500/20 to-teal-500/20 border-emerald-500/50 text-emerald-300" },
-  { id: "copywriting" as TabId, label: "Localizations", icon: Type, angleOffset: 8, radiusOffset: -10, routeType: "double_vh", cornerRatio: 0.55, color: "from-cyan-500/20 to-blue-500/20 border-cyan-500/50 text-cyan-300" },
-  { id: "drive" as TabId, label: "Google Drive", icon: HardDrive, angleOffset: -12, radiusOffset: 15, routeType: "h_first", cornerRatio: 0.35, color: "from-indigo-500/20 to-blue-500/20 border-indigo-500/50 text-indigo-300" },
-  { id: "status" as TabId, label: "System Modes", icon: ShieldAlert, angleOffset: 6, radiusOffset: -15, routeType: "double_hv", cornerRatio: 0.6, color: "from-rose-600/20 to-red-500/20 border-rose-400/50 text-rose-300" },
-  { id: "home_nodes" as TabId, label: "Menu Beranda", icon: LayoutGrid, angleOffset: -15, radiusOffset: -10, routeType: "v_first", cornerRatio: 0.75, color: "from-teal-500/20 to-emerald-500/20 border-teal-500/50 text-teal-300" },
+  { id: "root_system" as TabId, label: "Next.js Engine", icon: Cpu, angleOffset: 0, radiusOffset: 0, routeType: "v_first", cornerRatio: 0.7, color: "from-blue-500/20 to-cyan-500/20 border-cyan-500/50 text-cyan-300" },
+  { id: "push" as TabId, label: "Push & VAPID", icon: Bell, angleOffset: 0, radiusOffset: 0, routeType: "h_first", cornerRatio: 0.45, color: "from-amber-500/20 to-orange-500/20 border-amber-500/50 text-amber-300" },
+  { id: "security" as TabId, label: "API Security", icon: Lock, angleOffset: 0, radiusOffset: 0, routeType: "double_hv", cornerRatio: 0.5, color: "from-rose-500/20 to-pink-500/20 border-rose-500/50 text-rose-300" },
+  { id: "theme" as TabId, label: "Theme Engine", icon: Palette, angleOffset: 0, radiusOffset: 0, routeType: "v_first", cornerRatio: 0.85, color: "from-purple-500/20 to-indigo-500/20 border-purple-500/50 text-purple-300" },
+  { id: "branding" as TabId, label: "Branding & SEO", icon: Globe, angleOffset: 0, radiusOffset: 0, routeType: "h_first", cornerRatio: 0.65, color: "from-emerald-500/20 to-teal-500/20 border-emerald-500/50 text-emerald-300" },
+  { id: "copywriting" as TabId, label: "Localizations", icon: Type, angleOffset: 0, radiusOffset: 0, routeType: "double_vh", cornerRatio: 0.55, color: "from-cyan-500/20 to-blue-500/20 border-cyan-500/50 text-cyan-300" },
+  { id: "drive" as TabId, label: "Google Drive", icon: HardDrive, angleOffset: 0, radiusOffset: 0, routeType: "h_first", cornerRatio: 0.35, color: "from-indigo-500/20 to-blue-500/20 border-indigo-500/50 text-indigo-300" },
+  { id: "status" as TabId, label: "System Modes", icon: ShieldAlert, angleOffset: 0, radiusOffset: 0, routeType: "double_hv", cornerRatio: 0.6, color: "from-rose-600/20 to-red-500/20 border-rose-400/50 text-rose-300" },
+  { id: "home_nodes" as TabId, label: "Menu Beranda", icon: LayoutGrid, angleOffset: 0, radiusOffset: 0, routeType: "v_first", cornerRatio: 0.75, color: "from-teal-500/20 to-emerald-500/20 border-teal-500/50 text-teal-300" },
 ];
 
 export default function AdminSettingsCommandCenter() {
@@ -84,19 +84,19 @@ export default function AdminSettingsCommandCenter() {
 
   useEffect(() => {
     const handleResize = () => {
-      const availH = window.innerHeight - 150;
-      const availW = window.innerWidth - 60;
-      const maxSafeRadius = Math.min(availW * 0.35, availH * 0.33);
+      const availH = window.innerHeight - 140;
+      const availW = window.innerWidth - 80;
+      const maxSafeRadius = Math.min(availW * 0.38, availH * 0.38);
 
       if (window.innerWidth < 768) {
         setIsMobile(true);
         setBaseRadius(Math.min(130, maxSafeRadius));
       } else if (window.innerWidth < 1024) {
         setIsMobile(false);
-        setBaseRadius(Math.min(175, maxSafeRadius));
+        setBaseRadius(Math.min(185, maxSafeRadius));
       } else {
         setIsMobile(false);
-        setBaseRadius(Math.min(210, maxSafeRadius));
+        setBaseRadius(Math.min(235, maxSafeRadius));
       }
     };
     handleResize();
@@ -264,13 +264,18 @@ export default function AdminSettingsCommandCenter() {
 
   const getCoordinates = (index: number) => {
     const node = NODES[index];
-    const baseAngle = (index * 45) - 90;
+    const stepAngle = 360 / NODES.length;
+    const baseAngle = (index * stepAngle) - 90;
     const finalAngleDeg = baseAngle + (node.angleOffset || 0);
     const angleRad = (finalAngleDeg * Math.PI) / 180;
     const nodeRadius = baseRadius + (node.radiusOffset || 0);
     
-    const x = Math.cos(angleRad) * nodeRadius;
-    const y = Math.sin(angleRad) * nodeRadius;
+    // Elliptical scaling for widescreen displays (wider X radius, compact Y radius to prevent card collisions)
+    const radiusX = isMobile ? nodeRadius : nodeRadius * 1.35;
+    const radiusY = isMobile ? nodeRadius : nodeRadius * 0.95;
+
+    const x = Math.cos(angleRad) * radiusX;
+    const y = Math.sin(angleRad) * radiusY;
     return { x, y };
   };
 
@@ -399,7 +404,8 @@ export default function AdminSettingsCommandCenter() {
                     const isActive = activeTab === node.id;
                     
                     // Exit port on central core border
-                    const baseAngle = (i * 45) - 90;
+                    const stepAngle = 360 / NODES.length;
+                    const baseAngle = (i * stepAngle) - 90;
                     const finalAngleDeg = baseAngle + (node.angleOffset || 0);
                     const angleRad = (finalAngleDeg * Math.PI) / 180;
                     const CORE_RADIUS = 50;
