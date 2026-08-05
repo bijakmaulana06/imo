@@ -26,13 +26,14 @@ import {
   Sparkles,
   LayoutGrid,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
+  Music
 } from "lucide-react";
 import { Link } from "next-view-transitions";
 import ImoLogo from "@/components/ImoLogo";
 import StarfieldBackground from "@/components/StarfieldBackground";
 
-type TabId = "root_system" | "push" | "security" | "theme" | "branding" | "copywriting" | "drive" | "status" | "home_nodes";
+type TabId = "root_system" | "push" | "security" | "theme" | "branding" | "copywriting" | "drive" | "status" | "home_nodes" | "audio_player";
 
 // Organic offsets & distinct custom routing styles for PCB Circuit Constellation
 const NODES = [
@@ -45,6 +46,7 @@ const NODES = [
   { id: "drive" as TabId, label: "Google Drive", icon: HardDrive, angleOffset: 0, radiusOffset: 0, routeType: "h_first", cornerRatio: 0.35, color: "from-indigo-500/20 to-blue-500/20 border-indigo-500/50 text-indigo-300" },
   { id: "status" as TabId, label: "System Modes", icon: ShieldAlert, angleOffset: 0, radiusOffset: 0, routeType: "double_hv", cornerRatio: 0.6, color: "from-rose-600/20 to-red-500/20 border-rose-400/50 text-rose-300" },
   { id: "home_nodes" as TabId, label: "Menu Beranda", icon: LayoutGrid, angleOffset: 0, radiusOffset: 0, routeType: "v_first", cornerRatio: 0.75, color: "from-teal-500/20 to-emerald-500/20 border-teal-500/50 text-teal-300" },
+  { id: "audio_player" as TabId, label: "Audio Player", icon: Music, angleOffset: 45, radiusOffset: 15, routeType: "v_first", cornerRatio: 0.8, color: "from-fuchsia-500/20 to-purple-500/20 border-fuchsia-500/50 text-fuchsia-300" },
 ];
 
 export default function AdminSettingsCommandCenter() {

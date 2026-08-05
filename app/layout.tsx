@@ -4,6 +4,7 @@ import "./globals.css";
 import "cropperjs/dist/cropper.css";
 import MandatoryNotificationBlocker from "@/components/MandatoryNotificationBlocker";
 import SiteConfigProvider from "@/components/SiteConfigProvider";
+import AudioPlayerProvider from "@/components/AudioPlayerProvider";
 import { ViewTransitions } from "next-view-transitions";
 
 const josefinSans = Josefin_Sans({
@@ -48,9 +49,11 @@ export default function RootLayout({
       >
         <body className="min-h-full flex flex-col bg-background text-foreground font-sans">
           <SiteConfigProvider>
-            <MandatoryNotificationBlocker>
-              {children}
-            </MandatoryNotificationBlocker>
+            <AudioPlayerProvider>
+              <MandatoryNotificationBlocker>
+                {children}
+              </MandatoryNotificationBlocker>
+            </AudioPlayerProvider>
           </SiteConfigProvider>
           {/* Eruda Mobile DevTools Console */}
           <script src="https://cdn.jsdelivr.net/npm/eruda"></script>

@@ -87,6 +87,13 @@ export interface SiteConfig {
   // Home Page Node Graph
   homeNodesOrder: string[];
 
+  // Audio Player
+  musicPlayerEnabled: boolean;
+  musicUrl: string;
+  musicTitle: string;
+  musicArtist: string;
+  musicAlbumArt: string;
+
   // Footer
   footerText: string;
 }
@@ -156,6 +163,12 @@ export const DEFAULT_SITE_CONFIG: SiteConfig = {
   documentsHeroSubtitle: "Isi formulir online dan buat dokumen PDF resmi instan tanpa mengetik ulang.",
 
   homeNodesOrder: ["guide", "hub", "info", "idcard", "documents", "contact"],
+
+  musicPlayerEnabled: true,
+  musicUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+  musicTitle: "Outclass Journey",
+  musicArtist: "IMO 2026",
+  musicAlbumArt: "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=500&auto=format&fit=crop",
 
   footerText: "Made with Astro-Physics & Next.js.",
 };

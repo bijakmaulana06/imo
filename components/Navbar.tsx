@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import ImoLogo from "./ImoLogo";
 import { useSiteConfig } from "@/components/SiteConfigProvider";
+import NowPlayingNavbar from "./NowPlayingNavbar";
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -47,7 +48,7 @@ export default function Navbar() {
   const isActive = (path: string) => pathname === path;
 
   return (
-    <div className="sticky top-4 md:top-6 z-[100] w-full px-4 sm:px-6 lg:px-8 pointer-events-none flex justify-center">
+    <div className="sticky top-4 md:top-6 z-[100] w-full px-4 sm:px-6 lg:px-8 pointer-events-none flex flex-col md:flex-row items-center md:items-start justify-center gap-2">
       <nav 
         ref={navRef}
         onMouseMove={handleMouseMove}
@@ -170,6 +171,10 @@ export default function Navbar() {
           </div>
         )}
       </nav>
+
+      <div className="pointer-events-auto">
+        <NowPlayingNavbar />
+      </div>
     </div>
   );
 }

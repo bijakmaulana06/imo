@@ -1,0 +1,22 @@
+projectid : pcalfbxvlbmqbhhazbax
+api url : https://pcalfbxvlbmqbhhazbax.supabase.co/rest/v1/
+anon : eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBjYWxmYnh2bGJtcWJoaGF6YmF4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ2NDAxNjAsImV4cCI6MjEwMDIxNjE2MH0.XxTPz4DB23KlNJ-5nzq0uf5xsmQudow3ez67TbJtDuE
+service_role : eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBjYWxmYnh2bGJtcWJoaGF6YmF4Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NDY0MDE2MCwiZXhwIjoyMTAwMjE2MTYwfQ.YYaP6mUn077wtmaEH0WG-NujMT8GuyRnUiItQF-DnTo
+jwt : MpTd8YrM5DK3FITivyXXOsEQ6USfPtZhbf3W7JvmAl/EgaFIctKi/aH2ZajJOMCitHO2rIbKQaG496hAvCwO9g==
+
+direct connection 
+connection string : postgresql://postgres:[BMmb6999#%%]@db.pcalfbxvlbmqbhhazbax.supabase.co:5432/postgres
+host : db.pcalfbxvlbmqbhhazbax.supabase.co
+port : 5432
+database : postgres
+user : postgres
+
+Transaction pooler
+connection string : postgresql://postgres.pcalfbxvlbmqbhhazbax:[BMmb6999#%%]@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres
+host : aws-0-ap-southeast-1.pooler.supabase.com
+port : 6543
+database : postgres
+user : postgres.pcalfbxvlbmqbhhazbax
+
+
+

@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { parseTemplate, type ParsedTemplate } from '@/lib/idcard/psdTemplate';
 import { checkFonts, loadGoogleFont, type FontStatus } from '@/lib/idcard/fontManager';
 import FontPicker from '@/components/idcard/FontPicker';
+import PhotoCropperModal from '@/components/idcard/PhotoCropperModal';
 import Card from '@/components/Card';
 import Button from '@/components/Button';
 
@@ -19,6 +20,8 @@ import {
   ZoomIn,
   ZoomOut,
   Maximize2,
+  Crop,
+  Sliders,
 } from 'lucide-react';
 
 
@@ -43,7 +46,10 @@ export default function IdCardGenerator({ templateUrl, allowUserUpload = false }
   const [parsed, setParsed] = useState<ParsedTemplate | null>(null);
   const [values, setValues] = useState<Record<string, string>>({});
   const [photoImg, setPhotoImg] = useState<HTMLImageElement | null>(null);
+  const [rawPhotoSrc, setRawPhotoSrc] = useState<string | null>(null);
+  const [isCropperOpen, setIsCropperOpen] = useState<boolean>(false);
   const [photoFileName, setPhotoFileName] = useState<string>('');
+
   const [fontStatuses, setFontStatuses] = useState<FontStatus[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -127,10 +133,20 @@ export default function IdCardGenerator({ templateUrl, allowUserUpload = false }
   const handlePhotoUpload = (file: File) => {
     setPhotoFileName(file.name);
     const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => setPhotoImg(img);
-    img.src = url;
+    setRawPhotoSrc(url);
+
+    // Buka cropper modal otomatis agar user bisa mengatur posisi/crop
+    setIsCropperOpen(true);
   };
+
+  const handleCropComplete = useCallback((croppedDataUrl: string) => {
+    const img = new Image();
+    img.onload = () => {
+      setPhotoImg(img);
+    };
+    img.src = croppedDataUrl;
+  }, []);
+
 
   // onFontLoaded: refresh font status and trigger re-render
   const handleFontLoaded = useCallback((_alias: string) => {
@@ -371,16 +387,28 @@ export default function IdCardGenerator({ templateUrl, allowUserUpload = false }
                     <span className="text-[10px] text-slate-400 uppercase font-mono">Portrait 3x4</span>
                   </label>
                   
-                  <div className="flex items-center gap-3 mt-1">
+                  <div className="flex flex-wrap items-center gap-2.5 mt-1">
                     <button
                       type="button"
                       onClick={() => photoInputRef.current?.click()}
-                      className="px-4 py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white text-xs font-semibold flex items-center gap-2 transition-all active:scale-95"
+                      className="px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95"
                     >
                       <Upload className="w-4 h-4 text-cyan-400" />
                       {photoImg ? 'Ganti Foto' : 'Unggah Foto'}
                     </button>
-                    <span className="text-xs text-slate-400 truncate max-w-[180px]">
+
+                    {rawPhotoSrc && (
+                      <button
+                        type="button"
+                        onClick={() => setIsCropperOpen(true)}
+                        className="px-3.5 py-2 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 shadow-[0_0_12px_rgba(125,249,255,0.15)]"
+                      >
+                        <Crop className="w-4 h-4 text-cyan-400" />
+                        Atur & Crop Foto
+                      </button>
+                    )}
+
+                    <span className="text-xs text-slate-400 truncate max-w-[150px]">
                       {photoFileName || 'Belum ada foto'}
                     </span>
                   </div>
@@ -521,8 +549,19 @@ export default function IdCardGenerator({ templateUrl, allowUserUpload = false }
           </div>
         </div>
       )}
+
+      {/* Modal Editing & Crop Foto */}
+      <PhotoCropperModal
+        isOpen={isCropperOpen}
+        imageSrc={rawPhotoSrc}
+        onCropComplete={handleCropComplete}
+        onClose={() => setIsCropperOpen(false)}
+        aspectRatio={3 / 4}
+      />
     </div>
   );
 }
+
+
 
 

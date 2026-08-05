@@ -1,13 +1,12 @@
 /**
  * renderIdCard.ts
  * ---------------------------------------------------------------------------
- * TWO-PASS RENDER:
- * Pass 1 – Gambar semua layer PSD (raster background, boxes, labels) dalam urutan z-order.
- *           Layer tagged ({nama}, {kelompok}, dll.) DI-SKIP di pass ini (jangan gambar raster placeholder-nya).
- * Pass 2 – Gambar semua teks replacement DI ATAS segalanya (globalAlpha=1, source-over).
- *
- * Ini memastikan teks pengganti selalu muncul di atas white box / elemen PSD lainnya,
- * tanpa peduli z-order asli di dalam file PSD.
+ * 3-PASS RENDER ARCHITECTURE:
+ * Pass 1 – Gambar slot {foto} (foto user / placeholder) PERTAMA KALI pada canvas.
+ * Pass 2 – Gambar semua layer raster PSD (bingkai, portal kristal, overlay dengan lubang transparan)
+ *           DI ATAS foto. Ini memastikan elemen bingkai PSD menutupi pinggiran foto
+ *           dan foto tampil di BELAKANG desain melalui lubang transparan.
+ * Pass 3 – Gambar semua teks replacement ({nama}, {kelompok}, dll.) DI ATAS segalanya.
  */
 
 import type { Layer, Color } from 'ag-psd';
@@ -73,7 +72,7 @@ function luminance({ r, g, b }: { r: number; g: number; b: number }): number {
 
 function colorToCss(color: Color | undefined): string {
   const rgb = colorToRgb(color);
-  if (!rgb || luminance(rgb) > 0.85) return '#1a1a2e'; // default dark if undefined or near-white
+  if (!rgb || luminance(rgb) > 0.85) return '#1a1a2e';
   return `rgb(${rgb.r},${rgb.g},${rgb.b})`;
 }
 
@@ -84,40 +83,6 @@ function justificationToAlign(j: string | undefined): CanvasTextAlign {
   return 'left';
 }
 
-// ---------------------------------------------------------------------------
-// PASS 1 helper: draw raster layers only, skip tagged fields
-// ---------------------------------------------------------------------------
-function drawRasterLayer(
-  ctx: CanvasRenderingContext2D,
-  layer: Layer,
-  taggedLayers: Set<Layer>,
-  photoField: TemplateField | null,
-) {
-  if (layer.hidden) return;
-
-  if (layer.children) {
-    for (let i = layer.children.length - 1; i >= 0; i--) {
-      drawRasterLayer(ctx, layer.children[i], taggedLayers, photoField);
-    }
-    return;
-  }
-
-  // Skip tagged layers entirely in pass 1 (will be drawn in pass 2)
-  if (taggedLayers.has(layer)) return;
-
-  if (!layer.canvas) return;
-
-  ctx.save();
-  const rawOpacity = layer.opacity ?? 1;
-  ctx.globalAlpha = rawOpacity > 1 ? rawOpacity / 255 : rawOpacity;
-  ctx.globalCompositeOperation = BLEND_MODE_MAP[layer.blendMode ?? 'normal'] ?? 'source-over';
-  ctx.drawImage(layer.canvas, layer.left ?? 0, layer.top ?? 0);
-  ctx.restore();
-}
-
-// ---------------------------------------------------------------------------
-// PASS 2 helpers: draw text & photo replacements on top
-// ---------------------------------------------------------------------------
 function drawImageCover(
   ctx: CanvasRenderingContext2D,
   img: HTMLImageElement,
@@ -140,7 +105,8 @@ function drawPhotoField(
 ) {
   const { left, top, right, bottom } = field.bounds;
   const frameWidth  = right - left;
-  const frameHeight = frameWidth * aspectRatio;
+  const rawHeight   = bottom - top;
+  const frameHeight = rawHeight > frameWidth * 0.5 ? rawHeight : frameWidth * aspectRatio;
   const frameTop    = (top + bottom) / 2 - frameHeight / 2;
 
   ctx.save();
@@ -150,7 +116,7 @@ function drawPhotoField(
   drawImageCover(ctx, photo, left, frameTop, frameWidth, frameHeight);
   ctx.restore();
 
-  if (border) {
+  if (border && border.width > 0) {
     ctx.save();
     ctx.strokeStyle = border.color;
     ctx.lineWidth   = border.width;
@@ -160,6 +126,67 @@ function drawPhotoField(
   }
 }
 
+function drawPhotoPlaceholder(
+  ctx: CanvasRenderingContext2D,
+  field: TemplateField,
+  aspectRatio: number,
+) {
+  const { left, top, right, bottom } = field.bounds;
+  const frameWidth  = right - left;
+  const rawHeight   = bottom - top;
+  const frameHeight = rawHeight > frameWidth * 0.5 ? rawHeight : frameWidth * aspectRatio;
+  const frameTop    = (top + bottom) / 2 - frameHeight / 2;
+
+  ctx.save();
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+  ctx.setLineDash([4, 4]);
+  ctx.lineWidth = 1.5;
+  ctx.fillRect(left, frameTop, frameWidth, frameHeight);
+  ctx.strokeRect(left, frameTop, frameWidth, frameHeight);
+
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+  ctx.font = '14px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('{foto}', left + frameWidth / 2, (top + bottom) / 2);
+  ctx.restore();
+}
+
+// ---------------------------------------------------------------------------
+// PASS 2 helper: draw raster design layers, skip tagged text & photo layers
+// ---------------------------------------------------------------------------
+function drawRasterLayer(
+  ctx: CanvasRenderingContext2D,
+  layer: Layer,
+  taggedTextLayers: Set<Layer>,
+  photoLayers: Set<Layer>,
+) {
+  if (layer.hidden) return;
+
+  if (layer.children) {
+    for (let i = layer.children.length - 1; i >= 0; i--) {
+      drawRasterLayer(ctx, layer.children[i], taggedTextLayers, photoLayers);
+    }
+    return;
+  }
+
+  // Skip tagged text layers & photo layers in Pass 2 (drawn in Pass 1 & Pass 3)
+  if (taggedTextLayers.has(layer) || photoLayers.has(layer)) return;
+
+  if (!layer.canvas) return;
+
+  ctx.save();
+  const rawOpacity = layer.opacity ?? 1;
+  ctx.globalAlpha = rawOpacity > 1 ? rawOpacity / 255 : rawOpacity;
+  ctx.globalCompositeOperation = BLEND_MODE_MAP[layer.blendMode ?? 'normal'] ?? 'source-over';
+  ctx.drawImage(layer.canvas, layer.left ?? 0, layer.top ?? 0);
+  ctx.restore();
+}
+
+// ---------------------------------------------------------------------------
+// PASS 3 helper: draw text replacements on top
+// ---------------------------------------------------------------------------
 function drawTextField(
   ctx: CanvasRenderingContext2D,
   field: TemplateField,
@@ -169,7 +196,7 @@ function drawTextField(
   const bWidth  = right - left;
   const bHeight = bottom - top;
 
-  const showPlaceholder = options.showPlaceholder !== false; // default true
+  const showPlaceholder = options.showPlaceholder !== false;
 
   const rendered = field.rawTemplate.replace(/\{(\w+)\}/g, (_m, tag) => {
     const val = options.values[tag.toLowerCase()];
@@ -231,34 +258,52 @@ export function renderIdCard(
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Build a Set of all tagged layers so pass 1 can skip them
-  const taggedLayers = new Set<Layer>(parsed.fields.map(f => f.layer));
-
-  // Find photo field (if any) for pass 2
   const photoField = parsed.fields.find(f => f.type === 'photo') ?? null;
+  const taggedTextLayers = new Set<Layer>(
+    parsed.fields.filter(f => f.type === 'text').map(f => f.layer)
+  );
+  const photoLayers = new Set<Layer>(
+    parsed.fields.filter(f => f.type === 'photo').map(f => f.layer)
+  );
 
-  // ── PASS 1: Draw all raster layers (skip tagged text/photo layers) ─────────
-  const children = parsed.psd.children ?? [];
-  for (let i = children.length - 1; i >= 0; i--) {
-    drawRasterLayer(ctx, children[i], taggedLayers, photoField);
-  }
-
-  // ── PASS 2: Draw text & photo replacements ON TOP of everything ────────────
-  for (const field of parsed.fields) {
-    if (field.type === 'text') {
-      drawTextField(ctx, field, options);
-    } else if (field.type === 'photo' && options.photo) {
+  // ── PASS 1: Draw photo field BEHIND design raster layers ───────────────────
+  if (photoField) {
+    if (options.photo) {
       ctx.save();
-      ctx.globalAlpha = 1;
-      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = photoField.layer.opacity ?? 1;
       drawPhotoField(
         ctx,
-        field,
+        photoField,
         options.photo,
         options.photoAspectRatio ?? 4 / 3,
-        options.photoBorder ?? { width: 2, color: '#ffffff' },
+        options.photoBorder ?? null,
+      );
+      ctx.restore();
+    } else if (options.showPlaceholder !== false) {
+      ctx.save();
+      ctx.globalAlpha = photoField.layer.opacity ?? 1;
+      drawPhotoPlaceholder(
+        ctx,
+        photoField,
+        options.photoAspectRatio ?? 4 / 3,
       );
       ctx.restore();
     }
   }
+
+  // ── PASS 2: Draw all raster design layers (frames, crystal portal, overlays) ─
+  const children = parsed.psd.children ?? [];
+  for (let i = children.length - 1; i >= 0; i--) {
+    drawRasterLayer(ctx, children[i], taggedTextLayers, photoLayers);
+  }
+
+  // ── PASS 3: Draw text replacements ON TOP of everything ────────────────────
+  for (const field of parsed.fields) {
+    if (field.type === 'text') {
+      drawTextField(ctx, field, options);
+    }
+  }
 }
+
+
+

@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-
-const BUCKET_NAME = "idcard_templates";
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 
 function getAdminSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
@@ -9,21 +8,17 @@ function getAdminSupabase() {
   return createClient(url, key);
 }
 
-/** Ensure the storage bucket exists and is configured for public access & all file types */
-async function ensureStorageBucket(supabase: any) {
-  try {
-    const { data: bucket } = await supabase.storage.getBucket(BUCKET_NAME);
-    if (!bucket) {
-      await supabase.storage.createBucket(BUCKET_NAME, {
-        public: true,
-        allowedMimeTypes: null,
-        fileSizeLimit: 52428800, // 50MB
-      });
-    }
-  } catch (e) {
-    console.warn("Storage bucket check note:", e);
-  }
-}
+const s3Client = new S3Client({
+  region: "auto",
+  endpoint: process.env.R2_ENDPOINT || "",
+  credentials: {
+    accessKeyId: process.env.R2_ACCESS_KEY_ID || "",
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || "",
+  },
+});
+
+const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME || "imotemplate";
+const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL || process.env.R2_ENDPOINT + "/" + R2_BUCKET_NAME;
 
 // GET: Fetch list of ID card templates
 export async function GET() {
@@ -40,7 +35,23 @@ export async function GET() {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ templates: data || [] });
+    const formattedData = (data || []).map((t) => {
+      const storagePath = t.layout_json?.storage_path;
+      if (storagePath) {
+        const proxyUrl = `/api/id-card-templates/file?key=${encodeURIComponent(storagePath)}`;
+        return {
+          ...t,
+          background_url: proxyUrl,
+          layout_json: {
+            ...t.layout_json,
+            psd_url: proxyUrl,
+          },
+        };
+      }
+      return t;
+    });
+
+    return NextResponse.json({ templates: formattedData });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || "Failed to fetch templates" }, { status: 500 });
   }
@@ -50,7 +61,6 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const supabase = getAdminSupabase();
-    await ensureStorageBucket(supabase);
 
     const formData = await req.formData();
 
@@ -76,24 +86,25 @@ export async function POST(req: Request) {
 
     const contentType = file.type || "application/octet-stream";
 
-    const { data: storageData, error: storageError } = await supabase.storage
-      .from(BUCKET_NAME)
-      .upload(filePath, fileBuffer, {
-        contentType,
-        upsert: true,
-      });
-
-    if (storageError) {
-      console.error("Supabase Storage Upload Error:", storageError);
+    try {
+      await s3Client.send(
+        new PutObjectCommand({
+          Bucket: R2_BUCKET_NAME,
+          Key: filePath,
+          Body: fileBuffer,
+          ContentType: contentType,
+        })
+      );
+    } catch (storageError: any) {
+      console.error("R2 Storage Upload Error:", storageError);
       return NextResponse.json(
-        { error: `Gagal mengunggah file ke Storage: ${storageError.message}` },
+        { error: `Gagal mengunggah file ke Storage R2: ${storageError.message}` },
         { status: 500 }
       );
     }
 
-    // 2. Get Public URL for the uploaded file
-    const { data: publicUrlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filePath);
-    const publicPsdUrl = publicUrlData.publicUrl;
+    // 2. Get Proxy URL for the uploaded file
+    const publicPsdUrl = `/api/id-card-templates/file?key=${encodeURIComponent(filePath)}`;
 
     // 3. If set as default, reset other defaults first
     if (isDefault) {
@@ -153,7 +164,16 @@ export async function DELETE(req: Request) {
       .single();
 
     if (template?.layout_json?.storage_path) {
-      await supabase.storage.from(BUCKET_NAME).remove([template.layout_json.storage_path]);
+      try {
+        await s3Client.send(
+          new DeleteObjectCommand({
+            Bucket: R2_BUCKET_NAME,
+            Key: template.layout_json.storage_path,
+          })
+        );
+      } catch (err) {
+        console.error("Failed to delete from R2", err);
+      }
     }
 
     const { error } = await supabase.from("id_card_templates").delete().eq("id", id);
