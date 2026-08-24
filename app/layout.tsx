@@ -55,9 +55,6 @@ export default function RootLayout({
               </MandatoryNotificationBlocker>
             </AudioPlayerProvider>
           </SiteConfigProvider>
-          {/* Eruda Mobile DevTools Console */}
-          <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
-          <script dangerouslySetInnerHTML={{ __html: "eruda.init();" }} />
         </body>
       </html>
     </ViewTransitions>

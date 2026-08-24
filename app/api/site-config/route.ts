@@ -41,8 +41,6 @@ export async function GET() {
       globalBannerStyle: "info", // "info" | "warning" | "alert" | "success"
       globalBannerLink: "/guide",
 
-      // Eruda Inspector Console
-      enableErudaConsole: true,
       analyticsScriptTag: "",
 
       // Copywriting - Home Page

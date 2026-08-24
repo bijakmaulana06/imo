@@ -46,8 +46,7 @@ export async function GET() {
       globalBannerStyle: "info",
       globalBannerLink: "/guide",
 
-      // Eruda Inspector Console & Analytics
-      enableErudaConsole: true,
+      // Analytics
       analyticsScriptTag: "",
 
       // Copywriting - Home Page

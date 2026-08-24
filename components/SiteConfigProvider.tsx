@@ -42,8 +42,6 @@ export interface SiteConfig {
   globalBannerStyle: "info" | "warning" | "alert" | "success";
   globalBannerLink: string;
 
-  // Eruda Inspector Console
-  enableErudaConsole: boolean;
   analyticsScriptTag: string;
 
   // Copywriting - Home Page
@@ -128,7 +126,6 @@ export const DEFAULT_SITE_CONFIG: SiteConfig = {
   globalBannerStyle: "info",
   globalBannerLink: "/guide",
 
-  enableErudaConsole: true,
   analyticsScriptTag: "",
 
   homeMissionBadge: "Innovative Minds Outclass",
