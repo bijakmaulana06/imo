@@ -35,7 +35,8 @@ import {
   Share2,
   FileEdit,
   ArrowRight,
-  Download
+  Download,
+  Video
 } from "lucide-react";
 import { useSiteConfig } from "@/components/SiteConfigProvider";
 
@@ -268,6 +269,15 @@ Gunakan tombol "Buka Generator Autoform Surat" di bawah ini untuk mengisi dan me
     if (!rawUrl) return "";
     let url = rawUrl.trim();
 
+    if (url.includes("youtube.com/watch?v=")) {
+      const videoId = url.split("v=")[1]?.split("&")[0];
+      if (videoId) return `https://www.youtube.com/embed/${videoId}`;
+    }
+    if (url.includes("youtu.be/")) {
+      const videoId = url.split("youtu.be/")[1]?.split("?")[0];
+      if (videoId) return `https://www.youtube.com/embed/${videoId}`;
+    }
+
     if (url.includes("docs.google.com") || url.includes("drive.google.com")) {
       if (url.endsWith("/preview") || url.includes("/preview?") || url.includes("/embed")) {
         return url;
@@ -314,6 +324,7 @@ Gunakan tombol "Buka Generator Autoform Surat" di bawah ini untuk mengisi dan me
     if (cat.includes("transportasi") || cat.includes("gesang") || cat.includes("kendaraan")) return <Car className="h-4 w-4 text-accent-cyan" />;
     if (cat.includes("perlengkapan") || cat.includes("barang")) return <Backpack className="h-4 w-4 text-emerald-400" />;
     if (cat.includes("jadwal") || cat.includes("waktu")) return <Calendar className="h-4 w-4 text-accent-yellow" />;
+    if (cat.includes("video") || cat.includes("rekaman") || cat.includes("panitia")) return <Video className="h-4 w-4 text-rose-400" />;
     if (cat.includes("penting")) return <AlertCircle className="h-4 w-4 text-rose-400" />;
     return <FileText className="h-4 w-4 text-accent-cyan" />;
   };

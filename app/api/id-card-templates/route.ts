@@ -1,24 +1,13 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { getR2Client, R2_BUCKET_NAME } from "@/lib/r2";
 
 function getAdminSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
   return createClient(url, key);
 }
-
-const s3Client = new S3Client({
-  region: "auto",
-  endpoint: process.env.R2_ENDPOINT || "",
-  credentials: {
-    accessKeyId: process.env.R2_ACCESS_KEY_ID || "",
-    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || "",
-  },
-});
-
-const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME || "imotemplate";
-const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL || process.env.R2_ENDPOINT + "/" + R2_BUCKET_NAME;
 
 // GET: Fetch list of ID card templates
 export async function GET() {
@@ -87,6 +76,7 @@ export async function POST(req: Request) {
     const contentType = file.type || "application/octet-stream";
 
     try {
+      const s3Client = getR2Client();
       await s3Client.send(
         new PutObjectCommand({
           Bucket: R2_BUCKET_NAME,
@@ -165,6 +155,7 @@ export async function DELETE(req: Request) {
 
     if (template?.layout_json?.storage_path) {
       try {
+        const s3Client = getR2Client();
         await s3Client.send(
           new DeleteObjectCommand({
             Bucket: R2_BUCKET_NAME,

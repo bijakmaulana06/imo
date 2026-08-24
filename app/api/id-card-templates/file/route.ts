@@ -1,16 +1,6 @@
 import { NextResponse } from "next/server";
-import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
-
-const s3Client = new S3Client({
-  region: "auto",
-  endpoint: process.env.R2_ENDPOINT || "",
-  credentials: {
-    accessKeyId: process.env.R2_ACCESS_KEY_ID || "",
-    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || "",
-  },
-});
-
-const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME || "imotemplate";
+import { GetObjectCommand } from "@aws-sdk/client-s3";
+import { getR2Client, R2_BUCKET_NAME } from "@/lib/r2";
 
 export async function GET(req: Request) {
   try {
@@ -20,6 +10,8 @@ export async function GET(req: Request) {
     if (!key) {
       return NextResponse.json({ error: "Key file wajib diberikan" }, { status: 400 });
     }
+
+    const s3Client = getR2Client();
 
     const command = new GetObjectCommand({
       Bucket: R2_BUCKET_NAME,

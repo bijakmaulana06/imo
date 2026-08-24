@@ -20,16 +20,16 @@ interface ContactPerson {
 }
 
 const DEFAULT_CONTACTS: ContactPerson[] = [
-  { id: "1", name: "Siti Rahmawati", role: "Pendamping LO", group_name: "Kelompok 1", whatsapp: "081234567890", sort_order: 1 },
-  { id: "2", name: "Ahmad Fauzi", role: "Pendamping LO", group_name: "Kelompok 2", whatsapp: "081298765432", sort_order: 2 },
-  { id: "3", name: "Budi Pratama", role: "Pendamping LO", group_name: "Kelompok 3", whatsapp: "081311223344", sort_order: 3 },
-  { id: "4", name: "Dina Lestari", role: "Pendamping LO", group_name: "Kelompok 4", whatsapp: "081355667788", sort_order: 4 },
-  { id: "5", name: "Eko Wijaya", role: "Pendamping LO", group_name: "Kelompok 5", whatsapp: "081399001122", sort_order: 5 },
-  { id: "6", name: "Fifi Nurhaliza", role: "Pendamping LO", group_name: "Kelompok 6", whatsapp: "081244556677", sort_order: 6 },
-  { id: "7", name: "Gilang Ramadhan", role: "Pendamping LO", group_name: "Kelompok 7", whatsapp: "081288990011", sort_order: 7 },
-  { id: "8", name: "Hany Permata", role: "Pendamping LO", group_name: "Kelompok 8", whatsapp: "081322334455", sort_order: 8 },
-  { id: "9", name: "Indra Kusuma", role: "Pendamping LO", group_name: "Kelompok 9", whatsapp: "081366778899", sort_order: 9 },
-  { id: "10", name: "Jasmine Putri", role: "Pendamping LO", group_name: "Kelompok 10", whatsapp: "081200112233", sort_order: 10 },
+  { id: "1", name: "Siti Rahmawati", role: "LO", group_name: "Kelompok 1", whatsapp: "081234567890", sort_order: 1 },
+  { id: "2", name: "Ahmad Fauzi", role: "LO", group_name: "Kelompok 2", whatsapp: "081298765432", sort_order: 2 },
+  { id: "3", name: "Budi Pratama", role: "KOOR", group_name: "Kelompok 3", whatsapp: "081311223344", sort_order: 3 },
+  { id: "4", name: "Dina Lestari", role: "LO", group_name: "Kelompok 4", whatsapp: "081355667788", sort_order: 4 },
+  { id: "5", name: "Eko Wijaya", role: "Ketua Pelaksana", group_name: "Panitia Inti", whatsapp: "081399001122", sort_order: 5 },
+  { id: "6", name: "Fifi Nurhaliza", role: "LO", group_name: "Kelompok 6", whatsapp: "081244556677", sort_order: 6 },
+  { id: "7", name: "Gilang Ramadhan", role: "KOOR", group_name: "Kelompok 7", whatsapp: "081288990011", sort_order: 7 },
+  { id: "8", name: "Hany Permata", role: "LO", group_name: "Kelompok 8", whatsapp: "081322334455", sort_order: 8 },
+  { id: "9", name: "Indra Kusuma", role: "LO", group_name: "Kelompok 9", whatsapp: "081366778899", sort_order: 9 },
+  { id: "10", name: "Jasmine Putri", role: "LO", group_name: "Kelompok 10", whatsapp: "081200112233", sort_order: 10 },
 ];
 
 export default function ContactPage() {
@@ -174,7 +174,7 @@ export default function ContactPage() {
                   </h3>
 
                   <p className="text-xs text-slate-400 tracking-wider mb-6 uppercase font-mono">
-                    {contact.role} Pendamping
+                    {contact.role}
                   </p>
                 </div>
 

@@ -32,7 +32,8 @@ import {
   Download,
   XCircle,
   CheckCircle,
-  Bell
+  Bell,
+  Video
 } from "lucide-react";
 import { DEFAULT_ID_CARD_TEMPLATE } from "@/lib/defaultTemplate";
 
@@ -44,7 +45,7 @@ export default function AdminDashboardPage() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("links");
   const [loading, setLoading] = useState(true);
   const [userEmail, setUserEmail] = useState<string | null>(null);
-  
+
   const [links, setLinks] = useState<any[]>([]);
   const [contacts, setContacts] = useState<any[]>([]);
   const [announcements, setAnnouncements] = useState<any[]>([]);
@@ -123,6 +124,7 @@ export default function AdminDashboardPage() {
     category: "Contoh Surat",
     pinned: false,
   });
+  const [editingAnno, setEditingAnno] = useState<any | null>(null);
 
   // Extract placeholders inside {key}
   const adminDetectedPlaceholders = React.useMemo(() => {
@@ -264,7 +266,7 @@ export default function AdminDashboardPage() {
             updated_at: new Date().toISOString()
           }).eq("id", existing[0].id);
         }
-      } catch (e) {}
+      } catch (e) { }
     }
   };
 
@@ -342,14 +344,14 @@ export default function AdminDashboardPage() {
             if (Array.isArray(parsed) && parsed.length > 0) {
               setIndividuTaskDefs(parsed);
             }
-          } catch {}
+          } catch { }
         }
         const notifSetting = settingData.find((s: any) => s.key === "notification_settings");
         if (notifSetting && notifSetting.value) {
           try {
             const parsed = JSON.parse(notifSetting.value);
             setNotifSettings((prev: any) => ({ ...prev, ...parsed }));
-          } catch {}
+          } catch { }
         }
       }
 
@@ -440,7 +442,7 @@ export default function AdminDashboardPage() {
     };
     const nextDefs = [...individuTaskDefs, newTaskObj];
     handleSaveIndividuTasks(nextDefs);
-    
+
     // Kirim push notifikasi
     if (notifSettings?.newTaskTemplate) {
       const title = notifSettings.newTaskTemplate.title.replace(/{taskName}/g, newTaskObj.name);
@@ -532,7 +534,7 @@ export default function AdminDashboardPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Gagal sinkronisasi folder");
-      
+
       setSyncNotice(data.message || `Pengaturan disimpan & folder seluruh kelompok (${targetTotalGroups}) siap di Google Drive!`);
     } catch (err: any) {
       alert("Gagal menyimpan pengaturan: " + err.message);
@@ -688,7 +690,7 @@ export default function AdminDashboardPage() {
     try {
       const { error } = await supabase.from("hub_links").insert([newLink]);
       if (error) throw error;
-      
+
       // Kirim push notifikasi
       if (notifSettings?.linktreeTemplate) {
         const title = notifSettings.linktreeTemplate.title.replace(/{label}/g, newLink.label);
@@ -805,6 +807,69 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const handleOpenEditAnno = (a: any) => {
+    let notes = a.content;
+    let gdrive_url = "";
+    let autoform_url = "/documents";
+    try {
+      if (a.content && a.content.trim().startsWith("{")) {
+        const parsed = JSON.parse(a.content);
+        notes = parsed.notes || a.content;
+        gdrive_url = parsed.gdrive_url || "";
+        autoform_url = parsed.autoform_url || "/documents";
+      }
+    } catch (e) { }
+
+    setEditingAnno({
+      id: a.id,
+      title: a.title,
+      notes,
+      gdrive_url,
+      autoform_url,
+      category: a.category || "Contoh Surat",
+      pinned: !!a.pinned,
+    });
+  };
+
+  const handleUpdateAnno = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingAnno) return;
+    try {
+      const contentPayload = JSON.stringify({
+        notes: editingAnno.notes,
+        gdrive_url: editingAnno.gdrive_url,
+        autoform_url: editingAnno.autoform_url,
+      });
+
+      const { error } = await supabase.from("announcements").update({
+        title: editingAnno.title,
+        content: contentPayload,
+        category: editingAnno.category,
+        pinned: editingAnno.pinned,
+        updated_at: new Date().toISOString(),
+      }).eq("id", editingAnno.id);
+
+      if (error) throw error;
+
+      // Kirim / kirim ulang push notifikasi saat pengumuman diperbarui
+      if (notifSettings?.announcementTemplate) {
+        const targetUrl = `/guide?id=${editingAnno.id}`;
+        const title = `[Update] ${editingAnno.title}`;
+        const body = `Pengumuman "${editingAnno.title}" telah diperbarui. Cek informasi terbarunya sekarang!`;
+        fetch("/api/push/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title, message: body, url: targetUrl })
+        }).catch(e => console.warn("Push error:", e));
+      }
+
+      setEditingAnno(null);
+      loadData();
+    } catch (err: any) {
+      alert("Gagal memperbarui pengumuman: " + err.message);
+    }
+  };
+
   // ── PSD TEMPLATE HANDLERS ────────────────────────────────────────────────
   const handleUploadPsdTemplate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -917,7 +982,7 @@ export default function AdminDashboardPage() {
       <main className="flex-grow max-w-6xl mx-auto w-full px-4 py-10 relative z-10">
         {/* Simple Node Map UI with Connected Circuit SVG */}
         <div className="relative flex flex-col items-center py-6 w-full mb-8 border-b border-card-border/30">
-          
+
           {/* Quick Actions floating at top right */}
           <div className="absolute top-2 right-2 z-20">
             <Link href="/admin/settings" className="flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-mono font-bold bg-accent-purple/10 text-accent-purple border border-accent-purple/30 hover:bg-accent-purple hover:text-black hover:shadow-[0_0_15px_rgba(179,136,255,0.4)] transition duration-300">
@@ -928,7 +993,7 @@ export default function AdminDashboardPage() {
 
           {/* Central Hub IMO Node */}
           <div className="relative z-20 flex flex-col items-center">
-            <motion.div 
+            <motion.div
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ duration: 0.4, type: "spring" }}
@@ -957,19 +1022,19 @@ export default function AdminDashboardPage() {
                 const isSelected = activeTab === nodeIds[idx];
                 return (
                   <g key={idx}>
-                    <line 
-                      x1={x} 
-                      y1="35" 
-                      x2={x} 
-                      y2="70" 
-                      stroke={isSelected ? "#7df9ff" : "rgba(255,255,255,0.25)"} 
-                      strokeWidth={isSelected ? "3" : "1.5"} 
+                    <line
+                      x1={x}
+                      y1="35"
+                      x2={x}
+                      y2="70"
+                      stroke={isSelected ? "#7df9ff" : "rgba(255,255,255,0.25)"}
+                      strokeWidth={isSelected ? "3" : "1.5"}
                     />
-                    <circle 
-                      cx={x} 
-                      cy="35" 
-                      r={isSelected ? "4" : "2.5"} 
-                      fill={isSelected ? "#7df9ff" : "rgba(255,255,255,0.4)"} 
+                    <circle
+                      cx={x}
+                      cy="35"
+                      r={isSelected ? "4" : "2.5"}
+                      fill={isSelected ? "#7df9ff" : "rgba(255,255,255,0.4)"}
                     />
                   </g>
                 );
@@ -990,18 +1055,17 @@ export default function AdminDashboardPage() {
             ].map((t) => {
               const Icon = t.icon;
               const isCurrent = activeTab === t.id;
-              
+
               return (
                 <div key={t.id} className="relative flex flex-col items-center group cursor-pointer" onClick={() => setActiveTab(t.id as ActiveTab)}>
-                  <motion.div 
+                  <motion.div
                     whileHover={{ scale: 1.08 }}
                     whileTap={{ scale: 0.95 }}
                     transition={{ type: "spring", stiffness: 400, damping: 25 }}
-                    className={`h-16 w-16 flex flex-col items-center justify-center rounded-2xl border transition-all duration-300 z-10 ${
-                      isCurrent 
-                        ? `bg-slate-800 ${t.border} ${t.shadow} scale-110 ring-2 ring-white/10` 
-                        : `bg-slate-900/90 border-card-border/50 group-hover:border-slate-500`
-                    }`}
+                    className={`h-16 w-16 flex flex-col items-center justify-center rounded-2xl border transition-all duration-300 z-10 ${isCurrent
+                      ? `bg-slate-800 ${t.border} ${t.shadow} scale-110 ring-2 ring-white/10`
+                      : `bg-slate-900/90 border-card-border/50 group-hover:border-slate-500`
+                      }`}
                   >
                     <Icon className={`h-6 w-6 mb-1 transition-colors ${isCurrent ? t.color : 'text-slate-400 group-hover:text-slate-200'}`} />
                     <span className="text-[9px] font-mono font-bold bg-black/40 px-1.5 rounded text-slate-300">{t.count}</span>
@@ -1014,7 +1078,7 @@ export default function AdminDashboardPage() {
 
           {/* Mobile Node Buttons Grid */}
           <div className="w-full grid grid-cols-3 sm:hidden gap-3 mt-6 px-2">
-             {[
+            {[
               { id: "links", label: "Menu", icon: Layers, count: links.length, color: "text-blue-400", border: "border-blue-500/50" },
               { id: "contacts", label: "Kontak", icon: Users, count: contacts.length, color: "text-emerald-400", border: "border-emerald-500/50" },
               { id: "announcements", label: "Pengumuman", icon: Megaphone, count: announcements.length, color: "text-amber-400", border: "border-amber-500/50" },
@@ -1025,13 +1089,12 @@ export default function AdminDashboardPage() {
             ].map((t) => {
               const Icon = t.icon;
               const isCurrent = activeTab === t.id;
-              
+
               return (
                 <div key={t.id} className="relative flex flex-col items-center cursor-pointer" onClick={() => setActiveTab(t.id as ActiveTab)}>
-                  <div className={`h-12 w-12 flex flex-col items-center justify-center rounded-xl border transition-all duration-300 z-10 ${
-                      isCurrent 
-                        ? `bg-slate-800 ${t.border} scale-105 ring-1 ring-white/20` 
-                        : `bg-slate-900/90 border-card-border/50`
+                  <div className={`h-12 w-12 flex flex-col items-center justify-center rounded-xl border transition-all duration-300 z-10 ${isCurrent
+                    ? `bg-slate-800 ${t.border} scale-105 ring-1 ring-white/20`
+                    : `bg-slate-900/90 border-card-border/50`
                     }`}
                   >
                     <Icon className={`h-5 w-5 mb-0.5 ${isCurrent ? t.color : 'text-slate-400'}`} />
@@ -1075,11 +1138,10 @@ export default function AdminDashboardPage() {
                           </span>
                           <button
                             onClick={() => handleToggleLinkActive(link.id, link.is_active)}
-                            className={`text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full border cursor-pointer ${
-                              link.is_active
-                                ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/40"
-                                : "bg-slate-800 text-slate-500 border-slate-700"
-                            }`}
+                            className={`text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full border cursor-pointer ${link.is_active
+                              ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/40"
+                              : "bg-slate-800 text-slate-500 border-slate-700"
+                              }`}
                           >
                             {link.is_active ? "Aktif" : "Nonaktif"}
                           </button>
@@ -1153,11 +1215,10 @@ export default function AdminDashboardPage() {
 
                             <button
                               onClick={() => handleToggleDocTemplateActive(tpl.id, tpl.is_active)}
-                              className={`px-2.5 py-0.5 text-[10px] font-mono rounded-full border transition flex items-center gap-1 cursor-pointer ${
-                                tpl.is_active
-                                  ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
-                                  : "bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700"
-                              }`}
+                              className={`px-2.5 py-0.5 text-[10px] font-mono rounded-full border transition flex items-center gap-1 cursor-pointer ${tpl.is_active
+                                ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
+                                : "bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700"
+                                }`}
                             >
                               {tpl.is_active ? (
                                 <>
@@ -1236,782 +1297,788 @@ export default function AdminDashboardPage() {
               </div>
             )}
 
-        {activeTab === "contacts" && (
-          <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-              <div>
-                <h2 className="font-display font-black text-xl text-slate-100">Kelola Kontak LO (/contact)</h2>
-                <p className="text-xs text-slate-400">Daftar Liaison Officer & Pendamping kelompok yang tampil di halaman kontak.</p>
-              </div>
-              <Button variant="primary" size="sm" onClick={() => setShowAddContactModal(true)}>
-                <Plus className="h-4 w-4 mr-1.5" />
-                <span>Tambah Kontak LO</span>
-              </Button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {contacts.map((c) => (
-                <div key={c.id} className="glass rounded-2xl p-5 border border-card-border/40 flex flex-col justify-between">
+            {activeTab === "contacts" && (
+              <div className="space-y-6">
+                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                   <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-[10px] font-mono uppercase bg-accent-purple/15 text-accent-purple border border-accent-purple/30 px-2.5 py-0.5 rounded-full font-bold">
-                        {c.role}
-                      </span>
-                      <span className="text-[10px] font-mono text-slate-400">{c.group_name}</span>
-                    </div>
-
-                    <h3 className="font-display font-bold text-base text-slate-100">{c.name}</h3>
-                    <p className="text-xs text-emerald-400 font-mono mt-1">WA: {c.whatsapp}</p>
-                    {c.instagram && <p className="text-xs text-pink-400 font-mono">IG: @{c.instagram}</p>}
+                    <h2 className="font-display font-black text-xl text-slate-100">Kelola Kontak LO (/contact)</h2>
+                    <p className="text-xs text-slate-400">Daftar Liaison Officer & Pendamping kelompok yang tampil di halaman kontak.</p>
                   </div>
-
-                  <div className="flex justify-end pt-4 mt-4 border-t border-card-border/20">
-                    <button
-                      onClick={() => handleDeleteContact(c.id)}
-                      className="p-2 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-400 hover:bg-rose-500 hover:text-white transition cursor-pointer"
-                      title="Hapus Kontak"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {activeTab === "announcements" && (
-          <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-              <div>
-                <h2 className="font-display font-black text-xl text-slate-100">Pengumuman & Instruksi Misi</h2>
-                <p className="text-xs text-slate-400">Kelola informasi penting yang ditargetkan untuk seluruh peserta IMO 2026.</p>
-              </div>
-              <Button variant="primary" size="sm" onClick={() => setShowAddAnnoModal(true)}>
-                <Plus className="h-4 w-4 mr-1.5" />
-                <span>Buat Pengumuman Baru</span>
-              </Button>
-            </div>
-
-            <div className="space-y-4">
-              {announcements.map((a) => {
-                let parsedNotes = a.content;
-                let parsedGdriveUrl = "";
-                try {
-                  if (a.content.trim().startsWith("{")) {
-                    const parsed = JSON.parse(a.content);
-                    parsedNotes = parsed.notes || a.content;
-                    parsedGdriveUrl = parsed.gdrive_url || "";
-                  }
-                } catch (e) {}
-
-                return (
-                  <div key={a.id} className="glass rounded-2xl p-5 border border-card-border/40 flex items-start justify-between">
-                    <div className="space-y-1.5 max-w-3xl">
-                      <div className="flex items-center space-x-2">
-                        {a.pinned && <Pin className="h-4 w-4 text-accent-yellow fill-accent-yellow" />}
-                        <span className="text-[10px] font-mono uppercase bg-accent-yellow/15 text-accent-yellow border border-accent-yellow/30 px-2.5 py-0.5 rounded-full font-bold">
-                          {a.category}
-                        </span>
-                        {parsedGdriveUrl && (
-                          <span className="text-[10px] font-mono uppercase bg-accent-cyan/15 text-accent-cyan border border-accent-cyan/30 px-2.5 py-0.5 rounded-full font-bold flex items-center space-x-1">
-                            <span>📄 Embedded Doc</span>
-                          </span>
-                        )}
-                      </div>
-                      <h3 className="font-display font-bold text-lg text-slate-100">{a.title}</h3>
-                      <p className="text-xs text-slate-300 font-sans leading-relaxed whitespace-pre-wrap">{parsedNotes}</p>
-                      {parsedGdriveUrl && (
-                        <a href={parsedGdriveUrl} target="_blank" rel="noreferrer" className="text-[11px] text-accent-cyan font-mono hover:underline inline-block mt-1">
-                          🔗 {parsedGdriveUrl}
-                        </a>
-                      )}
-                    </div>
-
-                    <button
-                      onClick={() => handleDeleteAnno(a.id)}
-                      className="p-2 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-400 hover:bg-rose-500 hover:text-white transition cursor-pointer ml-4 flex-shrink-0"
-                      title="Hapus Pengumuman"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {activeTab === "templates" && (
-          <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-              <div>
-                <h2 className="font-display font-black text-xl text-slate-100 flex items-center space-x-2">
-                  <CreditCard className="h-6 w-6 text-accent-cyan" />
-                  <span>Manajemen Templat ID Card (.PSD)</span>
-                </h2>
-                <p className="text-xs text-slate-400 mt-1 max-w-2xl">
-                  Unggah dan kelola file template Photoshop <code className="text-accent-cyan font-mono font-semibold">.PSD</code> resmi. Seluruh peserta akan secara otomatis mendapatkan pilihan templat yang Anda sediakan di halaman ID Card.
-                </p>
-              </div>
-            </div>
-
-            {/* Upload Form Box */}
-            <Card glowColor="purple">
-              <div className="flex justify-between items-center mb-4 pb-3 border-b border-card-border/30">
-                <span className="font-mono text-xs font-bold text-accent-purple uppercase tracking-wider flex items-center space-x-2">
-                  <Upload className="h-4 w-4 text-accent-purple" />
-                  <span>Unggah Templat PSD Baru</span>
-                </span>
-                {psdSuccessMsg && (
-                  <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-xl border border-emerald-500/30">
-                    ✓ {psdSuccessMsg}
-                  </span>
-                )}
-                {psdErrorMsg && (
-                  <span className="text-xs font-mono text-rose-400 bg-rose-500/10 px-3 py-1 rounded-xl border border-rose-500/30">
-                    ⚠ {psdErrorMsg}
-                  </span>
-                )}
-              </div>
-
-              <form onSubmit={handleUploadPsdTemplate} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-mono text-slate-300 mb-1.5 font-bold">
-                      Nama Templat *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Templat Resmi IMO 2026 (V1)"
-                      value={newPsd.name}
-                      onChange={(e) => setNewPsd({ ...newPsd, name: e.target.value })}
-                      className="w-full px-4 py-2.5 rounded-xl bg-slate-950/80 border border-card-border/60 text-slate-100 text-xs focus:outline-none focus:border-accent-purple"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-mono text-slate-300 mb-1.5 font-bold">
-                      File Photoshop (.PSD) *
-                    </label>
-                    <input
-                      type="file"
-                      required
-                      accept=".psd"
-                      onChange={(e) => setSelectedPsdFile(e.target.files?.[0] || null)}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-950/80 border border-card-border/60 text-slate-300 text-xs file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-mono file:bg-accent-purple/20 file:text-accent-purple hover:file:bg-accent-purple/30"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-mono text-slate-300 mb-1.5 font-bold">
-                    Deskripsi Singkat (Opsional)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Desain bertema portal IMO 2026 dengan frame pasfoto & Motto"
-                    value={newPsd.description}
-                    onChange={(e) => setNewPsd({ ...newPsd, description: e.target.value })}
-                    className="w-full px-4 py-2 rounded-xl bg-slate-950/80 border border-card-border/60 text-slate-100 text-xs focus:outline-none focus:border-accent-purple"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between pt-2">
-                  <label className="flex items-center space-x-2 text-xs font-mono text-slate-300 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={newPsd.is_default}
-                      onChange={(e) => setNewPsd({ ...newPsd, is_default: e.target.checked })}
-                      className="rounded border-slate-700 bg-slate-950 text-accent-purple focus:ring-accent-purple"
-                    />
-                    <span>Jadikan Templat Default Utama</span>
-                  </label>
-
-                  <Button variant="primary" size="sm" type="submit" disabled={uploadingPsd || !selectedPsdFile}>
-                    {uploadingPsd ? (
-                      <>
-                        <RefreshCw className="h-4 w-4 mr-1.5 animate-spin" />
-                        <span>Mengunggah ke Storage...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Upload className="h-4 w-4 mr-1.5" />
-                        <span>Unggah & Simpan Templat</span>
-                      </>
-                    )}
+                  <Button variant="primary" size="sm" onClick={() => setShowAddContactModal(true)}>
+                    <Plus className="h-4 w-4 mr-1.5" />
+                    <span>Tambah Kontak LO</span>
                   </Button>
                 </div>
-              </form>
-            </Card>
 
-            {/* List of PSD Templates */}
-            <div className="space-y-4">
-              <h3 className="font-display font-bold text-base text-slate-100 flex items-center justify-between">
-                <span>Daftar Templat PSD Tersimpan ({psdTemplates.length})</span>
-              </h3>
-
-              {psdTemplates.length === 0 ? (
-                <div className="p-8 text-center rounded-2xl border border-card-border/30 bg-slate-900/40 text-slate-400 text-xs font-mono">
-                  Belum ada templat PSD kustom yang diunggah. Silakan unggah templat PSD di atas.
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {psdTemplates.map((t) => {
-                    const psdUrl = t.background_url || t.layout_json?.psd_url || "";
-                    return (
-                      <div key={t.id} className="glass rounded-2xl p-5 border border-card-border/40 flex flex-col justify-between gap-4">
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="font-display font-bold text-base text-slate-100">{t.name}</span>
-                            <div className="flex items-center space-x-1.5">
-                              {t.is_default && (
-                                <span className="text-[10px] font-mono uppercase bg-accent-cyan/20 text-accent-cyan border border-accent-cyan/40 px-2 py-0.5 rounded-full font-bold">
-                                  Default
-                                </span>
-                              )}
-                              <span
-                                className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border ${
-                                  t.is_active !== false
-                                    ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/40"
-                                    : "bg-slate-800 text-slate-500 border-slate-700"
-                                }`}
-                              >
-                                {t.is_active !== false ? "Aktif" : "Nonaktif"}
-                              </span>
-                            </div>
-                          </div>
-
-                          {t.description && (
-                            <p className="text-xs text-slate-400 leading-snug">{t.description}</p>
-                          )}
-
-                          <div className="text-[11px] font-mono text-slate-500 flex items-center justify-between pt-1">
-                            <span>File: {t.layout_json?.file_name || "Template.psd"}</span>
-                            <span>{new Date(t.created_at || Date.now()).toLocaleDateString("id-ID")}</span>
-                          </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {contacts.map((c) => (
+                    <div key={c.id} className="glass rounded-2xl p-5 border border-card-border/40 flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[10px] font-mono uppercase bg-accent-purple/15 text-accent-purple border border-accent-purple/30 px-2.5 py-0.5 rounded-full font-bold">
+                            {c.role}
+                          </span>
+                          <span className="text-[10px] font-mono text-slate-400">{c.group_name}</span>
                         </div>
 
-                        <div className="flex items-center justify-between pt-3 border-t border-card-border/20 flex-wrap gap-2">
-                          <div className="flex items-center space-x-2">
-                            {!t.is_default && (
-                              <button
-                                onClick={() => handleSetPsdDefault(t.id)}
-                                className="text-xs font-mono text-accent-cyan hover:underline cursor-pointer"
-                              >
-                                Set Default
-                              </button>
-                            )}
-                            <button
-                              onClick={() => handleTogglePsdActive(t.id, t.is_active !== false)}
-                              className="text-xs font-mono text-slate-400 hover:text-slate-200 cursor-pointer"
-                            >
-                              {t.is_active !== false ? "Nonaktifkan" : "Aktifkan"}
-                            </button>
-                          </div>
+                        <h3 className="font-display font-bold text-base text-slate-100">{c.name}</h3>
+                        <p className="text-xs text-emerald-400 font-mono mt-1">WA: {c.whatsapp}</p>
+                        {c.instagram && <p className="text-xs text-pink-400 font-mono">IG: @{c.instagram}</p>}
+                      </div>
 
+                      <div className="flex justify-end pt-4 mt-4 border-t border-card-border/20">
+                        <button
+                          onClick={() => handleDeleteContact(c.id)}
+                          className="p-2 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-400 hover:bg-rose-500 hover:text-white transition cursor-pointer"
+                          title="Hapus Kontak"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {activeTab === "announcements" && (
+              <div className="space-y-6">
+                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                  <div>
+                    <h2 className="font-display font-black text-xl text-slate-100">Pengumuman & Instruksi Misi</h2>
+                    <p className="text-xs text-slate-400">Kelola informasi penting yang ditargetkan untuk seluruh peserta IMO 2026.</p>
+                  </div>
+                  <Button variant="primary" size="sm" onClick={() => setShowAddAnnoModal(true)}>
+                    <Plus className="h-4 w-4 mr-1.5" />
+                    <span>Buat Pengumuman Baru</span>
+                  </Button>
+                </div>
+
+                <div className="space-y-4">
+                  {announcements.map((a) => {
+                    let parsedNotes = a.content;
+                    let parsedGdriveUrl = "";
+                    try {
+                      if (a.content.trim().startsWith("{")) {
+                        const parsed = JSON.parse(a.content);
+                        parsedNotes = parsed.notes || a.content;
+                        parsedGdriveUrl = parsed.gdrive_url || "";
+                      }
+                    } catch (e) { }
+
+                    return (
+                      <div key={a.id} className="glass rounded-2xl p-5 border border-card-border/40 flex items-start justify-between">
+                        <div className="space-y-1.5 max-w-3xl">
                           <div className="flex items-center space-x-2">
-                            {psdUrl && (
-                              <a
-                                href={psdUrl}
-                                download
-                                target="_blank"
-                                rel="noreferrer"
-                                className="p-2 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 hover:text-white transition"
-                                title="Download File PSD"
-                              >
-                                <ExternalLink className="h-3.5 w-3.5" />
-                              </a>
+                            {a.pinned && <Pin className="h-4 w-4 text-accent-yellow fill-accent-yellow" />}
+                            <span className="text-[10px] font-mono uppercase bg-accent-yellow/15 text-accent-yellow border border-accent-yellow/30 px-2.5 py-0.5 rounded-full font-bold">
+                              {a.category}
+                            </span>
+                            {parsedGdriveUrl && (
+                              <span className="text-[10px] font-mono uppercase bg-accent-cyan/15 text-accent-cyan border border-accent-cyan/30 px-2.5 py-0.5 rounded-full font-bold flex items-center space-x-1">
+                                <span>{a.category?.toLowerCase().includes("video") ? "📹 Embedded Video" : "📄 Embedded Doc"}</span>
+                              </span>
                             )}
-                            <button
-                              onClick={() => handleDeletePsdTemplate(t.id)}
-                              className="p-2 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-400 hover:bg-rose-500 hover:text-white transition cursor-pointer"
-                              title="Hapus Templat"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
                           </div>
+                          <h3 className="font-display font-bold text-lg text-slate-100">{a.title}</h3>
+                          <p className="text-xs text-slate-300 font-sans leading-relaxed whitespace-pre-wrap">{parsedNotes}</p>
+                          {parsedGdriveUrl && (
+                            <a href={parsedGdriveUrl} target="_blank" rel="noreferrer" className="text-[11px] text-accent-cyan font-mono hover:underline inline-block mt-1">
+                              🔗 {parsedGdriveUrl}
+                            </a>
+                          )}
+                        </div>
+
+                        <div className="flex items-center space-x-2 flex-shrink-0 ml-4">
+                          <button
+                            onClick={() => handleOpenEditAnno(a)}
+                            className="p-2 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 hover:text-white transition cursor-pointer"
+                            title="Edit Pengumuman"
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteAnno(a.id)}
+                            className="p-2 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-400 hover:bg-rose-500 hover:text-white transition cursor-pointer"
+                            title="Hapus Pengumuman"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
                         </div>
                       </div>
                     );
                   })}
                 </div>
-              )}
-            </div>
-          </div>
-        )}
-
-
-        {activeTab === "tasks" && (
-          <div className="space-y-8">
-            {/* Header & Description */}
-            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-              <div>
-                <h2 className="font-display font-black text-xl text-slate-100 flex items-center gap-2">
-                  <ListChecks className="h-6 w-6 text-accent-cyan" />
-                  <span>Kelola Penugasan Kelompok</span>
-                </h2>
-                <p className="text-xs text-slate-400 mt-1">
-                  Atur sumber Google Drive dan daftar tugas kelompok. Penambahan tugas berlaku otomatis untuk seluruh kelompok.
-                </p>
-              </div>
-              <div className="flex flex-wrap items-center gap-3">
-                <button
-                  onClick={handleSyncFolders}
-                  disabled={syncingFolders}
-                  className="px-4 py-2.5 rounded-xl bg-accent-purple/20 text-accent-purple border border-accent-purple/40 hover:bg-accent-purple/30 transition text-xs font-mono font-bold flex items-center space-x-2 cursor-pointer disabled:opacity-50"
-                >
-                  <RefreshCw className={`h-4 w-4 ${syncingFolders ? "animate-spin" : ""}`} />
-                  <span>{syncingFolders ? "Menyinkronkan..." : "Sinkronkan Folder Kelompok"}</span>
-                </button>
-                <Button variant="primary" size="sm" onClick={() => setShowAddTaskModal(true)}>
-                  <Plus className="h-4 w-4 mr-1.5" />
-                  <span>Tambah Tugas Kelompok Baru</span>
-                </Button>
-              </div>
-            </div>
-
-            {syncNotice && (
-              <div className="p-4 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-xs font-mono flex items-center justify-between">
-                <span>✓ {syncNotice}</span>
-                <button onClick={() => setSyncNotice(null)} className="text-slate-400 hover:text-white font-bold ml-4">✕</button>
               </div>
             )}
 
-            {/* Google Drive Parent Folder & Group Count Configuration */}
-            <div className="glass rounded-2xl p-6 border border-accent-cyan/30">
-              <h3 className="font-display font-bold text-sm text-accent-cyan uppercase tracking-wider mb-2 flex items-center gap-2">
-                <ExternalLink className="h-4 w-4" />
-                <span>Sumber Google Drive & Parameter Kelompok</span>
-              </h3>
-              <p className="text-xs text-slate-400 mb-4">
-                Atur Link Folder Google Drive Utama dan Jumlah Kelompok (misal: 20 kelompok). Saat menekan <strong>"Sinkronkan Folder Kelompok"</strong>, sistem akan membuat folder dari <strong>Kelompok 1 s/d Kelompok {targetTotalGroups}</strong> sekaligus (folder yang sudah ada tidak dibuat ulang).
-              </p>
-              <form onSubmit={handleSaveGdriveLink} className="space-y-3">
-                <div className="flex flex-col sm:flex-row gap-3 items-stretch">
-                  <div className="flex-grow">
-                    <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Link / ID Folder Induk Google Drive</label>
-                    <input
-                      type="text"
-                      value={gdriveLink}
-                      onChange={(e) => setGdriveLink(e.target.value)}
-                      placeholder="https://drive.google.com/drive/folders/1abc... atau ID Folder"
-                      className="w-full px-4 py-2.5 rounded-xl bg-slate-950/80 border border-card-border text-slate-100 text-xs font-mono focus:border-accent-cyan focus:outline-none"
-                    />
-                  </div>
-
-                  <div className="w-full sm:w-44">
-                    <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Total Kelompok</label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={100}
-                      value={targetTotalGroups}
-                      onChange={(e) => setTargetTotalGroups(Math.max(1, parseInt(e.target.value) || 1))}
-                      placeholder="20"
-                      className="w-full px-4 py-2.5 rounded-xl bg-slate-950/80 border border-card-border text-accent-cyan font-bold text-xs font-mono focus:border-accent-cyan focus:outline-none"
-                    />
-                  </div>
-
-                  <div className="w-full sm:w-56">
-                    <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Target Anggota / Kelompok (Individu)</label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={1000}
-                      value={targetMembersPerGroup}
-                      onChange={(e) => setTargetMembersPerGroup(Math.max(1, parseInt(e.target.value) || 1))}
-                      placeholder="10"
-                      className="w-full px-4 py-2.5 rounded-xl bg-slate-950/80 border border-card-border text-accent-purple font-bold text-xs font-mono focus:border-accent-purple focus:outline-none"
-                    />
+            {activeTab === "templates" && (
+              <div className="space-y-6">
+                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                  <div>
+                    <h2 className="font-display font-black text-xl text-slate-100 flex items-center space-x-2">
+                      <CreditCard className="h-6 w-6 text-accent-cyan" />
+                      <span>Manajemen Templat ID Card (.PSD)</span>
+                    </h2>
+                    <p className="text-xs text-slate-400 mt-1 max-w-2xl">
+                      Unggah dan kelola file template Photoshop <code className="text-accent-cyan font-mono font-semibold">.PSD</code> resmi. Seluruh peserta akan secara otomatis mendapatkan pilihan templat yang Anda sediakan di halaman ID Card.
+                    </p>
                   </div>
                 </div>
 
-                <div className="flex justify-end pt-1">
-                  <button
-                    type="submit"
-                    disabled={savingGdrive}
-                    className="px-5 py-2.5 rounded-xl bg-accent-cyan text-black font-extrabold text-xs hover:bg-accent-cyan/90 transition flex items-center justify-center space-x-1.5 cursor-pointer disabled:opacity-50"
-                  >
-                    <Save className="h-4 w-4" />
-                    <span>{savingGdrive ? "Menyimpan..." : "Simpan Pengaturan"}</span>
-                  </button>
-                </div>
-              </form>
-            </div>
+                {/* Upload Form Box */}
+                <Card glowColor="purple">
+                  <div className="flex justify-between items-center mb-4 pb-3 border-b border-card-border/30">
+                    <span className="font-mono text-xs font-bold text-accent-purple uppercase tracking-wider flex items-center space-x-2">
+                      <Upload className="h-4 w-4 text-accent-purple" />
+                      <span>Unggah Templat PSD Baru</span>
+                    </span>
+                    {psdSuccessMsg && (
+                      <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-xl border border-emerald-500/30">
+                        ✓ {psdSuccessMsg}
+                      </span>
+                    )}
+                    {psdErrorMsg && (
+                      <span className="text-xs font-mono text-rose-400 bg-rose-500/10 px-3 py-1 rounded-xl border border-rose-500/30">
+                        ⚠ {psdErrorMsg}
+                      </span>
+                    )}
+                  </div>
 
-            {/* Tasks List */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="font-display font-bold text-base text-slate-200">
-                  Daftar Tugas Kelompok ({tasks.length})
-                </h3>
-                <span className="text-[11px] text-slate-400 font-mono">
-                  Urutan tampil: Berdasarkan Abjad Nama Tugas
-                </span>
-              </div>
-
-              {tasks.length === 0 ? (
-                <div className="glass rounded-2xl p-8 border border-card-border/40 text-center">
-                  <p className="text-sm text-slate-400 font-sans">Belum ada tugas kelompok yang ditambahkan.</p>
-                  <button
-                    onClick={() => setShowAddTaskModal(true)}
-                    className="mt-3 inline-flex items-center text-xs font-bold text-accent-cyan hover:underline cursor-pointer"
-                  >
-                    + Tambah Tugas Pertama Sekarang
-                  </button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {tasks.map((task, index) => (
-                    <div
-                      key={task.id}
-                      className="glass rounded-2xl p-5 border border-card-border/40 flex flex-col justify-between hover:border-accent-cyan/40 transition"
-                    >
+                  <form onSubmit={handleUploadPsdTemplate} className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <div className="flex items-center justify-between mb-3">
-                          <span className="text-[10px] font-mono uppercase bg-slate-900 px-2.5 py-0.5 rounded-full border border-card-border/40 text-accent-purple font-bold">
-                            #{index + 1} • Tugas Kelompok
-                          </span>
-                          <button
-                            onClick={() => handleToggleTaskActive(task.id, task.is_active)}
-                            className={`text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full border cursor-pointer ${
-                              task.is_active
-                                ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/40"
-                                : "bg-slate-800 text-slate-500 border-slate-700"
-                            }`}
-                          >
-                            {task.is_active ? "Aktif" : "Nonaktif"}
-                          </button>
-                        </div>
-
-                        <h3 className="font-display font-bold text-base text-slate-100">{task.name}</h3>
-                        
-                        <div className="mt-3 p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80">
-                          <span className="text-[10px] font-mono text-slate-400 uppercase block mb-1">
-                            Keyword Deteksi Nama File:
-                          </span>
-                          <code className="text-xs font-mono text-accent-cyan font-bold bg-accent-cyan/10 px-2 py-0.5 rounded border border-accent-cyan/20">
-                            {task.keyword}
-                          </code>
-                        </div>
+                        <label className="block text-xs font-mono text-slate-300 mb-1.5 font-bold">
+                          Nama Templat *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Templat Resmi IMO 2026 (V1)"
+                          value={newPsd.name}
+                          onChange={(e) => setNewPsd({ ...newPsd, name: e.target.value })}
+                          className="w-full px-4 py-2.5 rounded-xl bg-slate-950/80 border border-card-border/60 text-slate-100 text-xs focus:outline-none focus:border-accent-purple"
+                        />
                       </div>
 
-                      <div className="flex items-center justify-end space-x-2 border-t border-card-border/30 pt-3 mt-4">
-                        <button
-                          onClick={() => setEditingTask(task)}
-                          className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs font-bold hover:bg-slate-700 transition cursor-pointer"
-                        >
-                          <Edit2 className="h-3.5 w-3.5" />
-                          <span>Edit</span>
-                        </button>
-                        <button
-                          onClick={() => handleDeleteTask(task.id)}
-                          className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/30 text-xs font-bold hover:bg-rose-500 hover:text-white transition cursor-pointer"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                          <span>Hapus</span>
-                        </button>
+                      <div>
+                        <label className="block text-xs font-mono text-slate-300 mb-1.5 font-bold">
+                          File Photoshop (.PSD) *
+                        </label>
+                        <input
+                          type="file"
+                          required
+                          accept=".psd"
+                          onChange={(e) => setSelectedPsdFile(e.target.files?.[0] || null)}
+                          className="w-full px-3 py-2 rounded-xl bg-slate-950/80 border border-card-border/60 text-slate-300 text-xs file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-mono file:bg-accent-purple/20 file:text-accent-purple hover:file:bg-accent-purple/30"
+                        />
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
 
-            {/* Individual Tasks List */}
-            <div className="space-y-4 pt-6 border-t border-card-border/40">
-              <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
-                <div>
-                  <h3 className="font-display font-bold text-base text-accent-purple flex items-center gap-2">
-                    <User className="h-5 w-5" />
-                    <span>Daftar Penugasan Individu ({individuTaskDefs.length})</span>
+                    <div>
+                      <label className="block text-xs font-mono text-slate-300 mb-1.5 font-bold">
+                        Deskripsi Singkat (Opsional)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Desain bertema portal IMO 2026 dengan frame pasfoto & Motto"
+                        value={newPsd.description}
+                        onChange={(e) => setNewPsd({ ...newPsd, description: e.target.value })}
+                        className="w-full px-4 py-2 rounded-xl bg-slate-950/80 border border-card-border/60 text-slate-100 text-xs focus:outline-none focus:border-accent-purple"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2">
+                      <label className="flex items-center space-x-2 text-xs font-mono text-slate-300 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={newPsd.is_default}
+                          onChange={(e) => setNewPsd({ ...newPsd, is_default: e.target.checked })}
+                          className="rounded border-slate-700 bg-slate-950 text-accent-purple focus:ring-accent-purple"
+                        />
+                        <span>Jadikan Templat Default Utama</span>
+                      </label>
+
+                      <Button variant="primary" size="sm" type="submit" disabled={uploadingPsd || !selectedPsdFile}>
+                        {uploadingPsd ? (
+                          <>
+                            <RefreshCw className="h-4 w-4 mr-1.5 animate-spin" />
+                            <span>Mengunggah ke Storage...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="h-4 w-4 mr-1.5" />
+                            <span>Unggah & Simpan Templat</span>
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </form>
+                </Card>
+
+                {/* List of PSD Templates */}
+                <div className="space-y-4">
+                  <h3 className="font-display font-bold text-base text-slate-100 flex items-center justify-between">
+                    <span>Daftar Templat PSD Tersimpan ({psdTemplates.length})</span>
                   </h3>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Definisikan jenis tugas individu yang wajib dikumpulkan per anggota kelompok.
-                  </p>
-                </div>
-                <Button variant="outline" size="sm" onClick={() => setShowAddIndividuModal(true)}>
-                  <Plus className="h-4 w-4 mr-1.5 text-accent-purple" />
-                  <span>Tambah Tugas Individu Baru</span>
-                </Button>
-              </div>
 
-              {individuTaskDefs.length === 0 ? (
-                <div className="glass rounded-2xl p-8 border border-card-border/40 text-center">
-                  <p className="text-sm text-slate-400 font-sans">Belum ada tugas individu yang ditambahkan.</p>
-                  <button
-                    onClick={() => setShowAddIndividuModal(true)}
-                    className="mt-3 inline-flex items-center text-xs font-bold text-accent-purple hover:underline cursor-pointer"
-                  >
-                    + Tambah Tugas Individu Pertama
-                  </button>
+                  {psdTemplates.length === 0 ? (
+                    <div className="p-8 text-center rounded-2xl border border-card-border/30 bg-slate-900/40 text-slate-400 text-xs font-mono">
+                      Belum ada templat PSD kustom yang diunggah. Silakan unggah templat PSD di atas.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {psdTemplates.map((t) => {
+                        const psdUrl = t.background_url || t.layout_json?.psd_url || "";
+                        return (
+                          <div key={t.id} className="glass rounded-2xl p-5 border border-card-border/40 flex flex-col justify-between gap-4">
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="font-display font-bold text-base text-slate-100">{t.name}</span>
+                                <div className="flex items-center space-x-1.5">
+                                  {t.is_default && (
+                                    <span className="text-[10px] font-mono uppercase bg-accent-cyan/20 text-accent-cyan border border-accent-cyan/40 px-2 py-0.5 rounded-full font-bold">
+                                      Default
+                                    </span>
+                                  )}
+                                  <span
+                                    className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border ${t.is_active !== false
+                                      ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/40"
+                                      : "bg-slate-800 text-slate-500 border-slate-700"
+                                      }`}
+                                  >
+                                    {t.is_active !== false ? "Aktif" : "Nonaktif"}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {t.description && (
+                                <p className="text-xs text-slate-400 leading-snug">{t.description}</p>
+                              )}
+
+                              <div className="text-[11px] font-mono text-slate-500 flex items-center justify-between pt-1">
+                                <span>File: {t.layout_json?.file_name || "Template.psd"}</span>
+                                <span>{new Date(t.created_at || Date.now()).toLocaleDateString("id-ID")}</span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between pt-3 border-t border-card-border/20 flex-wrap gap-2">
+                              <div className="flex items-center space-x-2">
+                                {!t.is_default && (
+                                  <button
+                                    onClick={() => handleSetPsdDefault(t.id)}
+                                    className="text-xs font-mono text-accent-cyan hover:underline cursor-pointer"
+                                  >
+                                    Set Default
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => handleTogglePsdActive(t.id, t.is_active !== false)}
+                                  className="text-xs font-mono text-slate-400 hover:text-slate-200 cursor-pointer"
+                                >
+                                  {t.is_active !== false ? "Nonaktifkan" : "Aktifkan"}
+                                </button>
+                              </div>
+
+                              <div className="flex items-center space-x-2">
+                                {psdUrl && (
+                                  <a
+                                    href={psdUrl}
+                                    download
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="p-2 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 hover:text-white transition"
+                                    title="Download File PSD"
+                                  >
+                                    <ExternalLink className="h-3.5 w-3.5" />
+                                  </a>
+                                )}
+                                <button
+                                  onClick={() => handleDeletePsdTemplate(t.id)}
+                                  className="p-2 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-400 hover:bg-rose-500 hover:text-white transition cursor-pointer"
+                                  title="Hapus Templat"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {individuTaskDefs.map((task, index) => (
-                    <div
-                      key={task.id}
-                      className="glass rounded-2xl p-5 border border-accent-purple/30 flex flex-col justify-between hover:border-accent-purple/60 transition"
+              </div>
+            )}
+
+
+            {activeTab === "tasks" && (
+              <div className="space-y-8">
+                {/* Header & Description */}
+                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                  <div>
+                    <h2 className="font-display font-black text-xl text-slate-100 flex items-center gap-2">
+                      <ListChecks className="h-6 w-6 text-accent-cyan" />
+                      <span>Kelola Penugasan Kelompok</span>
+                    </h2>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Atur sumber Google Drive dan daftar tugas kelompok. Penambahan tugas berlaku otomatis untuk seluruh kelompok.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      onClick={handleSyncFolders}
+                      disabled={syncingFolders}
+                      className="px-4 py-2.5 rounded-xl bg-accent-purple/20 text-accent-purple border border-accent-purple/40 hover:bg-accent-purple/30 transition text-xs font-mono font-bold flex items-center space-x-2 cursor-pointer disabled:opacity-50"
                     >
-                      <div>
-                        <div className="flex items-center justify-between mb-3">
-                          <span className="text-[10px] font-mono uppercase bg-slate-900 px-2.5 py-0.5 rounded-full border border-accent-purple/30 text-accent-cyan font-bold">
-                            #{index + 1} • Tugas Individu
-                          </span>
-                          <button
-                            onClick={() => handleToggleIndividuTaskActive(task.id)}
-                            className={`text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full border cursor-pointer ${
-                              task.is_active !== false
-                                ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/40"
-                                : "bg-slate-800 text-slate-500 border-slate-700"
-                            }`}
-                          >
-                            {task.is_active !== false ? "Aktif" : "Nonaktif"}
-                          </button>
-                        </div>
+                      <RefreshCw className={`h-4 w-4 ${syncingFolders ? "animate-spin" : ""}`} />
+                      <span>{syncingFolders ? "Menyinkronkan..." : "Sinkronkan Folder Kelompok"}</span>
+                    </button>
+                    <Button variant="primary" size="sm" onClick={() => setShowAddTaskModal(true)}>
+                      <Plus className="h-4 w-4 mr-1.5" />
+                      <span>Tambah Tugas Kelompok Baru</span>
+                    </Button>
+                  </div>
+                </div>
 
-                        <h3 className="font-display font-bold text-base text-slate-100">{task.name}</h3>
-                        
-                        <div className="mt-3 p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80">
-                          <span className="text-[10px] font-mono text-slate-400 uppercase block mb-1">
-                            Keyword Deteksi di Nama File:
-                          </span>
-                          <code className="text-xs font-mono text-accent-purple font-bold bg-accent-purple/10 px-2 py-0.5 rounded border border-accent-purple/20">
-                            {task.keyword}
-                          </code>
-                        </div>
+                {syncNotice && (
+                  <div className="p-4 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-xs font-mono flex items-center justify-between">
+                    <span>✓ {syncNotice}</span>
+                    <button onClick={() => setSyncNotice(null)} className="text-slate-400 hover:text-white font-bold ml-4">✕</button>
+                  </div>
+                )}
+
+                {/* Google Drive Parent Folder & Group Count Configuration */}
+                <div className="glass rounded-2xl p-6 border border-accent-cyan/30">
+                  <h3 className="font-display font-bold text-sm text-accent-cyan uppercase tracking-wider mb-2 flex items-center gap-2">
+                    <ExternalLink className="h-4 w-4" />
+                    <span>Sumber Google Drive & Parameter Kelompok</span>
+                  </h3>
+                  <p className="text-xs text-slate-400 mb-4">
+                    Atur Link Folder Google Drive Utama dan Jumlah Kelompok (misal: 20 kelompok). Saat menekan <strong>"Sinkronkan Folder Kelompok"</strong>, sistem akan membuat folder dari <strong>Kelompok 1 s/d Kelompok {targetTotalGroups}</strong> sekaligus (folder yang sudah ada tidak dibuat ulang).
+                  </p>
+                  <form onSubmit={handleSaveGdriveLink} className="space-y-3">
+                    <div className="flex flex-col sm:flex-row gap-3 items-stretch">
+                      <div className="flex-grow">
+                        <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Link / ID Folder Induk Google Drive</label>
+                        <input
+                          type="text"
+                          value={gdriveLink}
+                          onChange={(e) => setGdriveLink(e.target.value)}
+                          placeholder="https://drive.google.com/drive/folders/1abc... atau ID Folder"
+                          className="w-full px-4 py-2.5 rounded-xl bg-slate-950/80 border border-card-border text-slate-100 text-xs font-mono focus:border-accent-cyan focus:outline-none"
+                        />
                       </div>
 
-                      <div className="flex items-center justify-end space-x-2 border-t border-card-border/30 pt-3 mt-4">
-                        <button
-                          onClick={() => setEditingIndividuTask(task)}
-                          className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs font-bold hover:bg-slate-700 transition cursor-pointer"
-                        >
-                          <Edit2 className="h-3.5 w-3.5" />
-                          <span>Edit</span>
-                        </button>
-                        <button
-                          onClick={() => handleDeleteIndividuTask(task.id)}
-                          className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/30 text-xs font-bold hover:bg-rose-500 hover:text-white transition cursor-pointer"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                          <span>Hapus</span>
-                        </button>
+                      <div className="w-full sm:w-44">
+                        <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Total Kelompok</label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={100}
+                          value={targetTotalGroups}
+                          onChange={(e) => setTargetTotalGroups(Math.max(1, parseInt(e.target.value) || 1))}
+                          placeholder="20"
+                          className="w-full px-4 py-2.5 rounded-xl bg-slate-950/80 border border-card-border text-accent-cyan font-bold text-xs font-mono focus:border-accent-cyan focus:outline-none"
+                        />
+                      </div>
+
+                      <div className="w-full sm:w-56">
+                        <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Target Anggota / Kelompok (Individu)</label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={1000}
+                          value={targetMembersPerGroup}
+                          onChange={(e) => setTargetMembersPerGroup(Math.max(1, parseInt(e.target.value) || 1))}
+                          placeholder="10"
+                          className="w-full px-4 py-2.5 rounded-xl bg-slate-950/80 border border-card-border text-accent-purple font-bold text-xs font-mono focus:border-accent-purple focus:outline-none"
+                        />
                       </div>
                     </div>
-                  ))}
+
+                    <div className="flex justify-end pt-1">
+                      <button
+                        type="submit"
+                        disabled={savingGdrive}
+                        className="px-5 py-2.5 rounded-xl bg-accent-cyan text-black font-extrabold text-xs hover:bg-accent-cyan/90 transition flex items-center justify-center space-x-1.5 cursor-pointer disabled:opacity-50"
+                      >
+                        <Save className="h-4 w-4" />
+                        <span>{savingGdrive ? "Menyimpan..." : "Simpan Pengaturan"}</span>
+                      </button>
+                    </div>
+                  </form>
                 </div>
-              )}
-            </div>
 
-          </div>
-        )}
+                {/* Tasks List */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-display font-bold text-base text-slate-200">
+                      Daftar Tugas Kelompok ({tasks.length})
+                    </h3>
+                    <span className="text-[11px] text-slate-400 font-mono">
+                      Urutan tampil: Berdasarkan Abjad Nama Tugas
+                    </span>
+                  </div>
 
-        {activeTab === "notifications" && (
-          <div className="space-y-8">
-            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-              <div>
-                <h2 className="font-display font-black text-xl text-slate-100 flex items-center gap-2">
-                  <Bell className="h-6 w-6 text-rose-500" />
-                  <span>Pengaturan Notifikasi Push</span>
-                </h2>
-                <p className="text-xs text-slate-400 mt-1">
-                  Atur format template pesan notifikasi untuk berbagai trigger yang akan dikirim ke pengguna.
-                </p>
+                  {tasks.length === 0 ? (
+                    <div className="glass rounded-2xl p-8 border border-card-border/40 text-center">
+                      <p className="text-sm text-slate-400 font-sans">Belum ada tugas kelompok yang ditambahkan.</p>
+                      <button
+                        onClick={() => setShowAddTaskModal(true)}
+                        className="mt-3 inline-flex items-center text-xs font-bold text-accent-cyan hover:underline cursor-pointer"
+                      >
+                        + Tambah Tugas Pertama Sekarang
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {tasks.map((task, index) => (
+                        <div
+                          key={task.id}
+                          className="glass rounded-2xl p-5 border border-card-border/40 flex flex-col justify-between hover:border-accent-cyan/40 transition"
+                        >
+                          <div>
+                            <div className="flex items-center justify-between mb-3">
+                              <span className="text-[10px] font-mono uppercase bg-slate-900 px-2.5 py-0.5 rounded-full border border-card-border/40 text-accent-purple font-bold">
+                                #{index + 1} • Tugas Kelompok
+                              </span>
+                              <button
+                                onClick={() => handleToggleTaskActive(task.id, task.is_active)}
+                                className={`text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full border cursor-pointer ${task.is_active
+                                  ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/40"
+                                  : "bg-slate-800 text-slate-500 border-slate-700"
+                                  }`}
+                              >
+                                {task.is_active ? "Aktif" : "Nonaktif"}
+                              </button>
+                            </div>
+
+                            <h3 className="font-display font-bold text-base text-slate-100">{task.name}</h3>
+
+                            <div className="mt-3 p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80">
+                              <span className="text-[10px] font-mono text-slate-400 uppercase block mb-1">
+                                Keyword Deteksi Nama File:
+                              </span>
+                              <code className="text-xs font-mono text-accent-cyan font-bold bg-accent-cyan/10 px-2 py-0.5 rounded border border-accent-cyan/20">
+                                {task.keyword}
+                              </code>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-end space-x-2 border-t border-card-border/30 pt-3 mt-4">
+                            <button
+                              onClick={() => setEditingTask(task)}
+                              className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs font-bold hover:bg-slate-700 transition cursor-pointer"
+                            >
+                              <Edit2 className="h-3.5 w-3.5" />
+                              <span>Edit</span>
+                            </button>
+                            <button
+                              onClick={() => handleDeleteTask(task.id)}
+                              className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/30 text-xs font-bold hover:bg-rose-500 hover:text-white transition cursor-pointer"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              <span>Hapus</span>
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Individual Tasks List */}
+                <div className="space-y-4 pt-6 border-t border-card-border/40">
+                  <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
+                    <div>
+                      <h3 className="font-display font-bold text-base text-accent-purple flex items-center gap-2">
+                        <User className="h-5 w-5" />
+                        <span>Daftar Penugasan Individu ({individuTaskDefs.length})</span>
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Definisikan jenis tugas individu yang wajib dikumpulkan per anggota kelompok.
+                      </p>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => setShowAddIndividuModal(true)}>
+                      <Plus className="h-4 w-4 mr-1.5 text-accent-purple" />
+                      <span>Tambah Tugas Individu Baru</span>
+                    </Button>
+                  </div>
+
+                  {individuTaskDefs.length === 0 ? (
+                    <div className="glass rounded-2xl p-8 border border-card-border/40 text-center">
+                      <p className="text-sm text-slate-400 font-sans">Belum ada tugas individu yang ditambahkan.</p>
+                      <button
+                        onClick={() => setShowAddIndividuModal(true)}
+                        className="mt-3 inline-flex items-center text-xs font-bold text-accent-purple hover:underline cursor-pointer"
+                      >
+                        + Tambah Tugas Individu Pertama
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {individuTaskDefs.map((task, index) => (
+                        <div
+                          key={task.id}
+                          className="glass rounded-2xl p-5 border border-accent-purple/30 flex flex-col justify-between hover:border-accent-purple/60 transition"
+                        >
+                          <div>
+                            <div className="flex items-center justify-between mb-3">
+                              <span className="text-[10px] font-mono uppercase bg-slate-900 px-2.5 py-0.5 rounded-full border border-accent-purple/30 text-accent-cyan font-bold">
+                                #{index + 1} • Tugas Individu
+                              </span>
+                              <button
+                                onClick={() => handleToggleIndividuTaskActive(task.id)}
+                                className={`text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full border cursor-pointer ${task.is_active !== false
+                                  ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/40"
+                                  : "bg-slate-800 text-slate-500 border-slate-700"
+                                  }`}
+                              >
+                                {task.is_active !== false ? "Aktif" : "Nonaktif"}
+                              </button>
+                            </div>
+
+                            <h3 className="font-display font-bold text-base text-slate-100">{task.name}</h3>
+
+                            <div className="mt-3 p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80">
+                              <span className="text-[10px] font-mono text-slate-400 uppercase block mb-1">
+                                Keyword Deteksi di Nama File:
+                              </span>
+                              <code className="text-xs font-mono text-accent-purple font-bold bg-accent-purple/10 px-2 py-0.5 rounded border border-accent-purple/20">
+                                {task.keyword}
+                              </code>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-end space-x-2 border-t border-card-border/30 pt-3 mt-4">
+                            <button
+                              onClick={() => setEditingIndividuTask(task)}
+                              className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs font-bold hover:bg-slate-700 transition cursor-pointer"
+                            >
+                              <Edit2 className="h-3.5 w-3.5" />
+                              <span>Edit</span>
+                            </button>
+                            <button
+                              onClick={() => handleDeleteIndividuTask(task.id)}
+                              className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/30 text-xs font-bold hover:bg-rose-500 hover:text-white transition cursor-pointer"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              <span>Hapus</span>
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
               </div>
-            </div>
+            )}
 
-            <div className="glass rounded-2xl p-6 border border-rose-500/30">
-              <form onSubmit={handleSaveNotificationSettings} className="space-y-6">
-                
-                {/* Tugas Baru Template */}
-                <div className="space-y-3">
-                  <h3 className="font-bold text-sm text-slate-200 border-b border-card-border/50 pb-2">Tugas Baru</h3>
-                  <div className="grid grid-cols-1 gap-3">
-                    <div>
-                      <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Judul Notifikasi</label>
-                      <input
-                        type="text"
-                        value={notifSettings.newTaskTemplate?.title || ""}
-                        onChange={(e) => setNotifSettings({...notifSettings, newTaskTemplate: {...notifSettings.newTaskTemplate, title: e.target.value}})}
-                        className="w-full px-4 py-2 rounded-xl bg-slate-950/80 border border-card-border text-slate-100 text-xs font-mono focus:border-rose-500 focus:outline-none"
-                        placeholder="Contoh: Tugas Baru: {taskName}"
-                      />
-                      <p className="text-[10px] text-slate-500 mt-1">Variabel tersedia: <code className="text-rose-400">&#123;taskName&#125;</code></p>
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Isi Pesan Notifikasi</label>
-                      <textarea
-                        value={notifSettings.newTaskTemplate?.body || ""}
-                        onChange={(e) => setNotifSettings({...notifSettings, newTaskTemplate: {...notifSettings.newTaskTemplate, body: e.target.value}})}
-                        className="w-full px-4 py-2 rounded-xl bg-slate-950/80 border border-card-border text-slate-100 text-xs font-mono focus:border-rose-500 focus:outline-none h-16"
-                      />
-                    </div>
+            {activeTab === "notifications" && (
+              <div className="space-y-8">
+                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                  <div>
+                    <h2 className="font-display font-black text-xl text-slate-100 flex items-center gap-2">
+                      <Bell className="h-6 w-6 text-rose-500" />
+                      <span>Pengaturan Notifikasi Push</span>
+                    </h2>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Atur format template pesan notifikasi untuk berbagai trigger yang akan dikirim ke pengguna.
+                    </p>
                   </div>
                 </div>
 
-                {/* Deadline Template */}
-                <div className="space-y-3 pt-4 border-t border-card-border/30">
-                  <h3 className="font-bold text-sm text-slate-200 border-b border-card-border/50 pb-2">Peringatan Deadline</h3>
-                  <div className="grid grid-cols-1 gap-3">
-                    <div>
-                      <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Judul Notifikasi</label>
-                      <input
-                        type="text"
-                        value={notifSettings.deadlineTemplate?.title || ""}
-                        onChange={(e) => setNotifSettings({...notifSettings, deadlineTemplate: {...notifSettings.deadlineTemplate, title: e.target.value}})}
-                        className="w-full px-4 py-2 rounded-xl bg-slate-950/80 border border-card-border text-slate-100 text-xs font-mono focus:border-rose-500 focus:outline-none"
-                      />
-                      <p className="text-[10px] text-slate-500 mt-1">Variabel tersedia: <code className="text-rose-400">&#123;taskName&#125;</code></p>
+                <div className="glass rounded-2xl p-6 border border-rose-500/30">
+                  <form onSubmit={handleSaveNotificationSettings} className="space-y-6">
+
+                    {/* Tugas Baru Template */}
+                    <div className="space-y-3">
+                      <h3 className="font-bold text-sm text-slate-200 border-b border-card-border/50 pb-2">Tugas Baru</h3>
+                      <div className="grid grid-cols-1 gap-3">
+                        <div>
+                          <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Judul Notifikasi</label>
+                          <input
+                            type="text"
+                            value={notifSettings.newTaskTemplate?.title || ""}
+                            onChange={(e) => setNotifSettings({ ...notifSettings, newTaskTemplate: { ...notifSettings.newTaskTemplate, title: e.target.value } })}
+                            className="w-full px-4 py-2 rounded-xl bg-slate-950/80 border border-card-border text-slate-100 text-xs font-mono focus:border-rose-500 focus:outline-none"
+                            placeholder="Contoh: Tugas Baru: {taskName}"
+                          />
+                          <p className="text-[10px] text-slate-500 mt-1">Variabel tersedia: <code className="text-rose-400">&#123;taskName&#125;</code></p>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Isi Pesan Notifikasi</label>
+                          <textarea
+                            value={notifSettings.newTaskTemplate?.body || ""}
+                            onChange={(e) => setNotifSettings({ ...notifSettings, newTaskTemplate: { ...notifSettings.newTaskTemplate, body: e.target.value } })}
+                            className="w-full px-4 py-2 rounded-xl bg-slate-950/80 border border-card-border text-slate-100 text-xs font-mono focus:border-rose-500 focus:outline-none h-16"
+                          />
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Isi Pesan Notifikasi</label>
-                      <textarea
-                        value={notifSettings.deadlineTemplate?.body || ""}
-                        onChange={(e) => setNotifSettings({...notifSettings, deadlineTemplate: {...notifSettings.deadlineTemplate, body: e.target.value}})}
-                        className="w-full px-4 py-2 rounded-xl bg-slate-950/80 border border-card-border text-slate-100 text-xs font-mono focus:border-rose-500 focus:outline-none h-16"
-                      />
+
+                    {/* Deadline Template */}
+                    <div className="space-y-3 pt-4 border-t border-card-border/30">
+                      <h3 className="font-bold text-sm text-slate-200 border-b border-card-border/50 pb-2">Peringatan Deadline</h3>
+                      <div className="grid grid-cols-1 gap-3">
+                        <div>
+                          <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Judul Notifikasi</label>
+                          <input
+                            type="text"
+                            value={notifSettings.deadlineTemplate?.title || ""}
+                            onChange={(e) => setNotifSettings({ ...notifSettings, deadlineTemplate: { ...notifSettings.deadlineTemplate, title: e.target.value } })}
+                            className="w-full px-4 py-2 rounded-xl bg-slate-950/80 border border-card-border text-slate-100 text-xs font-mono focus:border-rose-500 focus:outline-none"
+                          />
+                          <p className="text-[10px] text-slate-500 mt-1">Variabel tersedia: <code className="text-rose-400">&#123;taskName&#125;</code></p>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Isi Pesan Notifikasi</label>
+                          <textarea
+                            value={notifSettings.deadlineTemplate?.body || ""}
+                            onChange={(e) => setNotifSettings({ ...notifSettings, deadlineTemplate: { ...notifSettings.deadlineTemplate, body: e.target.value } })}
+                            className="w-full px-4 py-2 rounded-xl bg-slate-950/80 border border-card-border text-slate-100 text-xs font-mono focus:border-rose-500 focus:outline-none h-16"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Ingatkan H-Berapa Jam (Cron Schedule)</label>
+                          <input
+                            type="number"
+                            min={1}
+                            value={notifSettings.deadlineReminderHours || 24}
+                            onChange={(e) => setNotifSettings({ ...notifSettings, deadlineReminderHours: parseInt(e.target.value) || 24 })}
+                            className="w-full max-w-[200px] px-4 py-2 rounded-xl bg-slate-950/80 border border-card-border text-slate-100 text-xs font-mono focus:border-rose-500 focus:outline-none"
+                          />
+                          <p className="text-[10px] text-slate-500 mt-1">Default 24 jam. Vercel cron akan mengecek tugas yang deadlinenya sesuai jam ini.</p>
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Ingatkan H-Berapa Jam (Cron Schedule)</label>
-                      <input
-                        type="number"
-                        min={1}
-                        value={notifSettings.deadlineReminderHours || 24}
-                        onChange={(e) => setNotifSettings({...notifSettings, deadlineReminderHours: parseInt(e.target.value) || 24})}
-                        className="w-full max-w-[200px] px-4 py-2 rounded-xl bg-slate-950/80 border border-card-border text-slate-100 text-xs font-mono focus:border-rose-500 focus:outline-none"
-                      />
-                      <p className="text-[10px] text-slate-500 mt-1">Default 24 jam. Vercel cron akan mengecek tugas yang deadlinenya sesuai jam ini.</p>
+
+                    {/* Pengumuman Template */}
+                    <div className="space-y-3 pt-4 border-t border-card-border/30">
+                      <h3 className="font-bold text-sm text-slate-200 border-b border-card-border/50 pb-2">Pengumuman Baru</h3>
+                      <div className="grid grid-cols-1 gap-3">
+                        <div>
+                          <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Judul Notifikasi</label>
+                          <input
+                            type="text"
+                            value={notifSettings.announcementTemplate?.title || ""}
+                            onChange={(e) => setNotifSettings({ ...notifSettings, announcementTemplate: { ...notifSettings.announcementTemplate, title: e.target.value } })}
+                            className="w-full px-4 py-2 rounded-xl bg-slate-950/80 border border-card-border text-slate-100 text-xs font-mono focus:border-rose-500 focus:outline-none"
+                          />
+                          <p className="text-[10px] text-slate-500 mt-1">Variabel tersedia: <code className="text-rose-400">&#123;title&#125;</code></p>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Isi Pesan Notifikasi</label>
+                          <textarea
+                            value={notifSettings.announcementTemplate?.body || ""}
+                            onChange={(e) => setNotifSettings({ ...notifSettings, announcementTemplate: { ...notifSettings.announcementTemplate, body: e.target.value } })}
+                            className="w-full px-4 py-2 rounded-xl bg-slate-950/80 border border-card-border text-slate-100 text-xs font-mono focus:border-rose-500 focus:outline-none h-16"
+                          />
+                        </div>
+                      </div>
                     </div>
+
+                    {/* Tautan Menu Template */}
+                    <div className="space-y-3 pt-4 border-t border-card-border/30">
+                      <h3 className="font-bold text-sm text-slate-200 border-b border-card-border/50 pb-2">Tautan Menu / Linktree Baru</h3>
+                      <div className="grid grid-cols-1 gap-3">
+                        <div>
+                          <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Judul Notifikasi</label>
+                          <input
+                            type="text"
+                            value={notifSettings.linktreeTemplate?.title || ""}
+                            onChange={(e) => setNotifSettings({ ...notifSettings, linktreeTemplate: { ...notifSettings.linktreeTemplate, title: e.target.value } })}
+                            className="w-full px-4 py-2 rounded-xl bg-slate-950/80 border border-card-border text-slate-100 text-xs font-mono focus:border-rose-500 focus:outline-none"
+                          />
+                          <p className="text-[10px] text-slate-500 mt-1">Variabel tersedia: <code className="text-rose-400">&#123;label&#125;</code></p>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Isi Pesan Notifikasi</label>
+                          <textarea
+                            value={notifSettings.linktreeTemplate?.body || ""}
+                            onChange={(e) => setNotifSettings({ ...notifSettings, linktreeTemplate: { ...notifSettings.linktreeTemplate, body: e.target.value } })}
+                            className="w-full px-4 py-2 rounded-xl bg-slate-950/80 border border-card-border text-slate-100 text-xs font-mono focus:border-rose-500 focus:outline-none h-16"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end pt-4 border-t border-card-border/30">
+                      <button
+                        type="submit"
+                        disabled={savingNotif}
+                        className="px-5 py-2.5 rounded-xl bg-rose-500 text-white font-extrabold text-xs hover:bg-rose-600 transition flex items-center justify-center space-x-1.5 cursor-pointer disabled:opacity-50"
+                      >
+                        <Save className="h-4 w-4" />
+                        <span>{savingNotif ? "Menyimpan..." : "Simpan Konfigurasi Notifikasi"}</span>
+                      </button>
+                    </div>
+                  </form>
+                </div>
+
+                {/* Custom Push Broadcast Form */}
+                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 pt-6 border-t border-card-border/30 mt-6">
+                  <div>
+                    <h2 className="font-display font-black text-xl text-slate-100 flex items-center gap-2">
+                      <Megaphone className="h-6 w-6 text-amber-500" />
+                      <span>Kirim Broadcast Custom (Manual)</span>
+                    </h2>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Kirim notifikasi push langsung ke semua pengguna secara instan tanpa mengaitkan ke fitur tertentu.
+                    </p>
                   </div>
                 </div>
 
-                {/* Pengumuman Template */}
-                <div className="space-y-3 pt-4 border-t border-card-border/30">
-                  <h3 className="font-bold text-sm text-slate-200 border-b border-card-border/50 pb-2">Pengumuman Baru</h3>
-                  <div className="grid grid-cols-1 gap-3">
+                <div className="glass rounded-2xl p-6 border border-amber-500/40 mt-4">
+                  <form onSubmit={handleSendCustomPush} className="space-y-4 font-sans text-xs">
                     <div>
-                      <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Judul Notifikasi</label>
+                      <label className="block text-slate-400 uppercase font-mono mb-1">Judul Notifikasi</label>
                       <input
                         type="text"
-                        value={notifSettings.announcementTemplate?.title || ""}
-                        onChange={(e) => setNotifSettings({...notifSettings, announcementTemplate: {...notifSettings.announcementTemplate, title: e.target.value}})}
-                        className="w-full px-4 py-2 rounded-xl bg-slate-950/80 border border-card-border text-slate-100 text-xs font-mono focus:border-rose-500 focus:outline-none"
+                        required
+                        value={customPush.title}
+                        onChange={(e) => setCustomPush({ ...customPush, title: e.target.value })}
+                        placeholder="Contoh: Info Mendadak dari Panitia!"
+                        className="w-full px-4 py-2 rounded-xl bg-slate-950/80 border border-card-border text-slate-100 font-mono focus:border-amber-500 focus:outline-none"
                       />
-                      <p className="text-[10px] text-slate-500 mt-1">Variabel tersedia: <code className="text-rose-400">&#123;title&#125;</code></p>
                     </div>
                     <div>
-                      <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Isi Pesan Notifikasi</label>
+                      <label className="block text-slate-400 uppercase font-mono mb-1">Isi Pesan Notifikasi</label>
                       <textarea
-                        value={notifSettings.announcementTemplate?.body || ""}
-                        onChange={(e) => setNotifSettings({...notifSettings, announcementTemplate: {...notifSettings.announcementTemplate, body: e.target.value}})}
-                        className="w-full px-4 py-2 rounded-xl bg-slate-950/80 border border-card-border text-slate-100 text-xs font-mono focus:border-rose-500 focus:outline-none h-16"
+                        required
+                        value={customPush.body}
+                        onChange={(e) => setCustomPush({ ...customPush, body: e.target.value })}
+                        placeholder="Isi pemberitahuan..."
+                        className="w-full px-4 py-2 rounded-xl bg-slate-950/80 border border-card-border text-slate-100 font-mono focus:border-amber-500 focus:outline-none h-20"
                       />
                     </div>
-                  </div>
-                </div>
-                
-                {/* Tautan Menu Template */}
-                <div className="space-y-3 pt-4 border-t border-card-border/30">
-                  <h3 className="font-bold text-sm text-slate-200 border-b border-card-border/50 pb-2">Tautan Menu / Linktree Baru</h3>
-                  <div className="grid grid-cols-1 gap-3">
                     <div>
-                      <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Judul Notifikasi</label>
+                      <label className="block text-slate-400 uppercase font-mono mb-1">Target URL Saat Diklik</label>
                       <input
                         type="text"
-                        value={notifSettings.linktreeTemplate?.title || ""}
-                        onChange={(e) => setNotifSettings({...notifSettings, linktreeTemplate: {...notifSettings.linktreeTemplate, title: e.target.value}})}
-                        className="w-full px-4 py-2 rounded-xl bg-slate-950/80 border border-card-border text-slate-100 text-xs font-mono focus:border-rose-500 focus:outline-none"
-                      />
-                      <p className="text-[10px] text-slate-500 mt-1">Variabel tersedia: <code className="text-rose-400">&#123;label&#125;</code></p>
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Isi Pesan Notifikasi</label>
-                      <textarea
-                        value={notifSettings.linktreeTemplate?.body || ""}
-                        onChange={(e) => setNotifSettings({...notifSettings, linktreeTemplate: {...notifSettings.linktreeTemplate, body: e.target.value}})}
-                        className="w-full px-4 py-2 rounded-xl bg-slate-950/80 border border-card-border text-slate-100 text-xs font-mono focus:border-rose-500 focus:outline-none h-16"
+                        required
+                        value={customPush.url}
+                        onChange={(e) => setCustomPush({ ...customPush, url: e.target.value })}
+                        placeholder="/info atau https://..."
+                        className="w-full px-4 py-2 rounded-xl bg-slate-950/80 border border-card-border text-slate-100 font-mono focus:border-amber-500 focus:outline-none"
                       />
                     </div>
-                  </div>
+                    <div className="flex justify-end pt-4 border-t border-card-border/30">
+                      <button
+                        type="submit"
+                        disabled={sendingCustomPush}
+                        className="px-5 py-2.5 rounded-xl bg-amber-500 text-black font-extrabold text-xs hover:bg-amber-400 transition flex items-center justify-center space-x-1.5 cursor-pointer disabled:opacity-50"
+                      >
+                        <Megaphone className="h-4 w-4" />
+                        <span>{sendingCustomPush ? "Mengirim..." : "Kirim Broadcast Sekarang"}</span>
+                      </button>
+                    </div>
+                  </form>
                 </div>
-
-                <div className="flex justify-end pt-4 border-t border-card-border/30">
-                  <button
-                    type="submit"
-                    disabled={savingNotif}
-                    className="px-5 py-2.5 rounded-xl bg-rose-500 text-white font-extrabold text-xs hover:bg-rose-600 transition flex items-center justify-center space-x-1.5 cursor-pointer disabled:opacity-50"
-                  >
-                    <Save className="h-4 w-4" />
-                    <span>{savingNotif ? "Menyimpan..." : "Simpan Konfigurasi Notifikasi"}</span>
-                  </button>
-                </div>
-              </form>
-            </div>
-
-            {/* Custom Push Broadcast Form */}
-            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 pt-6 border-t border-card-border/30 mt-6">
-              <div>
-                <h2 className="font-display font-black text-xl text-slate-100 flex items-center gap-2">
-                  <Megaphone className="h-6 w-6 text-amber-500" />
-                  <span>Kirim Broadcast Custom (Manual)</span>
-                </h2>
-                <p className="text-xs text-slate-400 mt-1">
-                  Kirim notifikasi push langsung ke semua pengguna secara instan tanpa mengaitkan ke fitur tertentu.
-                </p>
               </div>
-            </div>
-
-            <div className="glass rounded-2xl p-6 border border-amber-500/40 mt-4">
-              <form onSubmit={handleSendCustomPush} className="space-y-4 font-sans text-xs">
-                <div>
-                  <label className="block text-slate-400 uppercase font-mono mb-1">Judul Notifikasi</label>
-                  <input
-                    type="text"
-                    required
-                    value={customPush.title}
-                    onChange={(e) => setCustomPush({ ...customPush, title: e.target.value })}
-                    placeholder="Contoh: Info Mendadak dari Panitia!"
-                    className="w-full px-4 py-2 rounded-xl bg-slate-950/80 border border-card-border text-slate-100 font-mono focus:border-amber-500 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-400 uppercase font-mono mb-1">Isi Pesan Notifikasi</label>
-                  <textarea
-                    required
-                    value={customPush.body}
-                    onChange={(e) => setCustomPush({ ...customPush, body: e.target.value })}
-                    placeholder="Isi pemberitahuan..."
-                    className="w-full px-4 py-2 rounded-xl bg-slate-950/80 border border-card-border text-slate-100 font-mono focus:border-amber-500 focus:outline-none h-20"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-400 uppercase font-mono mb-1">Target URL Saat Diklik</label>
-                  <input
-                    type="text"
-                    required
-                    value={customPush.url}
-                    onChange={(e) => setCustomPush({ ...customPush, url: e.target.value })}
-                    placeholder="/info atau https://..."
-                    className="w-full px-4 py-2 rounded-xl bg-slate-950/80 border border-card-border text-slate-100 font-mono focus:border-amber-500 focus:outline-none"
-                  />
-                </div>
-                <div className="flex justify-end pt-4 border-t border-card-border/30">
-                  <button
-                    type="submit"
-                    disabled={sendingCustomPush}
-                    className="px-5 py-2.5 rounded-xl bg-amber-500 text-black font-extrabold text-xs hover:bg-amber-400 transition flex items-center justify-center space-x-1.5 cursor-pointer disabled:opacity-50"
-                  >
-                    <Megaphone className="h-4 w-4" />
-                    <span>{sendingCustomPush ? "Mengirim..." : "Kirim Broadcast Sekarang"}</span>
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
+            )}
           </motion.div>
         </AnimatePresence>
       </main>
@@ -2131,7 +2198,8 @@ export default function AdminDashboardPage() {
                     className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-card-border text-slate-100 text-xs"
                   >
                     <option value="LO">LO</option>
-                    <option value="Pendamping">Pendamping</option>
+                    <option value="KOOR">KOOR</option>
+                    <option value="Ketua Pelaksana">Ketua Pelaksana</option>
                   </select>
                 </div>
 
@@ -2220,6 +2288,7 @@ export default function AdminDashboardPage() {
                     <option value="Pembagian Gesang">Pembagian Gesang (Kendaraan)</option>
                     <option value="Jadwal Acara">Jadwal Acara</option>
                     <option value="Perlengkapan">Perlengkapan Wajib</option>
+                    <option value="Video">Video</option>
                     <option value="PENTING">Pengumuman Penting</option>
                   </select>
                 </div>
@@ -2282,6 +2351,113 @@ export default function AdminDashboardPage() {
                 </button>
                 <Button variant="primary" size="sm" type="submit">
                   Publikasikan Artikel
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {editingAnno && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="glass rounded-2xl p-6 border border-accent-cyan/40 max-w-lg w-full">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-display font-bold text-lg text-slate-100 flex items-center space-x-2">
+                <Edit2 className="h-5 w-5 text-accent-cyan" />
+                <span>Edit Artikel & Pengumuman</span>
+              </h3>
+              <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-0.5 rounded-full font-bold">
+                🔔 Notifikasi akan dikirim ulang
+              </span>
+            </div>
+
+            <form onSubmit={handleUpdateAnno} className="space-y-4 text-xs font-sans">
+              <div>
+                <label className="block text-slate-400 uppercase font-mono mb-1">Judul Artikel / Informasi</label>
+                <input
+                  type="text"
+                  required
+                  value={editingAnno.title}
+                  onChange={(e) => setEditingAnno({ ...editingAnno, title: e.target.value })}
+                  placeholder="Judul Pengumuman"
+                  className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-card-border text-slate-100 text-sm"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 uppercase font-mono mb-1">Kategori</label>
+                  <select
+                    value={editingAnno.category}
+                    onChange={(e) => setEditingAnno({ ...editingAnno, category: e.target.value })}
+                    className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-card-border text-slate-100 text-xs"
+                  >
+                    <option value="Contoh Surat">Contoh Surat / Dokumen</option>
+                    <option value="Pembagian Gesang">Pembagian Gesang (Kendaraan)</option>
+                    <option value="Jadwal Acara">Jadwal Acara</option>
+                    <option value="Perlengkapan">Perlengkapan Wajib</option>
+                    <option value="Video">Video</option>
+                    <option value="PENTING">Pengumuman Penting</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center pt-5">
+                  <label className="flex items-center space-x-2 cursor-pointer text-slate-300 font-mono text-xs">
+                    <input
+                      type="checkbox"
+                      checked={editingAnno.pinned}
+                      onChange={(e) => setEditingAnno({ ...editingAnno, pinned: e.target.checked })}
+                      className="rounded bg-slate-950 border-card-border text-accent-yellow focus:ring-0 h-4 w-4"
+                    />
+                    <span>Sematkan (Pin Highlight)</span>
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-400 uppercase font-mono mb-1">Link Embed Google Drive / Dokumen (Opsional)</label>
+                <input
+                  type="text"
+                  value={editingAnno.gdrive_url}
+                  onChange={(e) => setEditingAnno({ ...editingAnno, gdrive_url: e.target.value })}
+                  placeholder="https://docs.google.com/... atau https://drive.google.com/file/d/..."
+                  className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-card-border text-accent-cyan text-xs font-mono"
+                />
+                <p className="text-[10px] text-slate-500 mt-1">Dukungan embed: Google Docs, Google Sheets, Google Slides, Google Form, PDF, File Drive, atau YouTube.</p>
+              </div>
+
+              <div>
+                <label className="block text-slate-400 uppercase font-mono mb-1">Tautan Tombol Autoform Generator (Opsional)</label>
+                <input
+                  type="text"
+                  value={editingAnno.autoform_url}
+                  onChange={(e) => setEditingAnno({ ...editingAnno, autoform_url: e.target.value })}
+                  placeholder="/documents atau /documents/uuid-template"
+                  className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-card-border text-accent-purple text-xs font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 uppercase font-mono mb-1">Catatan Samping & Highlight Penting</label>
+                <textarea
+                  required
+                  value={editingAnno.notes}
+                  onChange={(e) => setEditingAnno({ ...editingAnno, notes: e.target.value })}
+                  placeholder="Tuliskan poin-poin ringkasan/catatan penting..."
+                  className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-card-border text-slate-100 text-xs h-28 leading-relaxed"
+                />
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingAnno(null)}
+                  className="px-4 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-300 text-xs cursor-pointer"
+                >
+                  Batal
+                </button>
+                <Button variant="primary" size="sm" type="submit">
+                  Simpan & Kirim Notif Ulang
                 </Button>
               </div>
             </form>
