@@ -45,6 +45,8 @@ interface ContactPerson {
   group_name: string;
   whatsapp: string;
   instagram?: string;
+  button_text?: string;
+  ig_button_text?: string;
   photo_url?: string;
   sort_order: number;
 }
@@ -166,64 +168,143 @@ export default function ContactPage() {
           </Card>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredContacts.map((contact) => (
-              <div
-                key={contact.id}
-                className="group relative rounded-[32px] p-6 sm:p-7 flex flex-col items-center text-center justify-between transition-all duration-300 transform hover:-translate-y-2 overflow-hidden border border-white/[0.14] hover:border-white/[0.28] backdrop-blur-2xl bg-gradient-to-b from-white/[0.08] via-white/[0.03] to-black/[0.45] shadow-[0_20px_50px_rgba(0,0,0,0.6),inset_0_1px_1px_rgba(255,255,255,0.3)] hover:shadow-[0_25px_60px_rgba(0,0,0,0.7),inset_0_1px_2px_rgba(255,255,255,0.45)] will-change-transform"
-              >
-                {/* Specular Apple Glass Sheen Reflection */}
-                <div className="absolute inset-0 bg-gradient-to-b from-white/[0.12] via-transparent to-transparent pointer-events-none rounded-[32px]" />
+            {filteredContacts.map((contact) => {
+              const isPanitia =
+                !contact.group_name ||
+                contact.group_name.trim().toLowerCase() === "none" ||
+                contact.group_name.toLowerCase().includes("panitia");
+              const isAdminB = contact.name.trim().toLowerCase() === "admin b";
+              const isWebmaster = isAdminB || contact.role.trim().toLowerCase().includes("webmaster");
 
-                {/* Subtle Ambient Radial Light */}
-                <div className="absolute -top-20 left-1/2 -translate-x-1/2 w-44 h-44 bg-accent-cyan/10 rounded-full blur-3xl pointer-events-none group-hover:bg-accent-cyan/15 transition-all duration-500" />
+              return (
+                <div
+                  key={contact.id}
+                  className={`group relative rounded-[32px] p-6 sm:p-7 flex flex-col items-center text-center justify-between transition-all duration-300 transform hover:-translate-y-2 overflow-hidden backdrop-blur-2xl will-change-transform ${
+                    isWebmaster
+                      ? "border border-amber-500/50 hover:border-amber-400/90 bg-gradient-to-b from-amber-500/[0.12] via-white/[0.03] to-black/[0.6] shadow-[0_20px_50px_rgba(245,158,11,0.2),inset_0_1px_1px_rgba(251,191,36,0.4)] hover:shadow-[0_25px_60px_rgba(245,158,11,0.35),inset_0_1px_2px_rgba(251,191,36,0.6)]"
+                      : "border border-white/[0.14] hover:border-white/[0.28] bg-gradient-to-b from-white/[0.08] via-white/[0.03] to-black/[0.45] shadow-[0_20px_50px_rgba(0,0,0,0.6),inset_0_1px_1px_rgba(255,255,255,0.3)] hover:shadow-[0_25px_60px_rgba(0,0,0,0.7),inset_0_1px_2px_rgba(255,255,255,0.45)]"
+                  }`}
+                >
+                  {/* Specular Glass Sheen Reflection */}
+                  <div
+                    className={`absolute inset-0 bg-gradient-to-b via-transparent to-transparent pointer-events-none rounded-[32px] ${
+                      isWebmaster ? "from-amber-300/[0.2]" : "from-white/[0.12]"
+                    }`}
+                  />
 
-                <div className="flex flex-col items-center relative z-10 w-full">
-                  {/* Apple-style Circular Avatar */}
-                  <div className="relative mb-4 group-hover:scale-105 transition-transform duration-300">
-                    <div className="relative h-24 w-24 rounded-full overflow-hidden p-1 bg-gradient-to-b from-white/30 via-white/10 to-white/5 shadow-[0_8px_25px_rgba(0,0,0,0.5)] ring-1 ring-white/20">
-                      {contact.photo_url ? (
-                        <img
-                          src={contact.photo_url}
-                          alt={contact.name}
-                          className="h-full w-full object-cover rounded-full"
-                        />
-                      ) : (
-                        <div className="h-full w-full flex flex-col items-center justify-center bg-slate-900 rounded-full text-slate-400 font-mono text-xs uppercase tracking-wider">
-                          <Users className="w-6 h-6 text-slate-500 mb-0.5" />
-                          <span>Astro</span>
-                        </div>
-                      )}
+                  {/* Ambient Radial Light (Gold for Webmaster, Purple for Panitia, Cyan for Group) */}
+                  <div
+                    className={`absolute -top-20 left-1/2 -translate-x-1/2 w-44 h-44 rounded-full blur-3xl pointer-events-none transition-all duration-500 ${
+                      isWebmaster
+                        ? "bg-amber-500/25 group-hover:bg-amber-400/40"
+                        : isPanitia
+                        ? "bg-accent-purple/15 group-hover:bg-accent-purple/25"
+                        : "bg-accent-cyan/10 group-hover:bg-accent-cyan/20"
+                    }`}
+                  />
+
+                  <div className="flex flex-col items-center relative z-10 w-full">
+                    {/* Circular Avatar */}
+                    <div className="relative mb-4 group-hover:scale-105 transition-transform duration-300">
+                      <div
+                        className={`relative h-24 w-24 rounded-full overflow-hidden p-1 bg-gradient-to-b shadow-[0_8px_25px_rgba(0,0,0,0.5)] ${
+                          isWebmaster
+                            ? "from-amber-300 via-amber-500/30 to-yellow-500/10 ring-2 ring-amber-400/60 shadow-[0_0_20px_rgba(245,158,11,0.4)]"
+                            : isPanitia
+                            ? "from-purple-400/40 via-purple-400/10 to-white/5 ring-1 ring-purple-400/30"
+                            : "from-white/30 via-white/10 to-white/5 ring-1 ring-white/20"
+                        }`}
+                      >
+                        {contact.photo_url ? (
+                          <img
+                            src={contact.photo_url}
+                            alt={contact.name}
+                            className="h-full w-full object-cover rounded-full"
+                          />
+                        ) : (
+                          <div className="h-full w-full flex flex-col items-center justify-center bg-slate-900 rounded-full text-slate-400 font-mono text-xs uppercase tracking-wider">
+                            <Users className="w-6 h-6 text-slate-500 mb-0.5" />
+                            <span>Astro</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
+
+                    {/* Pill Badge: Webmaster (Gold) vs Panitia (Purple) vs Kelompok (Cyan) */}
+                    {isWebmaster ? (
+                      <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-[11px] font-mono font-bold tracking-wider uppercase mb-3 bg-amber-500/20 border border-amber-400/50 text-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.35)] backdrop-blur-md">
+                        <span>👑</span>
+                        <span>Webmaster</span>
+                      </span>
+                    ) : isPanitia ? (
+                      <span className="inline-flex items-center px-3.5 py-1 rounded-full text-[11px] font-mono font-bold tracking-wider uppercase mb-3 bg-purple-500/15 border border-purple-500/35 text-purple-300 shadow-[0_0_15px_rgba(168,85,247,0.25)] backdrop-blur-md">
+                        Panitia
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-3.5 py-1 rounded-full text-[11px] font-mono font-semibold tracking-wider uppercase mb-3 bg-accent-cyan/10 border border-accent-cyan/30 text-accent-cyan shadow-[0_0_15px_rgba(125,249,255,0.2)] backdrop-blur-md">
+                        {contact.group_name}
+                      </span>
+                    )}
+
+                    {/* Name & Role */}
+                    <h3
+                      className={`font-display font-extrabold text-xl tracking-wide mb-1 ${
+                        isWebmaster
+                          ? "text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-400 drop-shadow-[0_0_10px_rgba(251,191,36,0.3)]"
+                          : "text-white"
+                      }`}
+                    >
+                      {contact.name}
+                    </h3>
+
+                    <p
+                      className={`text-[11px] font-mono tracking-widest uppercase ${
+                        isWebmaster ? "text-amber-300/85 font-semibold mb-2.5" : "text-slate-400 mb-6"
+                      }`}
+                    >
+                      {contact.role}
+                    </p>
+
+                    {/* Deskripsi Khusus Admin B */}
+                    {isAdminB && (
+                      <div className="mb-5 px-3.5 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-200/90 text-xs font-sans italic tracking-wide max-w-[260px] shadow-[0_2px_12px_rgba(245,158,11,0.12)]">
+                        &ldquo;Webnya bermasalah??, DM aja, segera tak benerin&rdquo;
+                      </div>
+                    )}
                   </div>
-
-                  {/* Refined Apple-style Pill Badge */}
-                  <span className="inline-flex items-center px-3.5 py-1 rounded-full text-[11px] font-mono font-semibold tracking-wider uppercase mb-3 bg-white/[0.07] border border-white/[0.14] text-slate-200 shadow-sm backdrop-blur-md">
-                    {contact.group_name}
-                  </span>
-
-                  {/* Name & Role */}
-                  <h3 className="font-display font-extrabold text-xl text-white tracking-wide mb-1">
-                    {contact.name}
-                  </h3>
-
-                  <p className="text-[11px] text-slate-400 font-mono tracking-widest uppercase mb-6">
-                    {contact.role}
-                  </p>
-                </div>
 
                 {/* Actions: WhatsApp & Instagram Buttons */}
                 <div className="w-full space-y-2.5 mt-auto relative z-10">
                   {/* WhatsApp Button with Official Theme & Logo */}
-                  <a
-                    href={getWhatsAppLink(contact.whatsapp)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full flex items-center justify-center space-x-2.5 py-3 rounded-2xl font-sans text-xs font-bold tracking-wide transition-all duration-300 bg-[#25D366]/15 hover:bg-[#25D366] text-[#25D366] hover:text-black border border-[#25D366]/40 hover:border-[#25D366] shadow-[0_4px_16px_rgba(37,211,102,0.15)] hover:shadow-[0_8px_25px_rgba(37,211,102,0.45)] group/wa cursor-pointer"
-                  >
-                    <WhatsAppIcon className="h-4.5 w-4.5 text-[#25D366] group-hover/wa:text-black transition-colors" />
-                    <span>WhatsApp</span>
-                    <ExternalLink className="h-3.5 w-3.5 opacity-60 group-hover/wa:opacity-100 transition-opacity ml-0.5" />
-                  </a>
+                  {(() => {
+                    const customButtonText = contact.button_text?.trim();
+                    const buttonLabel = customButtonText || (isAdminB ? "WA? no no ya ☝️☝️, DM ig aja" : "WhatsApp");
+                    const isDirectToIg =
+                      contact.instagram &&
+                      (buttonLabel.toLowerCase().includes("dm ig") ||
+                        buttonLabel.toLowerCase().includes("ke ig") ||
+                        buttonLabel.toLowerCase().includes("bukan wa"));
+
+                    const buttonHref =
+                      isDirectToIg && contact.instagram
+                        ? `https://instagram.com/${contact.instagram.replace(/^@/, "").trim()}`
+                        : getWhatsAppLink(contact.whatsapp);
+
+                    return (
+                      <a
+                        href={buttonHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full flex items-center justify-center space-x-2 py-3 rounded-2xl font-sans text-xs font-bold tracking-wide transition-all duration-300 bg-[#25D366]/15 hover:bg-[#25D366] text-[#25D366] hover:text-black border border-[#25D366]/40 hover:border-[#25D366] shadow-[0_4px_16px_rgba(37,211,102,0.15)] hover:shadow-[0_8px_25px_rgba(37,211,102,0.45)] group/wa cursor-pointer"
+                      >
+                        <WhatsAppIcon className="h-4.5 w-4.5 text-[#25D366] group-hover/wa:text-black transition-colors flex-shrink-0" />
+                        <span className="truncate">
+                          {buttonLabel}
+                        </span>
+                        <ExternalLink className="h-3.5 w-3.5 opacity-60 group-hover/wa:opacity-100 transition-opacity ml-0.5 flex-shrink-0" />
+                      </a>
+                    );
+                  })()}
 
                   {/* Instagram Button */}
                   {contact.instagram && contact.instagram.trim() && (
@@ -234,13 +315,16 @@ export default function ContactPage() {
                       className="w-full flex items-center justify-center space-x-2.5 py-2.5 rounded-2xl font-sans text-xs font-bold tracking-wide transition-all duration-300 bg-gradient-to-r from-purple-500/15 via-pink-500/15 to-amber-500/15 hover:from-purple-600 hover:via-pink-600 hover:to-amber-500 text-pink-300 hover:text-white border border-pink-500/35 hover:border-transparent shadow-[0_4px_16px_rgba(236,72,153,0.15)] hover:shadow-[0_8px_25px_rgba(236,72,153,0.45)] group/ig cursor-pointer"
                     >
                       <InstagramIcon className="h-4 w-4 text-pink-400 group-hover/ig:text-white transition-colors flex-shrink-0" />
-                      <span className="truncate">@{contact.instagram.replace(/^@/, "").trim()}</span>
+                      <span className="truncate">
+                        {contact.ig_button_text?.trim() || `@${contact.instagram.replace(/^@/, "").trim()}`}
+                      </span>
                       <ExternalLink className="h-3.5 w-3.5 opacity-60 group-hover/ig:opacity-100 transition-opacity ml-0.5" />
                     </a>
                   )}
                 </div>
               </div>
-            ))}
+            );
+          })}
           </div>
         )}
 

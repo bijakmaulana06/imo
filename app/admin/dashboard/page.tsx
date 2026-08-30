@@ -167,10 +167,12 @@ export default function AdminDashboardPage() {
   const [editingContact, setEditingContact] = useState<any | null>(null);
   const [newContact, setNewContact] = useState({
     name: "",
-    role: "LO",
-    group_name: "Kelompok 1",
+    role: "",
+    group_name: "None",
     whatsapp: "",
     instagram: "",
+    button_text: "",
+    ig_button_text: "",
     photo_url: "",
   });
   const [selectedContactCropFile, setSelectedContactCropFile] = useState<File | null>(null);
@@ -465,7 +467,7 @@ export default function AdminDashboardPage() {
       if (currentSetting?.value) {
         try {
           currentConfig = JSON.parse(currentSetting.value);
-        } catch (e) {}
+        } catch (e) { }
       }
 
       const updatedConfig = {
@@ -486,7 +488,7 @@ export default function AdminDashboardPage() {
       if (error) throw error;
 
       // Trigger cache refresh
-      fetch("/api/site-config").catch(() => {});
+      fetch("/api/site-config").catch(() => { });
 
       setStorylineSuccessMsg("Alur Cerita (Storyline) berhasil disimpan & langsung aktif di Beranda!");
       setTimeout(() => setStorylineSuccessMsg(null), 4000);
@@ -884,12 +886,14 @@ export default function AdminDashboardPage() {
       const { error } = await supabase.from("contact_persons").insert([
         {
           ...newContact,
+          button_text: newContact.button_text?.trim() || null,
+          ig_button_text: newContact.ig_button_text?.trim() || null,
           photo_url: newContact.photo_url || null,
         },
       ]);
       if (error) throw error;
       setShowAddContactModal(false);
-      setNewContact({ name: "", role: "LO", group_name: "Kelompok 1", whatsapp: "", instagram: "", photo_url: "" });
+      setNewContact({ name: "", role: "", group_name: "None", whatsapp: "", instagram: "", button_text: "", ig_button_text: "", photo_url: "" });
       loadData();
     } catch (err: any) {
       alert("Gagal menambahkan kontak: " + err.message);
@@ -908,6 +912,8 @@ export default function AdminDashboardPage() {
           group_name: editingContact.group_name,
           whatsapp: editingContact.whatsapp,
           instagram: editingContact.instagram,
+          button_text: editingContact.button_text?.trim() || null,
+          ig_button_text: editingContact.ig_button_text?.trim() || null,
           photo_url: editingContact.photo_url || null,
           updated_at: new Date().toISOString(),
         })
@@ -1491,25 +1497,67 @@ export default function AdminDashboardPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {contacts.map((c) => {
+                    const isNoneGroup = !c.group_name || c.group_name.trim().toLowerCase() === "none";
                     const groupNum = c.group_name?.match(/\d+/)?.[0];
                     const customName = groupNum && groupNames[groupNum] ? groupNames[groupNum].trim() : "";
-                    const displayGroupName = customName ? `${customName} (${c.group_name})` : c.group_name;
+                    const displayGroupName = isNoneGroup ? "Bukan LO" : customName ? `${customName} (${c.group_name})` : c.group_name;
+                    const isAdminB = c.name.trim().toLowerCase() === "admin b";
+                    const isWebmaster = isAdminB || (c.role && c.role.trim().toLowerCase().includes("webmaster"));
 
                     return (
-                      <div key={c.id} className="glass rounded-2xl p-5 border border-card-border/40 flex flex-col justify-between">
-                        <div>
+                      <div
+                        key={c.id}
+                        className={`group relative rounded-[28px] p-5 backdrop-blur-2xl transition-all duration-300 flex flex-col justify-between overflow-hidden ${
+                          isWebmaster
+                            ? "border border-amber-500/40 hover:border-amber-400/80 bg-gradient-to-b from-amber-500/[0.1] via-white/[0.03] to-black/[0.5] shadow-[0_12px_32px_rgba(245,158,11,0.15)]"
+                            : "border border-white/[0.12] hover:border-white/[0.25] bg-gradient-to-b from-white/[0.08] via-white/[0.03] to-black/[0.45] shadow-[0_12px_32px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,255,255,0.25)] hover:shadow-[0_16px_40px_rgba(0,0,0,0.6),inset_0_1px_2px_rgba(255,255,255,0.35)]"
+                        }`}
+                      >
+                        {/* Specular glass sheen reflection */}
+                        <div
+                          className={`absolute inset-0 bg-gradient-to-b via-transparent to-transparent pointer-events-none rounded-[28px] ${
+                            isWebmaster ? "from-amber-300/[0.15]" : "from-white/[0.08]"
+                          }`}
+                        />
+
+                        <div className="relative z-10">
                           <div className="flex items-center justify-between mb-3">
-                            <span className="text-[10px] font-mono uppercase bg-accent-purple/15 text-accent-purple border border-accent-purple/30 px-2.5 py-0.5 rounded-full font-bold">
-                              {c.role}
+                            <span
+                              className={`text-[10px] font-mono font-bold uppercase px-2.5 py-0.5 rounded-full ${
+                                isWebmaster
+                                  ? "bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-[0_0_10px_rgba(245,158,11,0.25)]"
+                                  : "bg-purple-500/15 text-purple-300 border border-purple-500/30"
+                              }`}
+                            >
+                              {isWebmaster ? "👑 " : ""}{c.role || "Narahubung"}
                             </span>
-                            <span className="text-[10px] font-mono text-cyan-400 font-semibold truncate max-w-[140px]" title={displayGroupName}>
-                              {displayGroupName}
-                            </span>
+                            {isWebmaster ? (
+                              <span className="text-[10px] font-mono text-amber-300 font-bold bg-amber-500/15 border border-amber-500/35 px-2.5 py-0.5 rounded-full">
+                                Webmaster
+                              </span>
+                            ) : isNoneGroup ? (
+                              <span className="text-[10px] font-mono text-slate-400 font-semibold bg-slate-800/80 border border-slate-700/60 px-2.5 py-0.5 rounded-full">
+                                Panitia
+                              </span>
+                            ) : (
+                              <span
+                                className="text-[10px] font-mono text-cyan-300 font-semibold truncate max-w-[150px] bg-cyan-500/10 border border-cyan-500/25 px-2.5 py-0.5 rounded-full"
+                                title={displayGroupName}
+                              >
+                                {displayGroupName}
+                              </span>
+                            )}
                           </div>
 
                           <div className="flex items-center gap-3.5 mb-3">
-                            {/* Circular avatar matching /contact UI */}
-                            <div className="relative h-14 w-14 rounded-full overflow-hidden flex-shrink-0 border p-0.5 bg-[#020510] border-accent-cyan/50 shadow-[0_0_15px_rgba(125,249,255,0.2)]">
+                            {/* Circular avatar with smooth double-ringed frosted glass border */}
+                            <div
+                              className={`relative h-14 w-14 rounded-full overflow-hidden flex-shrink-0 p-0.5 bg-gradient-to-b shadow-[0_4px_16px_rgba(0,0,0,0.4)] ${
+                                isWebmaster
+                                  ? "from-amber-300 via-amber-500/30 to-yellow-500/10 ring-2 ring-amber-400/60 shadow-[0_0_15px_rgba(245,158,11,0.3)]"
+                                  : "from-white/30 via-white/10 to-white/5 ring-1 ring-white/20"
+                              }`}
+                            >
                               {c.photo_url ? (
                                 <img
                                   src={c.photo_url}
@@ -1524,27 +1572,60 @@ export default function AdminDashboardPage() {
                             </div>
 
                             <div className="flex-1 min-w-0">
-                              <h3 className="font-display font-bold text-base text-slate-100 truncate">{c.name}</h3>
-                              <p className="text-xs text-emerald-400 font-mono mt-0.5 truncate">WA: {c.whatsapp}</p>
-                              {c.instagram && <p className="text-xs text-pink-400 font-mono truncate">IG: @{c.instagram}</p>}
+                              <h3
+                                className={`font-display font-bold text-base truncate ${
+                                  isWebmaster
+                                    ? "text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-400"
+                                    : "text-slate-100"
+                                }`}
+                              >
+                                {c.name}
+                              </h3>
+                              <p className="text-xs text-emerald-400 font-mono mt-0.5 truncate flex items-center gap-1.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                                <span>WA: {c.whatsapp}</span>
+                              </p>
+                              {c.instagram && (
+                                <p className="text-xs text-pink-300 font-mono truncate flex items-center gap-1.5 mt-0.5">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-pink-400"></span>
+                                  <span>IG: @{c.instagram.replace(/^@/, "")}</span>
+                                </p>
+                              )}
+                              {c.button_text && (
+                                <p className="text-xs text-amber-300 font-mono truncate flex items-center gap-1.5 mt-0.5" title={c.button_text}>
+                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                                  <span>Tombol WA: &quot;{c.button_text}&quot;</span>
+                                </p>
+                              )}
+                              {c.ig_button_text && (
+                                <p className="text-xs text-pink-300 font-mono truncate flex items-center gap-1.5 mt-0.5" title={c.ig_button_text}>
+                                  <span className="w-1.5 h-1.5 rounded-full bg-pink-400"></span>
+                                  <span>Tombol IG: &quot;{c.ig_button_text}&quot;</span>
+                                </p>
+                              )}
+                              {isAdminB && (
+                                <p className="text-[11px] text-amber-200/85 italic font-sans mt-1.5 bg-amber-500/10 border border-amber-500/20 px-2 py-1 rounded-lg">
+                                  &ldquo;Webnya bermasalah??, DM aja, segera tak benerin&rdquo;
+                                </p>
+                              )}
                             </div>
                           </div>
                         </div>
 
-                        <div className="flex justify-end items-center gap-2 pt-3 mt-2 border-t border-card-border/20">
+                        <div className="flex justify-end items-center gap-2 pt-3 mt-2 border-t border-white/[0.08] relative z-10">
                           <button
                             onClick={() => {
                               setEditingContact({ ...c });
                               setShowEditContactModal(true);
                             }}
-                            className="p-2 rounded-xl bg-accent-cyan/15 border border-accent-cyan/30 text-accent-cyan hover:bg-accent-cyan hover:text-black transition cursor-pointer"
+                            className="p-2 rounded-xl bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-400 hover:text-black transition cursor-pointer"
                             title="Edit Kontak"
                           >
                             <Edit2 className="h-4 w-4" />
                           </button>
                           <button
                             onClick={() => handleDeleteContact(c.id)}
-                            className="p-2 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-400 hover:bg-rose-500 hover:text-white transition cursor-pointer"
+                            className="p-2 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 hover:bg-rose-500 hover:text-white transition cursor-pointer"
                             title="Hapus Kontak"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -2071,14 +2152,14 @@ export default function AdminDashboardPage() {
                               const effectiveName = customName.trim() || defaultGroupName;
                               const currentQuota = groupMemberCounts[String(groupNum)] ?? groupMemberCounts[defaultGroupName] ?? targetMembersPerGroup;
                               const isCustomQuota = (groupMemberCounts[String(groupNum)] !== undefined && groupMemberCounts[String(groupNum)] !== targetMembersPerGroup) ||
-                                                    (groupMemberCounts[defaultGroupName] !== undefined && groupMemberCounts[defaultGroupName] !== targetMembersPerGroup);
+                                (groupMemberCounts[defaultGroupName] !== undefined && groupMemberCounts[defaultGroupName] !== targetMembersPerGroup);
                               const isCustomName = !!customName.trim() && customName.trim() !== defaultGroupName;
 
                               if (groupSearchQuery) {
                                 const q = groupSearchQuery.toLowerCase();
                                 if (!defaultGroupName.toLowerCase().includes(q) &&
-                                    !effectiveName.toLowerCase().includes(q) &&
-                                    !String(groupNum).includes(q)) {
+                                  !effectiveName.toLowerCase().includes(q) &&
+                                  !String(groupNum).includes(q)) {
                                   return null;
                                 }
                               }
@@ -2086,11 +2167,10 @@ export default function AdminDashboardPage() {
                               return (
                                 <div
                                   key={groupNum}
-                                  className={`p-3 rounded-xl border transition-all flex flex-col justify-between space-y-2.5 ${
-                                    isCustomName || isCustomQuota
-                                      ? "bg-purple-950/20 border-purple-500/50 shadow-[0_0_15px_rgba(168,85,247,0.15)]"
-                                      : "bg-slate-900/60 border-slate-800 hover:border-slate-700"
-                                  }`}
+                                  className={`p-3 rounded-xl border transition-all flex flex-col justify-between space-y-2.5 ${isCustomName || isCustomQuota
+                                    ? "bg-purple-950/20 border-purple-500/50 shadow-[0_0_15px_rgba(168,85,247,0.15)]"
+                                    : "bg-slate-900/60 border-slate-800 hover:border-slate-700"
+                                    }`}
                                 >
                                   {/* Card Header */}
                                   <div className="flex items-center justify-between">
@@ -2420,11 +2500,10 @@ export default function AdminDashboardPage() {
                     <button
                       type="button"
                       onClick={() => setStorylineEnabled(!storylineEnabled)}
-                      className={`px-3 py-2 rounded-xl text-xs font-mono font-bold transition flex items-center space-x-1.5 cursor-pointer ${
-                        storylineEnabled
-                          ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 shadow-[0_0_15px_rgba(16,185,129,0.2)]"
-                          : "bg-rose-500/15 text-rose-300 border border-rose-500/40"
-                      }`}
+                      className={`px-3 py-2 rounded-xl text-xs font-mono font-bold transition flex items-center space-x-1.5 cursor-pointer ${storylineEnabled
+                        ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 shadow-[0_0_15px_rgba(16,185,129,0.2)]"
+                        : "bg-rose-500/15 text-rose-300 border border-rose-500/40"
+                        }`}
                     >
                       <span className={`h-2 w-2 rounded-full ${storylineEnabled ? "bg-emerald-400 animate-ping" : "bg-rose-400"}`} />
                       <span>{storylineEnabled ? "SECTION AKTIF" : "SECTION NONAKTIF"}</span>
@@ -3145,7 +3224,7 @@ export default function AdminDashboardPage() {
             <form onSubmit={handleCreateContact} className="space-y-4 text-xs font-sans">
               {/* Profile Picture Upload with circular preview matching /contact */}
               <div className="flex flex-col items-center justify-center p-4 rounded-2xl bg-slate-950/70 border border-card-border/50">
-                <div className="relative h-24 w-24 rounded-full overflow-hidden mb-3 border-2 p-0.5 bg-[#020510] border-accent-cyan/60 shadow-[0_0_25px_rgba(125,249,255,0.25)]">
+                <div className="relative h-24 w-24 rounded-full overflow-hidden mb-3 p-1 bg-gradient-to-b from-white/30 via-white/10 to-white/5 shadow-[0_8px_25px_rgba(0,0,0,0.4)] ring-1 ring-white/20">
                   {newContact.photo_url ? (
                     <img
                       src={newContact.photo_url}
@@ -3209,17 +3288,14 @@ export default function AdminDashboardPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-400 uppercase font-mono mb-1">Peran / Role</label>
-                  <select
+                  <input
+                    type="text"
+                    required
                     value={newContact.role}
                     onChange={(e) => setNewContact({ ...newContact, role: e.target.value })}
+                    placeholder="e.g. LO, Koor, Panitia"
                     className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-card-border text-slate-100 text-xs"
-                  >
-                    <option value="LO">LO</option>
-                    <option value="KOOR">KOOR</option>
-                    <option value="Ketua Pelaksana">Ketua Pelaksana</option>
-                    <option value="Panitia">Panitia</option>
-                    <option value="Pemandu">Pemandu</option>
-                  </select>
+                  />
                 </div>
 
                 <div>
@@ -3229,6 +3305,7 @@ export default function AdminDashboardPage() {
                     onChange={(e) => setNewContact({ ...newContact, group_name: e.target.value })}
                     className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-card-border text-slate-100 text-xs"
                   >
+                    <option value="None">Panitia (Bukan LO)</option>
                     {[...Array(targetTotalGroups || 20)].map((_, i) => {
                       const num = i + 1;
                       const rawGroup = `Kelompok ${num}`;
@@ -3267,6 +3344,32 @@ export default function AdminDashboardPage() {
                 />
               </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 uppercase font-mono mb-1">Teks Tombol WA (Opsional)</label>
+                  <input
+                    type="text"
+                    value={newContact.button_text || ""}
+                    onChange={(e) => setNewContact({ ...newContact, button_text: e.target.value })}
+                    placeholder='Default: "WhatsApp"'
+                    className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-card-border text-slate-100 text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 uppercase font-mono mb-1">Teks Tombol IG (Opsional)</label>
+                  <input
+                    type="text"
+                    value={newContact.ig_button_text || ""}
+                    onChange={(e) => setNewContact({ ...newContact, ig_button_text: e.target.value })}
+                    placeholder='Default: "@username"'
+                    className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-card-border text-slate-100 text-xs"
+                  />
+                </div>
+              </div>
+              <p className="text-[10px] text-slate-400 font-mono -mt-1">
+                Bebas kustom kata-kata tombol WA & IG. Kosongkan jika ingin memakai teks default.
+              </p>
+
               <div className="flex justify-end space-x-3 pt-2">
                 <button
                   type="button"
@@ -3291,7 +3394,7 @@ export default function AdminDashboardPage() {
             <form onSubmit={handleUpdateContact} className="space-y-4 text-xs font-sans">
               {/* Profile Picture Upload with circular preview matching /contact */}
               <div className="flex flex-col items-center justify-center p-4 rounded-2xl bg-slate-950/70 border border-card-border/50">
-                <div className="relative h-24 w-24 rounded-full overflow-hidden mb-3 border-2 p-0.5 bg-[#020510] border-accent-cyan/60 shadow-[0_0_25px_rgba(125,249,255,0.25)]">
+                <div className="relative h-24 w-24 rounded-full overflow-hidden mb-3 p-1 bg-gradient-to-b from-white/30 via-white/10 to-white/5 shadow-[0_8px_25px_rgba(0,0,0,0.4)] ring-1 ring-white/20">
                   {editingContact.photo_url ? (
                     <img
                       src={editingContact.photo_url}
@@ -3355,17 +3458,14 @@ export default function AdminDashboardPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-400 uppercase font-mono mb-1">Peran / Role</label>
-                  <select
+                  <input
+                    type="text"
+                    required
                     value={editingContact.role}
                     onChange={(e) => setEditingContact({ ...editingContact, role: e.target.value })}
+                    placeholder="e.g. LO, Koor, Panitia"
                     className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-card-border text-slate-100 text-xs"
-                  >
-                    <option value="LO">LO</option>
-                    <option value="KOOR">KOOR</option>
-                    <option value="Ketua Pelaksana">Ketua Pelaksana</option>
-                    <option value="Panitia">Panitia</option>
-                    <option value="Pemandu">Pemandu</option>
-                  </select>
+                  />
                 </div>
 
                 <div>
@@ -3375,6 +3475,7 @@ export default function AdminDashboardPage() {
                     onChange={(e) => setEditingContact({ ...editingContact, group_name: e.target.value })}
                     className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-card-border text-slate-100 text-xs"
                   >
+                    <option value="None">Panitia (Bukan LO)</option>
                     {[...Array(targetTotalGroups || 20)].map((_, i) => {
                       const num = i + 1;
                       const rawGroup = `Kelompok ${num}`;
@@ -3412,6 +3513,32 @@ export default function AdminDashboardPage() {
                   className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-card-border text-slate-100 text-sm font-mono"
                 />
               </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 uppercase font-mono mb-1">Teks Tombol WA (Opsional)</label>
+                  <input
+                    type="text"
+                    value={editingContact.button_text || ""}
+                    onChange={(e) => setEditingContact({ ...editingContact, button_text: e.target.value })}
+                    placeholder='Default: "WhatsApp"'
+                    className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-card-border text-slate-100 text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 uppercase font-mono mb-1">Teks Tombol IG (Opsional)</label>
+                  <input
+                    type="text"
+                    value={editingContact.ig_button_text || ""}
+                    onChange={(e) => setEditingContact({ ...editingContact, ig_button_text: e.target.value })}
+                    placeholder='Default: "@username"'
+                    className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-card-border text-slate-100 text-xs"
+                  />
+                </div>
+              </div>
+              <p className="text-[10px] text-slate-400 font-mono -mt-1">
+                Bebas kustom kata-kata tombol WA & IG. Kosongkan jika ingin memakai teks default.
+              </p>
 
               <div className="flex justify-end space-x-3 pt-2">
                 <button
