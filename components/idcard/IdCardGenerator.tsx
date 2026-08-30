@@ -35,22 +35,22 @@ interface IdCardGeneratorProps {
 function getTagPlaceholder(tag: string): string {
   const lower = tag.toLowerCase().trim();
   if (lower === 'nama' || lower === 'name' || lower.includes('nama')) {
-    return 'Nama: Xaviera Putri';
+    return 'Xaviera Putri';
   }
   if (lower === 'nim' || lower === 'nrp' || lower.includes('nim')) {
-    return 'NIM : 260xxxxxxxx';
+    return '260xxxxxxxx';
   }
   if (lower === 'kelompok' || lower === 'group') {
-    return 'Kelompok: Kelompok 01';
+    return 'Kelompok 01';
   }
   if (lower === 'jurusan' || lower === 'prodi') {
-    return 'Jurusan: Teknologi Pendidikan';
+    return 'Teknologi Pendidikan';
   }
   if (lower === 'peran' || lower === 'role') {
-    return 'Peran: Peserta';
+    return 'Peserta';
   }
   if (lower === 'quote' || lower === 'motto') {
-    return 'Motto: Chasing Glories';
+    return 'Chasing Glories';
   }
   return `Masukkan ${tag}...`;
 }

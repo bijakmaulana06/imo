@@ -132,9 +132,9 @@ export default function IdCardGenerator({ templateUrl }: IdCardGeneratorProps) {
                 onChange={(e) => setValues((v) => ({ ...v, [tag]: e.target.value }))}
                 placeholder={
                   tag.toLowerCase().includes('nama')
-                    ? 'Nama: Xaviera Putri'
+                    ? 'Xaviera Putri'
                     : tag.toLowerCase().includes('nim')
-                    ? 'NIM : 260xxxxxxxx'
+                    ? '260xxxxxxxx'
                     : `Isi ${tag}`
                 }
             </label>

@@ -25,10 +25,10 @@ function getFieldPlaceholder(field: DocumentFieldConfig): string {
   const labelLower = (field.label || "").toLowerCase();
   const tagLower = (field.tag || "").toLowerCase();
   if (labelLower.includes("nama") || tagLower.includes("nama")) {
-    return "Nama: Xaviera Putri";
+    return "Xaviera Putri";
   }
   if (labelLower.includes("nim") || tagLower.includes("nim")) {
-    return "NIM : 260xxxxxxxx";
+    return "260xxxxxxxx";
   }
   return `Masukkan ${field.label}...`;
 }

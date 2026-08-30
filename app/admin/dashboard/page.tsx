@@ -3201,7 +3201,7 @@ export default function AdminDashboardPage() {
                   required
                   value={newContact.name}
                   onChange={(e) => setNewContact({ ...newContact, name: e.target.value })}
-                  placeholder="Nama: Xaviera Putri"
+                  placeholder="Xaviera Putri"
                   className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-card-border text-slate-100 text-sm"
                 />
               </div>
@@ -3347,7 +3347,7 @@ export default function AdminDashboardPage() {
                   required
                   value={editingContact.name}
                   onChange={(e) => setEditingContact({ ...editingContact, name: e.target.value })}
-                  placeholder="Nama: Xaviera Putri"
+                  placeholder="Xaviera Putri"
                   className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-card-border text-slate-100 text-sm"
                 />
               </div>
