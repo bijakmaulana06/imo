@@ -125,7 +125,7 @@ export default function LockdownPreviewGateway() {
     { name: "Status Pengumpulan", path: "/info", icon: FileCheck, desc: "Drive Verifier & Rekapitulasi", color: "emerald" },
     { name: "ID Card Generator", path: "/id-card", icon: CreditCard, desc: "Pembuat Kartu Tanda Pengenal", color: "pink" },
     { name: "Auto-Form Dokumen", path: "/documents", icon: FileText, desc: "Generator Surat & Form PDF", color: "blue" },
-    { name: "Kontak LO & Tim", path: "/contact", icon: PhoneCall, desc: "Direktori Orbit Pendamping", color: "teal" },
+    { name: "Kontak", path: "/contact", icon: PhoneCall, desc: "Direktori Orbit Pendamping", color: "teal" },
   ];
 
   return (

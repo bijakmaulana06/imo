@@ -1458,7 +1458,7 @@ export default function AdminSettingsCommandCenter() {
                              "info": "Status Tugas Kelompok",
                              "idcard": "ID Card Generator",
                              "documents": "Auto-Form Generator",
-                             "contact": "Kontak LO & Pendamping"
+                             "contact": "Kontak & Pendamping"
                            };
                            return (
                              <div key={nodeId} className="flex items-center justify-between p-3 bg-black/70 border border-slate-800 rounded-lg">

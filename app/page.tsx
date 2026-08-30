@@ -148,8 +148,8 @@ export default function Home() {
     },
     contact: {
       id: "contact",
-      title: config.homeCard3Title || "Hubungi LO",
-      desc: config.homeCard3Desc || "Hubungi LO/Pendamping kelompok Anda secara langsung.",
+      title: config.homeCard3Title || "Kontak",
+      desc: config.homeCard3Desc || "Hubungi kontak pendamping kelompok Anda secara langsung.",
       href: "/contact",
       icon: <Contact className="h-6 w-6" />,
       colorClasses: { border: "border-accent-yellow/40", bg: "bg-accent-yellow/15", text: "text-accent-yellow" },

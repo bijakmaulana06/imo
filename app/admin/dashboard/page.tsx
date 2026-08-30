@@ -9,6 +9,7 @@ import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
 import { Link } from "next-view-transitions";
 import { motion, AnimatePresence } from "framer-motion";
+import ContactPhotoCropperModal from "@/components/admin/ContactPhotoCropperModal";
 import {
   Layers,
   Users,
@@ -162,13 +163,19 @@ export default function AdminDashboardPage() {
   });
 
   const [showAddContactModal, setShowAddContactModal] = useState(false);
+  const [showEditContactModal, setShowEditContactModal] = useState(false);
+  const [editingContact, setEditingContact] = useState<any | null>(null);
   const [newContact, setNewContact] = useState({
     name: "",
     role: "LO",
     group_name: "Kelompok 1",
     whatsapp: "",
     instagram: "",
+    photo_url: "",
   });
+  const [selectedContactCropFile, setSelectedContactCropFile] = useState<File | null>(null);
+  const [isContactCropperOpen, setIsContactCropperOpen] = useState(false);
+  const [contactCropTarget, setContactCropTarget] = useState<"new" | "edit">("new");
 
   const [showAddAnnoModal, setShowAddAnnoModal] = useState(false);
   const [newAnno, setNewAnno] = useState({
@@ -874,13 +881,43 @@ export default function AdminDashboardPage() {
   const handleCreateContact = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const { error } = await supabase.from("contact_persons").insert([newContact]);
+      const { error } = await supabase.from("contact_persons").insert([
+        {
+          ...newContact,
+          photo_url: newContact.photo_url || null,
+        },
+      ]);
       if (error) throw error;
       setShowAddContactModal(false);
-      setNewContact({ name: "", role: "LO", group_name: "Kelompok 1", whatsapp: "", instagram: "" });
+      setNewContact({ name: "", role: "LO", group_name: "Kelompok 1", whatsapp: "", instagram: "", photo_url: "" });
       loadData();
     } catch (err: any) {
       alert("Gagal menambahkan kontak: " + err.message);
+    }
+  };
+
+  const handleUpdateContact = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingContact) return;
+    try {
+      const { error } = await supabase
+        .from("contact_persons")
+        .update({
+          name: editingContact.name,
+          role: editingContact.role,
+          group_name: editingContact.group_name,
+          whatsapp: editingContact.whatsapp,
+          instagram: editingContact.instagram,
+          photo_url: editingContact.photo_url || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", editingContact.id);
+      if (error) throw error;
+      setShowEditContactModal(false);
+      setEditingContact(null);
+      loadData();
+    } catch (err: any) {
+      alert("Gagal memperbarui kontak: " + err.message);
     }
   };
 
@@ -1186,7 +1223,7 @@ export default function AdminDashboardPage() {
           <div className="relative w-full max-w-5xl flex justify-between items-start mt-2 z-10 hidden sm:flex gap-1.5">
             {[
               { id: "links", label: "Menu Links", icon: Layers, count: links.length, color: "text-blue-400", border: "border-blue-500/50", shadow: "shadow-[0_0_20px_rgba(59,130,246,0.3)]" },
-              { id: "contacts", label: "Kontak LO", icon: Users, count: contacts.length, color: "text-emerald-400", border: "border-emerald-500/50", shadow: "shadow-[0_0_20px_rgba(16,185,129,0.3)]" },
+              { id: "contacts", label: "Kontak", icon: Users, count: contacts.length, color: "text-emerald-400", border: "border-emerald-500/50", shadow: "shadow-[0_0_20px_rgba(16,185,129,0.3)]" },
               { id: "announcements", label: "Pengumuman", icon: Megaphone, count: announcements.length, color: "text-amber-400", border: "border-amber-500/50", shadow: "shadow-[0_0_20px_rgba(245,158,11,0.3)]" },
               { id: "templates", label: "Template ID", icon: CreditCard, count: templates.length, color: "text-purple-400", border: "border-purple-500/50", shadow: "shadow-[0_0_20px_rgba(168,85,247,0.3)]" },
               { id: "tasks", label: "Penugasan", icon: ListChecks, count: tasks.length, color: "text-rose-400", border: "border-rose-500/50", shadow: "shadow-[0_0_20px_rgba(244,63,114,0.3)]" },
@@ -1443,42 +1480,79 @@ export default function AdminDashboardPage() {
               <div className="space-y-6">
                 <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                   <div>
-                    <h2 className="font-display font-black text-xl text-slate-100">Kelola Kontak LO (/contact)</h2>
-                    <p className="text-xs text-slate-400">Daftar Liaison Officer & Pendamping kelompok yang tampil di halaman kontak.</p>
+                    <h2 className="font-display font-black text-xl text-slate-100">Kelola Kontak (/contact)</h2>
+                    <p className="text-xs text-slate-400">Daftar kontak pendamping & narahubung kelompok yang tampil di halaman kontak.</p>
                   </div>
                   <Button variant="primary" size="sm" onClick={() => setShowAddContactModal(true)}>
                     <Plus className="h-4 w-4 mr-1.5" />
-                    <span>Tambah Kontak LO</span>
+                    <span>Tambah Kontak Baru</span>
                   </Button>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {contacts.map((c) => (
-                    <div key={c.id} className="glass rounded-2xl p-5 border border-card-border/40 flex flex-col justify-between">
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-[10px] font-mono uppercase bg-accent-purple/15 text-accent-purple border border-accent-purple/30 px-2.5 py-0.5 rounded-full font-bold">
-                            {c.role}
-                          </span>
-                          <span className="text-[10px] font-mono text-slate-400">{c.group_name}</span>
+                  {contacts.map((c) => {
+                    const groupNum = c.group_name?.match(/\d+/)?.[0];
+                    const customName = groupNum && groupNames[groupNum] ? groupNames[groupNum].trim() : "";
+                    const displayGroupName = customName ? `${customName} (${c.group_name})` : c.group_name;
+
+                    return (
+                      <div key={c.id} className="glass rounded-2xl p-5 border border-card-border/40 flex flex-col justify-between">
+                        <div>
+                          <div className="flex items-center justify-between mb-3">
+                            <span className="text-[10px] font-mono uppercase bg-accent-purple/15 text-accent-purple border border-accent-purple/30 px-2.5 py-0.5 rounded-full font-bold">
+                              {c.role}
+                            </span>
+                            <span className="text-[10px] font-mono text-cyan-400 font-semibold truncate max-w-[140px]" title={displayGroupName}>
+                              {displayGroupName}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-3.5 mb-3">
+                            {/* Circular avatar matching /contact UI */}
+                            <div className="relative h-14 w-14 rounded-full overflow-hidden flex-shrink-0 border p-0.5 bg-[#020510] border-accent-cyan/50 shadow-[0_0_15px_rgba(125,249,255,0.2)]">
+                              {c.photo_url ? (
+                                <img
+                                  src={c.photo_url}
+                                  alt={c.name}
+                                  className="h-full w-full object-cover rounded-full"
+                                />
+                              ) : (
+                                <div className="h-full w-full flex items-center justify-center bg-slate-900 rounded-full text-slate-500 font-mono text-[10px] uppercase">
+                                  Astro
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="flex-1 min-w-0">
+                              <h3 className="font-display font-bold text-base text-slate-100 truncate">{c.name}</h3>
+                              <p className="text-xs text-emerald-400 font-mono mt-0.5 truncate">WA: {c.whatsapp}</p>
+                              {c.instagram && <p className="text-xs text-pink-400 font-mono truncate">IG: @{c.instagram}</p>}
+                            </div>
+                          </div>
                         </div>
 
-                        <h3 className="font-display font-bold text-base text-slate-100">{c.name}</h3>
-                        <p className="text-xs text-emerald-400 font-mono mt-1">WA: {c.whatsapp}</p>
-                        {c.instagram && <p className="text-xs text-pink-400 font-mono">IG: @{c.instagram}</p>}
+                        <div className="flex justify-end items-center gap-2 pt-3 mt-2 border-t border-card-border/20">
+                          <button
+                            onClick={() => {
+                              setEditingContact({ ...c });
+                              setShowEditContactModal(true);
+                            }}
+                            className="p-2 rounded-xl bg-accent-cyan/15 border border-accent-cyan/30 text-accent-cyan hover:bg-accent-cyan hover:text-black transition cursor-pointer"
+                            title="Edit Kontak"
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteContact(c.id)}
+                            className="p-2 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-400 hover:bg-rose-500 hover:text-white transition cursor-pointer"
+                            title="Hapus Kontak"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
                       </div>
-
-                      <div className="flex justify-end pt-4 mt-4 border-t border-card-border/20">
-                        <button
-                          onClick={() => handleDeleteContact(c.id)}
-                          className="p-2 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-400 hover:bg-rose-500 hover:text-white transition cursor-pointer"
-                          title="Hapus Kontak"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -3066,17 +3140,68 @@ export default function AdminDashboardPage() {
 
       {showAddContactModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="glass rounded-2xl p-6 border border-accent-purple/40 max-w-md w-full">
-            <h3 className="font-display font-bold text-lg text-slate-100 mb-4">Tambah Kontak LO Baru</h3>
+          <div className="glass rounded-2xl p-6 border border-accent-purple/40 max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <h3 className="font-display font-bold text-lg text-slate-100 mb-4">Tambah Kontak Baru</h3>
             <form onSubmit={handleCreateContact} className="space-y-4 text-xs font-sans">
+              {/* Profile Picture Upload with circular preview matching /contact */}
+              <div className="flex flex-col items-center justify-center p-4 rounded-2xl bg-slate-950/70 border border-card-border/50">
+                <div className="relative h-24 w-24 rounded-full overflow-hidden mb-3 border-2 p-0.5 bg-[#020510] border-accent-cyan/60 shadow-[0_0_25px_rgba(125,249,255,0.25)]">
+                  {newContact.photo_url ? (
+                    <img
+                      src={newContact.photo_url}
+                      alt="Foto Kontak"
+                      className="h-full w-full object-cover rounded-full"
+                    />
+                  ) : (
+                    <div className="h-full w-full flex flex-col items-center justify-center bg-slate-900 rounded-full text-slate-500">
+                      <Camera className="w-6 h-6 mb-1 text-slate-400" />
+                      <span className="font-mono text-[9px] uppercase tracking-wider">Astro</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <label className="px-3.5 py-1.5 rounded-xl bg-accent-cyan/15 hover:bg-accent-cyan/25 border border-accent-cyan/40 text-accent-cyan text-xs font-bold font-mono uppercase tracking-wider cursor-pointer transition flex items-center gap-1.5">
+                    <Camera className="w-3.5 h-3.5" />
+                    <span>{newContact.photo_url ? "Ganti Foto" : "Unggah & Pangkas Foto"}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) {
+                          setSelectedContactCropFile(f);
+                          setContactCropTarget("new");
+                          setIsContactCropperOpen(true);
+                        }
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                  {newContact.photo_url && (
+                    <button
+                      type="button"
+                      onClick={() => setNewContact({ ...newContact, photo_url: "" })}
+                      className="px-2.5 py-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 text-rose-300 text-xs font-mono transition"
+                    >
+                      Hapus
+                    </button>
+                  )}
+                </div>
+                <p className="text-[10px] text-slate-400 mt-2 font-mono text-center">
+                  Foto akan otomatis di-crop 1:1, di-rescale & disimpan di Cloudflare R2 secara server-side.
+                </p>
+              </div>
+
               <div>
-                <label className="block text-slate-400 uppercase font-mono mb-1">Nama Lengkap LO</label>
+                <label className="block text-slate-400 uppercase font-mono mb-1">Nama Lengkap Kontak</label>
                 <input
                   type="text"
                   required
                   value={newContact.name}
                   onChange={(e) => setNewContact({ ...newContact, name: e.target.value })}
-                  placeholder="Kak Ahmad"
+                  placeholder="Nama: Xaviera Putri"
                   className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-card-border text-slate-100 text-sm"
                 />
               </div>
@@ -3092,6 +3217,8 @@ export default function AdminDashboardPage() {
                     <option value="LO">LO</option>
                     <option value="KOOR">KOOR</option>
                     <option value="Ketua Pelaksana">Ketua Pelaksana</option>
+                    <option value="Panitia">Panitia</option>
+                    <option value="Pemandu">Pemandu</option>
                   </select>
                 </div>
 
@@ -3102,11 +3229,17 @@ export default function AdminDashboardPage() {
                     onChange={(e) => setNewContact({ ...newContact, group_name: e.target.value })}
                     className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-card-border text-slate-100 text-xs"
                   >
-                    {[...Array(20)].map((_, i) => (
-                      <option key={i} value={`Kelompok ${i + 1}`}>
-                        Kelompok {i + 1}
-                      </option>
-                    ))}
+                    {[...Array(targetTotalGroups || 20)].map((_, i) => {
+                      const num = i + 1;
+                      const rawGroup = `Kelompok ${num}`;
+                      const custom = (groupNames[String(num)] || "").trim();
+                      const label = custom ? `${custom} (${rawGroup})` : rawGroup;
+                      return (
+                        <option key={num} value={rawGroup}>
+                          {label}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
               </div>
@@ -3144,6 +3277,155 @@ export default function AdminDashboardPage() {
                 </button>
                 <Button variant="primary" size="sm" type="submit">
                   Simpan Kontak
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showEditContactModal && editingContact && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="glass rounded-2xl p-6 border border-accent-cyan/40 max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <h3 className="font-display font-bold text-lg text-slate-100 mb-4">Edit Kontak</h3>
+            <form onSubmit={handleUpdateContact} className="space-y-4 text-xs font-sans">
+              {/* Profile Picture Upload with circular preview matching /contact */}
+              <div className="flex flex-col items-center justify-center p-4 rounded-2xl bg-slate-950/70 border border-card-border/50">
+                <div className="relative h-24 w-24 rounded-full overflow-hidden mb-3 border-2 p-0.5 bg-[#020510] border-accent-cyan/60 shadow-[0_0_25px_rgba(125,249,255,0.25)]">
+                  {editingContact.photo_url ? (
+                    <img
+                      src={editingContact.photo_url}
+                      alt="Foto Kontak"
+                      className="h-full w-full object-cover rounded-full"
+                    />
+                  ) : (
+                    <div className="h-full w-full flex flex-col items-center justify-center bg-slate-900 rounded-full text-slate-500">
+                      <Camera className="w-6 h-6 mb-1 text-slate-400" />
+                      <span className="font-mono text-[9px] uppercase tracking-wider">Astro</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <label className="px-3.5 py-1.5 rounded-xl bg-accent-cyan/15 hover:bg-accent-cyan/25 border border-accent-cyan/40 text-accent-cyan text-xs font-bold font-mono uppercase tracking-wider cursor-pointer transition flex items-center gap-1.5">
+                    <Camera className="w-3.5 h-3.5" />
+                    <span>{editingContact.photo_url ? "Ganti Foto" : "Unggah & Pangkas Foto"}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) {
+                          setSelectedContactCropFile(f);
+                          setContactCropTarget("edit");
+                          setIsContactCropperOpen(true);
+                        }
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                  {editingContact.photo_url && (
+                    <button
+                      type="button"
+                      onClick={() => setEditingContact({ ...editingContact, photo_url: "" })}
+                      className="px-2.5 py-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 text-rose-300 text-xs font-mono transition"
+                    >
+                      Hapus
+                    </button>
+                  )}
+                </div>
+                <p className="text-[10px] text-slate-400 mt-2 font-mono text-center">
+                  Foto akan otomatis di-crop 1:1, di-rescale & disimpan di Cloudflare R2 secara server-side.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-slate-400 uppercase font-mono mb-1">Nama Lengkap Kontak</label>
+                <input
+                  type="text"
+                  required
+                  value={editingContact.name}
+                  onChange={(e) => setEditingContact({ ...editingContact, name: e.target.value })}
+                  placeholder="Nama: Xaviera Putri"
+                  className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-card-border text-slate-100 text-sm"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 uppercase font-mono mb-1">Peran / Role</label>
+                  <select
+                    value={editingContact.role}
+                    onChange={(e) => setEditingContact({ ...editingContact, role: e.target.value })}
+                    className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-card-border text-slate-100 text-xs"
+                  >
+                    <option value="LO">LO</option>
+                    <option value="KOOR">KOOR</option>
+                    <option value="Ketua Pelaksana">Ketua Pelaksana</option>
+                    <option value="Panitia">Panitia</option>
+                    <option value="Pemandu">Pemandu</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 uppercase font-mono mb-1">Kelompok</label>
+                  <select
+                    value={editingContact.group_name}
+                    onChange={(e) => setEditingContact({ ...editingContact, group_name: e.target.value })}
+                    className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-card-border text-slate-100 text-xs"
+                  >
+                    {[...Array(targetTotalGroups || 20)].map((_, i) => {
+                      const num = i + 1;
+                      const rawGroup = `Kelompok ${num}`;
+                      const custom = (groupNames[String(num)] || "").trim();
+                      const label = custom ? `${custom} (${rawGroup})` : rawGroup;
+                      return (
+                        <option key={num} value={rawGroup}>
+                          {label}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-400 uppercase font-mono mb-1">Nomor WhatsApp</label>
+                <input
+                  type="text"
+                  required
+                  value={editingContact.whatsapp}
+                  onChange={(e) => setEditingContact({ ...editingContact, whatsapp: e.target.value })}
+                  placeholder="6281234567890"
+                  className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-card-border text-slate-100 text-sm font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 uppercase font-mono mb-1">Username Instagram (Opsional)</label>
+                <input
+                  type="text"
+                  value={editingContact.instagram || ""}
+                  onChange={(e) => setEditingContact({ ...editingContact, instagram: e.target.value })}
+                  placeholder="ahmad_imo2026"
+                  className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-card-border text-slate-100 text-sm font-mono"
+                />
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEditContactModal(false);
+                    setEditingContact(null);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-300 text-xs"
+                >
+                  Batal
+                </button>
+                <Button variant="primary" size="sm" type="submit">
+                  Perbarui Kontak
                 </Button>
               </div>
             </form>
@@ -3590,6 +3872,23 @@ export default function AdminDashboardPage() {
           </div>
         </div>
       )}
+
+      {/* Contact Photo Cropper Modal (Server-Side Processing) */}
+      <ContactPhotoCropperModal
+        isOpen={isContactCropperOpen}
+        file={selectedContactCropFile}
+        onClose={() => {
+          setIsContactCropperOpen(false);
+          setSelectedContactCropFile(null);
+        }}
+        onSuccess={(uploadedUrl) => {
+          if (contactCropTarget === "new") {
+            setNewContact((prev) => ({ ...prev, photo_url: uploadedUrl }));
+          } else if (editingContact) {
+            setEditingContact((prev: any) => ({ ...prev, photo_url: uploadedUrl }));
+          }
+        }}
+      />
     </div>
   );
 }

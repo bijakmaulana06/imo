@@ -152,8 +152,8 @@ export const DEFAULT_SITE_CONFIG: SiteConfig = {
   homeCard1Desc: "Periksa kelengkapan pengumpulan tugas kelompok Anda yang terverifikasi otomatis dari repositori Google Drive IMO 2026.",
   homeCard2Title: "ID Card Generator",
   homeCard2Desc: "Kustomisasi & unduh tanda pengenal resmi IMO 2026. Diproses instan murni pada perangkat Android/iOS Anda untuk menjaga keamanan data.",
-  homeCard3Title: "Hubungi LO",
-  homeCard3Desc: "Kehilangan arah dalam perjalanan luar angkasa ini? Hubungi LO/Pendamping kelompok Anda secara langsung melalui satu tombol WhatsApp.",
+  homeCard3Title: "Pusat Kontak",
+  homeCard3Desc: "Kehilangan arah dalam perjalanan luar angkasa ini? Hubungi kontak pendamping kelompok Anda secara langsung melalui satu tombol WhatsApp.",
 
   homePhotoSlotsEnabled: true,
   homePhotoSlotsTitle: "ALUR KISAH PENJELAJAHAN ORBIT",
@@ -171,8 +171,8 @@ export const DEFAULT_SITE_CONFIG: SiteConfig = {
   guideHeroTitle: "PANDUAN & EMBED DOKUMEN",
   guideHeroSubtitle: "Halaman interaktif pengumuman resmi & contoh surat. Tinjau dokumen bersandingan dengan petunjuk & tombol langsung ke Auto-Form Generator.",
 
-  contactHeroTitle: "LO & PENDAMPING KELOMPOK",
-  contactHeroSubtitle: "Temukan pemandu orbit Anda. Cari berdasarkan nama kelompok atau nama LO untuk menghubungi langsung.",
+  contactHeroTitle: "KONTAK",
+  contactHeroSubtitle: "Temukan pemandu orbit Anda. Cari berdasarkan nama kelompok atau nama pendamping untuk menghubungi langsung.",
 
   idCardHeroTitle: "ID CARD GENERATOR",
   idCardHeroSubtitle: "Generator tanda pengenal resmi peserta IMO 2026. Diproses 100% di browser Anda untuk keamanan data penuh.",

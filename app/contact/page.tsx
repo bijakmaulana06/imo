@@ -75,10 +75,10 @@ export default function ContactPage() {
       <main className="flex-grow py-12 px-4 max-w-6xl mx-auto w-full relative z-10">
         <div className="text-center mb-12">
           <h1 className="text-3xl md:text-5xl font-display font-extrabold tracking-wider bg-gradient-to-r from-accent-cyan via-accent-purple to-accent-cyan bg-clip-text text-transparent mb-4">
-            {config.contactHeroTitle || "LO & PENDAMPING KELOMPOK"}
+            {config.contactHeroTitle || "KONTAK"}
           </h1>
           <p className="text-slate-400 text-sm md:text-base max-w-xl mx-auto font-sans leading-relaxed">
-            {config.contactHeroSubtitle || "Temukan pemandu orbit Anda. Cari berdasarkan nama kelompok atau nama LO untuk menghubungi langsung."}
+            {config.contactHeroSubtitle || "Temukan pemandu orbit Anda. Cari berdasarkan nama kelompok atau nama pendamping untuk menghubungi langsung."}
           </p>
         </div>
 
@@ -88,7 +88,7 @@ export default function ContactPage() {
           </span>
           <input
             type="text"
-            placeholder="Cari kelompok atau nama LO..."
+            placeholder="Cari kelompok atau nama kontak..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-11 pr-4 py-3 rounded-full bg-slate-950/80 border border-card-border/50 text-slate-200 text-sm placeholder-slate-500 focus:outline-none focus:border-accent-cyan/60 transition-all font-sans"
@@ -121,17 +121,17 @@ export default function ContactPage() {
         ) : contacts.length === 0 ? (
           <Card glowColor="purple" className="text-center py-16 max-w-md mx-auto">
             <Users className="h-12 w-12 text-accent-purple/50 mx-auto mb-4" />
-            <h3 className="font-display font-bold text-lg text-slate-200 mb-2">Belum Ada Kontak Pendamping</h3>
+            <h3 className="font-display font-bold text-lg text-slate-200 mb-2">Belum Ada Kontak</h3>
             <p className="text-sm text-slate-400 font-sans">
-              Saat ini belum ada data LO atau kontak pendamping kelompok yang ditambahkan oleh panitia.
+              Saat ini belum ada data kontak atau pendamping kelompok yang ditambahkan oleh panitia.
             </p>
           </Card>
         ) : filteredContacts.length === 0 ? (
           <Card glowColor="purple" className="text-center py-16 max-w-md mx-auto">
             <Users className="h-12 w-12 text-accent-purple mx-auto mb-4" />
-            <h3 className="font-display font-bold text-lg text-slate-200 mb-2">LO Tidak Ditemukan</h3>
+            <h3 className="font-display font-bold text-lg text-slate-200 mb-2">Kontak Tidak Ditemukan</h3>
             <p className="text-sm text-slate-400 font-sans">
-              Kelompok atau nama LO &quot;{searchQuery}&quot; belum terdaftar atau tidak ditemukan di server radar kami.
+              Kelompok atau nama kontak &quot;{searchQuery}&quot; tidak ditemukan dalam daftar radar kami.
             </p>
           </Card>
         ) : (

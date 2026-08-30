@@ -42,7 +42,7 @@ export default function Navbar() {
     { name: "Status Tugas", label: "Scanner Drive", href: "/info", icon: CheckCircle2 },
     { name: "ID Card", label: "Generator Card", href: "/id-card", icon: QrCode },
     { name: "Auto Form", label: "Doc Generator", href: "/documents", icon: FileEdit },
-    { name: "Kontak LO", label: "Pendamping", href: "/contact", icon: Users },
+    { name: "Kontak", label: "Pendamping", href: "/contact", icon: Users },
   ];
 
   const isActive = (path: string) => pathname === path;

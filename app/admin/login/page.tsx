@@ -114,7 +114,7 @@ export default function AdminLoginPage() {
             ADMINISTRATOR LOGIN
           </h1>
           <p className="text-xs text-slate-400 font-sans mt-1">
-            Masuk untuk mengelola data Mission Control, Kontak LO, dan Pengumuman.
+            Masuk untuk mengelola data Mission Control, Kontak, dan Pengumuman.
           </p>
         </div>
 
