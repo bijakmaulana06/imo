@@ -13,9 +13,9 @@ import {
   RefreshCw,
   Check,
   X,
-  Sparkles,
   Loader2,
   Image as ImageIcon,
+  Move,
 } from "lucide-react";
 
 interface ContactPhotoCropperModalProps {
@@ -63,19 +63,20 @@ export default function ContactPhotoCropperModal({
     }
 
     const cropper = new Cropper(imgRef.current, {
-      aspectRatio: 1, // 1:1 Square avatar matching /contact UI
+      aspectRatio: 1, // Strictly 1:1 circular ratio
       viewMode: 1,
-      dragMode: "move",
-      autoCropArea: 0.9,
+      dragMode: "move", // Drag to pan the image seamlessly
+      autoCropArea: 0.85,
       restore: false,
-      guides: true,
+      guides: false, // Turn off rectangular dashed guides for clean circular appearance
       center: true,
       highlight: false,
       cropBoxMovable: true,
       cropBoxResizable: true,
       toggleDragModeOnDblclick: false,
-      background: true,
+      background: false, // Remove checkerboard background
       responsive: true,
+      preview: ".avatar-live-circle-preview", // Real-time circular avatar preview
     });
 
     cropperRef.current = cropper;
@@ -126,7 +127,7 @@ export default function ContactPhotoCropperModal({
     setError(null);
 
     try {
-      // Ambil parameter crop murni tanpa rendering canvas berat di client
+      // Extract crop parameters without client canvas bottleneck
       const cropData = cropperRef.current.getData(true);
 
       const formData = new FormData();
@@ -157,66 +158,115 @@ export default function ContactPhotoCropperModal({
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="glass rounded-3xl p-6 border border-accent-cyan/40 max-w-xl w-full flex flex-col shadow-[0_0_50px_rgba(125,249,255,0.2)]">
-        {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-card-border/30">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-accent-cyan/15 border border-accent-cyan/30 text-accent-cyan shadow-[0_0_10px_rgba(125,249,255,0.3)]">
+      {/* Scoped CSS for Genuine Circular Cropper without confusing static overlays */}
+      <style jsx global>{`
+        .circular-avatar-cropper .cropper-view-box,
+        .circular-avatar-cropper .cropper-face {
+          border-radius: 50% !important;
+        }
+        .circular-avatar-cropper .cropper-view-box {
+          outline: 2.5px solid #7df9ff !important;
+          box-shadow: 0 0 20px rgba(125, 249, 255, 0.45) !important;
+        }
+        .circular-avatar-cropper .cropper-modal {
+          background-color: rgba(2, 5, 16, 0.8) !important;
+          opacity: 0.85 !important;
+        }
+        .circular-avatar-cropper .cropper-dashed,
+        .circular-avatar-cropper .cropper-line,
+        .circular-avatar-cropper .cropper-point.point-e,
+        .circular-avatar-cropper .cropper-point.point-w,
+        .circular-avatar-cropper .cropper-point.point-s,
+        .circular-avatar-cropper .cropper-point.point-n {
+          display: none !important;
+        }
+        .circular-avatar-cropper .cropper-point.point-nw,
+        .circular-avatar-cropper .cropper-point.point-ne,
+        .circular-avatar-cropper .cropper-point.point-sw,
+        .circular-avatar-cropper .cropper-point.point-se {
+          width: 14px !important;
+          height: 14px !important;
+          border-radius: 50% !important;
+          background-color: #7df9ff !important;
+          border: 2.5px solid #020510 !important;
+          opacity: 1 !important;
+        }
+        .avatar-live-circle-preview {
+          overflow: hidden;
+        }
+        .avatar-live-circle-preview img {
+          max-width: none !important;
+        }
+      `}</style>
+
+      <div className="glass rounded-3xl p-6 border border-accent-cyan/40 max-w-2xl w-full flex flex-col shadow-[0_0_50px_rgba(125,249,255,0.2)]">
+        {/* Header with Live Circle Preview */}
+        <div className="flex items-center justify-between pb-4 border-b border-card-border/30 gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-2xl bg-accent-cyan/15 border border-accent-cyan/30 text-accent-cyan shadow-[0_0_12px_rgba(125,249,255,0.3)]">
               <ImageIcon className="w-5 h-5" />
             </div>
             <div>
               <h3 className="font-display font-extrabold text-base text-slate-100">
-                Atur & Pangkas Foto Profil
+                Pangkas & Sesuaikan Foto Profil
               </h3>
               <p className="text-[11px] text-slate-400 font-sans">
-                Rasio 1:1 bundar. Pemrosesan crop & kompresi dilakukan di server side.
+                Tarik sudut lingkaran atau geser foto untuk mengatur posisi wajah.
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            disabled={uploading}
-            className="p-1.5 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
 
-        {/* Cropper Container */}
-        <div className="relative w-full h-80 bg-slate-950/90 rounded-2xl overflow-hidden my-4 border border-card-border/60 flex items-center justify-center">
-          <img
-            ref={imgRef}
-            src={previewSrc}
-            alt="Pratinjau Cropper Kontak"
-            className="max-w-full max-h-full block"
-          />
-
-          {/* Circular mask guide */}
-          <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-            <div className="w-56 h-56 rounded-full border-2 border-dashed border-accent-cyan/60 shadow-[0_0_0_9999px_rgba(2,5,16,0.55)]" />
+          {/* Real-time Live Preview Thumbnail */}
+          <div className="flex items-center gap-3 bg-slate-950/80 px-3 py-1.5 rounded-2xl border border-card-border/60 flex-shrink-0">
+            <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-accent-cyan shadow-[0_0_15px_rgba(125,249,255,0.35)] avatar-live-circle-preview bg-black flex-shrink-0" />
+            <div className="hidden sm:block text-left">
+              <span className="text-[9px] font-mono uppercase text-slate-400 block font-bold">Hasil Akhir</span>
+              <span className="text-[11px] font-bold text-accent-cyan block">Pratinjau</span>
+            </div>
+            <button
+              onClick={onClose}
+              disabled={uploading}
+              className="p-1 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition cursor-pointer ml-1"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
         </div>
 
+        {/* Dynamic Cropper Canvas */}
+        <div className="relative w-full h-88 md:h-[400px] bg-[#020510] rounded-2xl overflow-hidden my-4 border border-card-border/60 flex items-center justify-center circular-avatar-cropper">
+          <img
+            ref={imgRef}
+            src={previewSrc}
+            alt="Pratinjau Foto Kontak"
+            className="max-w-full max-h-full block"
+          />
+        </div>
+
         {/* Controls Toolbar */}
-        <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-2xl bg-slate-950/70 border border-card-border/40 text-slate-300">
+        <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-2xl bg-slate-950/80 border border-card-border/40 text-slate-300">
           <div className="flex items-center gap-1">
             <button
               type="button"
               onClick={() => handleZoom(0.1)}
-              className="p-2 rounded-xl hover:bg-slate-800 hover:text-accent-cyan transition cursor-pointer"
-              title="Perbesar"
+              className="p-2 rounded-xl hover:bg-slate-800 hover:text-accent-cyan transition cursor-pointer flex items-center gap-1 text-xs"
+              title="Perbesar Foto"
             >
               <ZoomIn className="w-4 h-4" />
+              <span className="hidden sm:inline text-[11px] font-mono">Zoom In</span>
             </button>
             <button
               type="button"
               onClick={() => handleZoom(-0.1)}
-              className="p-2 rounded-xl hover:bg-slate-800 hover:text-accent-cyan transition cursor-pointer"
-              title="Perkecil"
+              className="p-2 rounded-xl hover:bg-slate-800 hover:text-accent-cyan transition cursor-pointer flex items-center gap-1 text-xs"
+              title="Perkecil Foto"
             >
               <ZoomOut className="w-4 h-4" />
+              <span className="hidden sm:inline text-[11px] font-mono">Zoom Out</span>
             </button>
+
             <div className="w-px h-5 bg-card-border/50 mx-1" />
+
             <button
               type="button"
               onClick={() => handleRotate(-90)}
@@ -233,7 +283,9 @@ export default function ContactPhotoCropperModal({
             >
               <RotateCw className="w-4 h-4" />
             </button>
+
             <div className="w-px h-5 bg-card-border/50 mx-1" />
+
             <button
               type="button"
               onClick={handleFlipX}
@@ -255,7 +307,8 @@ export default function ContactPhotoCropperModal({
           <button
             type="button"
             onClick={handleReset}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-xl hover:bg-slate-800 text-xs text-slate-400 hover:text-slate-200 transition cursor-pointer font-mono"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl hover:bg-slate-800 text-xs text-slate-400 hover:text-slate-200 transition cursor-pointer font-mono"
+            title="Kembalikan posisi semula"
           >
             <RefreshCw className="w-3.5 h-3.5" />
             <span>Reset</span>
@@ -269,34 +322,40 @@ export default function ContactPhotoCropperModal({
         )}
 
         {/* Footer Actions */}
-        <div className="flex items-center justify-end gap-3 pt-4 mt-2 border-t border-card-border/20">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={uploading}
-            className="px-4 py-2.5 rounded-xl bg-slate-900 border border-card-border text-slate-300 text-xs font-bold hover:bg-slate-800 transition cursor-pointer"
-          >
-            Batal
-          </button>
+        <div className="flex items-center justify-between pt-4 mt-2 border-t border-card-border/20">
+          <p className="text-[11px] text-slate-400 font-mono hidden sm:block">
+            ⚡ Pemotongan & kompresi WebP otomatis diproses di server.
+          </p>
 
-          <button
-            type="button"
-            onClick={handleUploadServer}
-            disabled={uploading}
-            className="px-5 py-2.5 rounded-xl bg-accent-cyan text-black font-extrabold text-xs shadow-[0_0_20px_rgba(125,249,255,0.4)] hover:shadow-[0_0_25px_rgba(125,249,255,0.6)] hover:scale-[1.02] active:scale-[0.98] transition flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {uploading ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin text-black" />
-                <span>Memproses di Server R2...</span>
-              </>
-            ) : (
-              <>
-                <Check className="w-4 h-4 text-black" />
-                <span>Simpan Foto (Server Side)</span>
-              </>
-            )}
-          </button>
+          <div className="flex items-center gap-3 ml-auto">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={uploading}
+              className="px-4 py-2.5 rounded-xl bg-slate-900 border border-card-border text-slate-300 text-xs font-bold hover:bg-slate-800 transition cursor-pointer"
+            >
+              Batal
+            </button>
+
+            <button
+              type="button"
+              onClick={handleUploadServer}
+              disabled={uploading}
+              className="px-5 py-2.5 rounded-xl bg-accent-cyan text-black font-extrabold text-xs shadow-[0_0_20px_rgba(125,249,255,0.4)] hover:shadow-[0_0_25px_rgba(125,249,255,0.6)] hover:scale-[1.02] active:scale-[0.98] transition flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {uploading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-black" />
+                  <span>Memproses di Server R2...</span>
+                </>
+              ) : (
+                <>
+                  <Check className="w-4 h-4 text-black" />
+                  <span>Terapkan & Simpan Foto</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>

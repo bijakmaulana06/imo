@@ -6,6 +6,24 @@ import StarfieldBackground from "@/components/StarfieldBackground";
 import Card from "@/components/Card";
 import { createClient } from "@/utils/supabase/client";
 import { MessageSquare, Search, AlertCircle, Users, ExternalLink } from "lucide-react";
+
+function InstagramIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
+      <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+      <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
+    </svg>
+  );
+}
 import { useSiteConfig } from "@/components/SiteConfigProvider";
 
 interface ContactPerson {
@@ -176,20 +194,35 @@ export default function ContactPage() {
                   </p>
                 </div>
 
-                <a
-                  href={getWhatsAppLink(contact.whatsapp)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={`w-full flex items-center justify-center space-x-2 py-3 rounded-xl font-mono text-xs font-bold uppercase tracking-wider transition-all duration-300 border ${
-                    contact.role.toUpperCase() === "LO"
-                      ? "bg-accent-cyan/15 text-accent-cyan border-accent-cyan hover:bg-accent-cyan hover:text-black hover:shadow-[0_0_20px_rgba(125,249,255,0.4)]"
-                      : "bg-accent-purple/15 text-accent-purple border-accent-purple hover:bg-accent-purple hover:text-black hover:shadow-[0_0_20px_rgba(180,140,255,0.4)]"
-                  }`}
-                >
-                  <MessageSquare className="h-4 w-4" />
-                  <span>Kirim Pesan</span>
-                  <ExternalLink className="h-3.5 w-3.5 opacity-60" />
-                </a>
+                <div className="w-full space-y-2 mt-auto">
+                  <a
+                    href={getWhatsAppLink(contact.whatsapp)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`w-full flex items-center justify-center space-x-2 py-2.5 rounded-xl font-mono text-xs font-bold uppercase tracking-wider transition-all duration-300 border ${
+                      contact.role.toUpperCase() === "LO"
+                        ? "bg-accent-cyan/15 text-accent-cyan border-accent-cyan hover:bg-accent-cyan hover:text-black hover:shadow-[0_0_20px_rgba(125,249,255,0.4)]"
+                        : "bg-accent-purple/15 text-accent-purple border-accent-purple hover:bg-accent-purple hover:text-black hover:shadow-[0_0_20px_rgba(180,140,255,0.4)]"
+                    }`}
+                  >
+                    <MessageSquare className="h-4 w-4" />
+                    <span>Kirim Pesan</span>
+                    <ExternalLink className="h-3.5 w-3.5 opacity-60" />
+                  </a>
+
+                  {contact.instagram && contact.instagram.trim() && (
+                    <a
+                      href={`https://instagram.com/${contact.instagram.replace(/^@/, "").trim()}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full flex items-center justify-center space-x-2 py-2.5 rounded-xl font-mono text-xs font-bold transition-all duration-300 border bg-gradient-to-r from-pink-500/15 via-purple-500/15 to-amber-500/15 text-pink-300 border-pink-500/40 hover:border-pink-400 hover:text-white hover:shadow-[0_0_20px_rgba(236,72,153,0.4)] group"
+                    >
+                      <InstagramIcon className="h-4 w-4 text-pink-400 group-hover:scale-110 transition-transform flex-shrink-0" />
+                      <span className="truncate">@{contact.instagram.replace(/^@/, "").trim()}</span>
+                      <ExternalLink className="h-3.5 w-3.5 opacity-60 ml-0.5" />
+                    </a>
+                  )}
+                </div>
               </Card>
             ))}
           </div>
