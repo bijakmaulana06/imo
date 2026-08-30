@@ -7,6 +7,16 @@ import { Wrench, Sparkles, X, ChevronRight, AlertTriangle } from "lucide-react";
 import StarfieldBackground from "@/components/StarfieldBackground";
 import RealisticBlackHole from "@/components/RealisticBlackHole";
 
+export interface HomePhotoSlot {
+  id: string;
+  badge?: string;
+  title: string;
+  description: string;
+  gdriveUrl: string;
+  coordinateLabel?: string;
+  dateTag?: string;
+}
+
 export interface SiteConfig {
   // Branding & Identity
   siteName: string;
@@ -55,6 +65,12 @@ export interface SiteConfig {
   homeCard2Desc: string;
   homeCard3Title: string;
   homeCard3Desc: string;
+
+  // Home Photo Slots (GDrive Showcase)
+  homePhotoSlotsEnabled: boolean;
+  homePhotoSlotsTitle: string;
+  homePhotoSlotsSubtitle: string;
+  homePhotoSlots: HomePhotoSlot[];
 
   // Copywriting - Info Page
   infoHeroTitle: string;
@@ -139,6 +155,11 @@ export const DEFAULT_SITE_CONFIG: SiteConfig = {
   homeCard3Title: "Hubungi LO",
   homeCard3Desc: "Kehilangan arah dalam perjalanan luar angkasa ini? Hubungi LO/Pendamping kelompok Anda secara langsung melalui satu tombol WhatsApp.",
 
+  homePhotoSlotsEnabled: true,
+  homePhotoSlotsTitle: "ALUR KISAH PENJELAJAHAN ORBIT",
+  homePhotoSlotsSubtitle: "Rekam jejak kronologis dan narasi momentum penjelajahan Mahasiswa Baru IMO 2026 dari awal keberangkatan hingga puncak inovasi.",
+  homePhotoSlots: [],
+
   infoHeroTitle: "Status Hub & Pengumpulan",
   infoHeroSubtitle: "Verifikasi kelengkapan pengumpulan tugas kelompok dan berkas individu real-time.",
   infoWarningNotice: "Catatan: Jika ingin membuka folder, mohon menunggu loading selesai, Terimakasih.",
@@ -173,9 +194,13 @@ export const DEFAULT_SITE_CONFIG: SiteConfig = {
 const SiteConfigContext = createContext<{
   config: SiteConfig;
   refreshConfig: () => Promise<void>;
+  isDevBypass: boolean;
+  setDevBypass: (active: boolean) => void;
 }>({
   config: DEFAULT_SITE_CONFIG,
   refreshConfig: async () => {},
+  isDevBypass: false,
+  setDevBypass: () => {},
 });
 
 export const useSiteConfig = () => useContext(SiteConfigContext);
@@ -183,6 +208,7 @@ export const useSiteConfig = () => useContext(SiteConfigContext);
 export default function SiteConfigProvider({ children }: { children: React.ReactNode }) {
   const [config, setConfig] = useState<SiteConfig>(DEFAULT_SITE_CONFIG);
   const [bannerDismissed, setBannerDismissed] = useState(false);
+  const [isDevBypass, setIsDevBypass] = useState<boolean>(false);
   const pathname = usePathname();
 
   const fetchConfig = async () => {
@@ -201,6 +227,42 @@ export default function SiteConfigProvider({ children }: { children: React.React
     fetchConfig();
   }, []);
 
+  // Sync dev bypass state with session storage & url
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    if (config.maintenanceMode) {
+      const stored = sessionStorage.getItem("imo_lockdown_bypass");
+      const urlParams = new URLSearchParams(window.location.search);
+      const hasParam = urlParams.get("bypass") === "1" || urlParams.get("dev") === "1";
+      const isPreviewRoute = pathname?.startsWith("/preview");
+
+      if (stored === "1" || hasParam || isPreviewRoute) {
+        setIsDevBypass(true);
+        sessionStorage.setItem("imo_lockdown_bypass", "1");
+        document.cookie = "imo_lockdown_bypass=1; path=/; max-age=86400; SameSite=Lax";
+      }
+    } else {
+      // If maintenanceMode is off, clean up bypass session
+      setIsDevBypass(false);
+      sessionStorage.removeItem("imo_lockdown_bypass");
+      document.cookie = "imo_lockdown_bypass=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    }
+  }, [config.maintenanceMode, pathname]);
+
+  const handleSetDevBypass = (active: boolean) => {
+    setIsDevBypass(active);
+    if (typeof window !== "undefined") {
+      if (active) {
+        sessionStorage.setItem("imo_lockdown_bypass", "1");
+        document.cookie = "imo_lockdown_bypass=1; path=/; max-age=86400; SameSite=Lax";
+      } else {
+        sessionStorage.removeItem("imo_lockdown_bypass");
+        document.cookie = "imo_lockdown_bypass=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+      }
+    }
+  };
+
   // Inject CSS Variables dynamically into document root
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -214,9 +276,11 @@ export default function SiteConfigProvider({ children }: { children: React.React
   }, [config]);
 
   const isAdminPath = pathname?.startsWith("/admin");
+  const isPreviewPath = pathname?.startsWith("/preview");
+  const isBypassed = isDevBypass && config.maintenanceMode;
 
-  // Check Maintenance Mode
-  if (config.maintenanceMode && !isAdminPath) {
+  // Check Maintenance Mode (Lockdown)
+  if (config.maintenanceMode && !isAdminPath && !isPreviewPath && !isBypassed) {
     return (
       <div className="relative min-h-screen flex flex-col items-center justify-center bg-black text-slate-100 px-4 text-center overflow-hidden font-mono">
         <StarfieldBackground />
@@ -279,7 +343,41 @@ export default function SiteConfigProvider({ children }: { children: React.React
   };
 
   return (
-    <SiteConfigContext.Provider value={{ config, refreshConfig: fetchConfig }}>
+    <SiteConfigContext.Provider value={{ config, refreshConfig: fetchConfig, isDevBypass, setDevBypass: handleSetDevBypass }}>
+      {/* Floating DEVELOPMENT MODE Indicator HUD Bar during Lockdown Bypass */}
+      {config.maintenanceMode && isBypassed && !isAdminPath && (
+        <div className="sticky top-0 left-0 right-0 z-[200] bg-black/90 border-b border-amber-500/60 shadow-[0_4px_30px_rgba(245,158,11,0.35)] backdrop-blur-xl px-4 py-2 flex items-center justify-between font-mono text-xs text-amber-200 transition-all select-none">
+          <div className="flex items-center space-x-3 max-w-4xl truncate">
+            <span className="flex h-2.5 w-2.5 relative">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+            </span>
+            <span className="bg-amber-500/20 border border-amber-400/50 px-2 py-0.5 rounded text-[11px] font-black tracking-widest text-amber-300 shadow-[0_0_10px_rgba(245,158,11,0.3)]">
+              DEVELOPMENT MODE
+            </span>
+            <span className="hidden sm:inline text-slate-400 text-[11px] truncate">
+              [LOCKDOWN BYPASS ACTIVE — ADMIN TESTING PROTOCOL]
+            </span>
+          </div>
+
+          <div className="flex items-center space-x-2.5">
+            <Link
+              href="/preview"
+              className="px-2.5 py-1 rounded-md bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-[10px] font-bold tracking-wider transition"
+            >
+              Control Portal
+            </Link>
+            <button
+              onClick={() => handleSetDevBypass(false)}
+              className="px-2.5 py-1 rounded-md bg-rose-950/60 hover:bg-rose-900/80 text-rose-300 border border-rose-800/60 text-[10px] font-bold tracking-wider transition hover:shadow-[0_0_10px_rgba(244,63,94,0.3)]"
+              title="Kunci kembali website ke status lockdown"
+            >
+              Exit Dev Mode
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Global Top Announcement Alert Banner */}
       {config.enableGlobalBanner && !bannerDismissed && (
         <div className={`w-full py-2.5 px-4 border-b text-xs font-mono font-bold flex items-center justify-between relative z-[150] transition-all backdrop-blur-md ${getBannerColor(config.globalBannerStyle)}`}>

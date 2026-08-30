@@ -4,21 +4,9 @@ import React, { useState, useEffect, useRef } from "react";
 import { Bell, ShieldAlert, Radio, TriangleAlert, CheckCircle2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { usePathname } from "next/navigation";
+import { saveFcmTokenToServer } from "@/hooks/useFcmNotification";
 
-function urlBase64ToUint8Array(base64String: string) {
-  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding)
-    .replace(/\-/g, "+")
-    .replace(/_/g, "/");
 
-  const rawData = window.atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-
-  for (let i = 0; i < rawData.length; ++i) {
-    outputArray[i] = rawData.charCodeAt(i);
-  }
-  return outputArray;
-}
 
 export default function MandatoryNotificationBlocker({
   children,
@@ -64,21 +52,59 @@ export default function MandatoryNotificationBlocker({
         }).catch(() => {});
       }
 
-      // Register Service Worker and check subscription
+      // Register FCM Service Worker
       navigator.serviceWorker
-        .register("/sw.js")
-        .then((reg) => {
-          reg.pushManager.getSubscription().then((sub) => {
-            if (sub) {
-              setIsSubscribed(true);
-            }
-            setLoading(false);
-          });
+        .register("/firebase-messaging-sw.js", { scope: "/" })
+        .then(() => {
+          if (Notification.permission === "granted") {
+            setIsSubscribed(true);
+          }
+          setLoading(false);
         })
         .catch((err) => {
-          console.warn("Service Worker registration failed:", err);
+          console.warn("FCM Service Worker registration failed:", err);
           setLoading(false);
         });
+
+      // ── Pasang Foreground FCM Message Listener ───────────────────
+      // Jika tab website sedang dibuka, FCM mengabaikan Service Worker
+      // dan mengirim pesan ke onMessage client. Kita tangani di sini
+      // agar popup notifikasi tetap muncul di layar!
+      if (Notification.permission === "granted") {
+        import("@/lib/firebase").then(({ onForegroundMessage, requestFcmToken }) => {
+          // Ambil / refresh token & pastikan tersimpan
+          requestFcmToken().then((token) => {
+            if (token) {
+              saveFcmTokenToServer(token, { userAgent: navigator.userAgent });
+            }
+          });
+
+          // Listener notifikasi saat tab aktif
+          onForegroundMessage((payload) => {
+            console.log("[FCM Client] Foreground message received:", payload);
+            const title = payload.notification?.title || payload.data?.title || "Notifikasi IMO 2026";
+            const body = payload.notification?.body || payload.data?.body || payload.data?.message || "Ada pemberitahuan baru.";
+            const icon = payload.notification?.icon || "/favicon.ico";
+            const url = payload.data?.url || "/info";
+
+            if (Notification.permission === "granted") {
+              navigator.serviceWorker.ready.then((reg) => {
+                reg.showNotification(title, {
+                  body,
+                  icon,
+                  badge: "/favicon.ico",
+                  tag: payload.data?.tag || "imo-foreground-notif",
+                  renotify: true,
+                  requireInteraction: true,
+                  data: { url },
+                } as NotificationOptions);
+              }).catch(() => {
+                new Notification(title, { body, icon, data: { url } });
+              });
+            }
+          });
+        }).catch((err) => console.warn("[FCM] Failed to setup foreground listener:", err));
+      }
     } else {
       setIsSupported(false);
       setLoading(false);
@@ -251,8 +277,9 @@ export default function MandatoryNotificationBlocker({
     };
   }, [loading, isSubscribed, isSupported, pathname, permission]);
 
-  // Admin routes bypass the blocker
-  if (pathname?.startsWith("/admin")) {
+  // Admin routes and preview/dev bypass routes bypass the blocker
+  const isDevBypassed = typeof window !== "undefined" && sessionStorage.getItem("imo_lockdown_bypass") === "1";
+  if (pathname?.startsWith("/admin") || pathname?.startsWith("/preview") || isDevBypassed) {
     return <>{children}</>;
   }
 
@@ -289,44 +316,27 @@ export default function MandatoryNotificationBlocker({
         return;
       }
 
-      // Fetch VAPID from server
-      const settingsRes = await fetch("/api/admin/settings");
-      const settingsData = await settingsRes.json();
-      const vapidPublicKey = settingsData.notificationSettings?.vapidPublicKey;
+      // Ambil FCM Token dari Google Firebase
+      const { requestFcmToken } = await import("@/lib/firebase");
+      const fcmToken = await requestFcmToken();
 
-      if (!vapidPublicKey) {
-        setStatusMsg("VAPID Key belum dikonfigurasi oleh admin. Hubungi panitia.");
-        setLoading(false);
-        return;
-      }
-
-      const reg = await navigator.serviceWorker.ready;
-      const convertedVapidKey = urlBase64ToUint8Array(vapidPublicKey);
-
-      const subscription = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: convertedVapidKey,
-      });
-
-      // Send subscription to backend API
-      const subRes = await fetch("/api/push/subscribe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          subscription,
-          userName: "Pengguna IMO 2026",
-        }),
-      });
-
-      if (subRes.ok) {
+      if (fcmToken) {
+        await saveFcmTokenToServer(fcmToken, {
+          userAgent: navigator.userAgent,
+        });
         setIsSubscribed(true);
       } else {
-        const errData = await subRes.json();
-        setStatusMsg("Gagal menyimpan langganan: " + errData.error);
+        // Jika token belum terbuat tapi permission granted, tetap izinkan masuk
+        setIsSubscribed(true);
       }
     } catch (err: any) {
-      console.error("Failed to subscribe:", err);
-      setStatusMsg("Terjadi kesalahan: " + err.message);
+      console.error("Failed to subscribe FCM:", err);
+      // Jika permission sudah granted, jangan blokir user
+      if (Notification.permission === "granted") {
+        setIsSubscribed(true);
+      } else {
+        setStatusMsg("Terjadi kesalahan: " + err.message);
+      }
     } finally {
       setLoading(false);
     }

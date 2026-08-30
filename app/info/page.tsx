@@ -124,6 +124,8 @@ export default function SummaryTugasPage() {
     heroSubtitle: "Verifikasi kelengkapan pengumpulan tugas kelompok dan berkas individu real-time.",
     announcementBanner: "Catatan: Jika ingin membuka folder, mohon menunggu loading selesai, Terimakasih.",
   });
+  const [totalGroupsCount, setTotalGroupsCount] = useState<number>(20);
+  const [groupNames, setGroupNames] = useState<Record<string, string>>({});
 
   useEffect(() => {
     async function loadSettings() {
@@ -133,6 +135,12 @@ export default function SummaryTugasPage() {
           const data = await res.json();
           if (data.uiCustomizations) {
             setUiCustomizations((prev) => ({ ...prev, ...data.uiCustomizations }));
+          }
+          if (data.totalGroupsCount && typeof data.totalGroupsCount === "number") {
+            setTotalGroupsCount(data.totalGroupsCount);
+          }
+          if (data.groupNames && typeof data.groupNames === "object") {
+            setGroupNames(data.groupNames);
           }
         }
       } catch (err) {
@@ -236,15 +244,11 @@ export default function SummaryTugasPage() {
       setIsKelompokCached(!!data.isCached);
     } catch (err: any) {
       clearTimeout(timeoutId);
-      console.warn("Drive check API failure, fallback engaged:", err);
-      const fallbackTasks: TaskStatus[] = [
-        { taskId: "1", taskName: "Rekaman Video Flashmob IMO 2026", taskType: "kelompok", isCompleted: true, fileName: `Rekaman_Flashmob_${targetGroup.replace(/\s+/g, "")}.mp4` },
-        { taskId: "2", taskName: "Berkas Administrasi Kelompok", taskType: "kelompok", isCompleted: true, fileName: `Berkas_Pengumpulan_Tugas_${targetGroup.replace(/\s+/g, "")}.pdf` },
-        { taskId: "3", taskName: "Dokumen Jargon & Tagline", taskType: "kelompok", isCompleted: false },
-      ];
-      setKelompokTasks(fallbackTasks);
-      setCompletedCount(2);
-      setTotalCount(3);
+      console.warn("Drive check API failure:", err);
+      setKelompokTasks([]);
+      setCompletedCount(0);
+      setTotalCount(0);
+      setErrorKelompok(err.message || "Gagal memindai berkas tugas kelompok");
     } finally {
       setLoadingKelompok(false);
     }
@@ -285,37 +289,11 @@ export default function SummaryTugasPage() {
       }
     } catch (err: any) {
       clearTimeout(timeoutId);
-      console.warn("Drive Individu API failure, fallback engaged:", err);
-      const fallbackPersons: PersonGroupedData[] = [
-        {
-          personName: "Ahmad Fauzi",
-          submittedCount: 2,
-          totalRequired: 3,
-          completionPercentage: 67,
-          tasks: [
-            { taskId: "1", taskName: "Jurnal Harian & Resume", isCompleted: true, fileName: `Jurnal_Harian_${targetGroup.replace(/\s+/g, "")}_Ahmad.pdf`, driveLink: "https://drive.google.com" },
-            { taskId: "2", taskName: "Berkas Administrasi Mandiri", isCompleted: true, fileName: `Administrasi_${targetGroup.replace(/\s+/g, "")}_Ahmad.pdf`, driveLink: "https://drive.google.com" },
-            { taskId: "3", taskName: "Twibbon & ID Card", isCompleted: false }
-          ],
-          allFiles: [{ id: "f1", name: `Jurnal_Harian_Ahmad.pdf`, mimeType: "application/pdf" }]
-        },
-        {
-          personName: "Budi Santoso",
-          submittedCount: 3,
-          totalRequired: 3,
-          completionPercentage: 100,
-          tasks: [
-            { taskId: "1", taskName: "Jurnal Harian & Resume", isCompleted: true, fileName: `Jurnal_Harian_${targetGroup.replace(/\s+/g, "")}_Budi.pdf`, driveLink: "https://drive.google.com" },
-            { taskId: "2", taskName: "Berkas Administrasi Mandiri", isCompleted: true, fileName: `Administrasi_${targetGroup.replace(/\s+/g, "")}_Budi.pdf`, driveLink: "https://drive.google.com" },
-            { taskId: "3", taskName: "Twibbon & ID Card", isCompleted: true, fileName: `Twibbon_${targetGroup.replace(/\s+/g, "")}_Budi.png`, driveLink: "https://drive.google.com" }
-          ],
-          allFiles: [{ id: "f2", name: `Jurnal_Harian_Budi.pdf`, mimeType: "application/pdf" }]
-        }
-      ];
-      setIndividuPersons(fallbackPersons);
-      setIndividuTargetMembers(10);
-      setIndividuSubmittedCount(2);
-      setIndividuFolderFound(true);
+      console.warn("Drive Individu API failure:", err);
+      setIndividuFiles([]);
+      setIndividuPersons([]);
+      setIndividuFolderFound(false);
+      setErrorIndividu(err.message || "Gagal memindai berkas individu");
     } finally {
       setLoadingIndividu(false);
     }
@@ -472,20 +450,44 @@ export default function SummaryTugasPage() {
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2 mb-4">
-            {["Kelompok 1", "Kelompok 2", "Kelompok 3", "Kelompok 4", "Kelompok 5"].map((grp) => (
-              <button
-                key={grp}
-                onClick={() => handleGroupSelect(grp)}
-                className={`px-4 py-2 rounded-xl text-xs font-bold font-mono transition duration-300 cursor-pointer ${
-                  groupName === grp
-                    ? "bg-accent-cyan text-black font-extrabold shadow-[0_0_15px_rgba(125,249,255,0.4)]"
-                    : "bg-slate-900/90 text-slate-300 hover:bg-slate-800 border border-white/10"
-                }`}
-              >
-                {grp}
-              </button>
-            ))}
+          <div className="flex flex-wrap gap-2 mb-4 max-h-[160px] overflow-y-auto pr-1">
+            {Array.from({ length: totalGroupsCount }, (_, idx) => {
+              const groupNum = idx + 1;
+              const defaultName = `Kelompok ${groupNum}`;
+              const custom = groupNames[String(groupNum)] || groupNames[defaultName];
+              
+              let grpLabel = defaultName;
+              if (custom && custom.trim()) {
+                const trimmed = custom.trim();
+                if (new RegExp(`\\(Kelompok\\s*${groupNum}\\)`, "i").test(trimmed)) {
+                  grpLabel = trimmed;
+                } else if (new RegExp(`\\bKelompok\\s*${groupNum}\\b`, "i").test(trimmed)) {
+                  grpLabel = trimmed.replace(new RegExp(`\\s*\\(?Kelompok\\s*${groupNum}\\)?`, "i"), ` (Kelompok ${groupNum})`);
+                } else if (/^Kelompok\s+\d+$/i.test(trimmed)) {
+                  grpLabel = trimmed;
+                } else {
+                  grpLabel = `${trimmed} (Kelompok ${groupNum})`;
+                }
+              }
+
+              const isActive = groupName.toLowerCase() === grpLabel.toLowerCase() || 
+                               groupName.toLowerCase() === defaultName.toLowerCase() ||
+                               (custom && groupName.toLowerCase() === custom.trim().toLowerCase());
+
+              return (
+                <button
+                  key={groupNum}
+                  onClick={() => handleGroupSelect(grpLabel)}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold font-mono transition duration-300 cursor-pointer ${
+                    isActive
+                      ? "bg-accent-cyan text-black font-extrabold shadow-[0_0_15px_rgba(125,249,255,0.4)]"
+                      : "bg-slate-900/90 text-slate-300 hover:bg-slate-800 border border-white/10"
+                  }`}
+                >
+                  {grpLabel}
+                </button>
+              );
+            })}
           </div>
 
           <form onSubmit={handleCustomSubmit} className="flex gap-2">
@@ -755,7 +757,9 @@ export default function SummaryTugasPage() {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2.5">
                 <div className="flex items-center space-x-2">
                   <span className="text-xs font-mono font-bold text-slate-300 uppercase tracking-wider">Progres Pengumpulan Anggota</span>
-                  <span className="text-[10px] font-mono text-slate-500">(Target Admin: {individuTargetMembers} Orang/Kelompok)</span>
+                  <span className="text-[10px] font-mono text-slate-400 bg-slate-900/80 border border-slate-700/60 px-2 py-0.5 rounded-full">
+                    Target: {individuTargetMembers} Peserta
+                  </span>
                 </div>
                 <div className="text-xs font-mono font-bold text-accent-purple">
                   {individuSubmittedCount} dari {individuTargetMembers} Anggota Telah Mengumpulkan ({Math.min(100, Math.round((individuSubmittedCount / (individuTargetMembers || 1)) * 100))}%)

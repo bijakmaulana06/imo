@@ -48,3 +48,8 @@ service_account.json
 SUpabase database
 implementasi
 S3 R2.txt
+
+# Firebase service account keys (JANGAN di-commit!)
+scripts/*serviceaccount*.json
+scripts/*firebase-adminsdk*.json
+scripts/imo-info-serviceaccount.json

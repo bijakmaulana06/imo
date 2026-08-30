@@ -34,7 +34,7 @@ const FALLBACK_TEMPLATE: TemplateItem = {
 
 export default function IdCardPage() {
   const [templates, setTemplates] = useState<TemplateItem[]>([]);
-  const [selectedTemplateUrl, setSelectedTemplateUrl] = useState<string>("/templates/id-card.psd");
+  const [selectedTemplateUrl, setSelectedTemplateUrl] = useState<string>("");
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("official-default-template");
   const [loadingTemplates, setLoadingTemplates] = useState(true);
 
@@ -55,9 +55,14 @@ export default function IdCardPage() {
           const psdUrl = defaultItem.background_url || defaultItem.layout_json?.psd_url || "/templates/id-card.psd";
           setSelectedTemplateUrl(psdUrl);
           setSelectedTemplateId(defaultItem.id);
+        } else {
+          setSelectedTemplateUrl("/templates/id-card.psd");
+          setSelectedTemplateId("official-default-template");
         }
       } catch (err) {
-        console.warn("Could not load templates list from API:", err);
+        console.warn("Could not load templates list from API, using fallback:", err);
+        setSelectedTemplateUrl("/templates/id-card.psd");
+        setSelectedTemplateId("official-default-template");
       } finally {
         setLoadingTemplates(false);
       }
@@ -136,7 +141,14 @@ export default function IdCardPage() {
 
         {/* Core Generator Section */}
         <section className="w-full">
-          <IdCardGenerator templateUrl={selectedTemplateUrl} allowUserUpload={false} />
+          {loadingTemplates || !selectedTemplateUrl ? (
+            <div className="w-full max-w-4xl mx-auto rounded-3xl glass border border-card-border/40 p-16 flex flex-col items-center justify-center gap-3 text-slate-400">
+              <Loader2 className="w-8 h-8 animate-spin text-accent-cyan" />
+              <p className="font-mono text-xs text-slate-300">Menyiapkan mesin templat ID Card...</p>
+            </div>
+          ) : (
+            <IdCardGenerator templateUrl={selectedTemplateUrl} allowUserUpload={false} />
+          )}
         </section>
       </main>
 

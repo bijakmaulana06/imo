@@ -82,13 +82,7 @@ export async function GET(request: NextRequest) {
   const privateKey = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n");
   let folderId = process.env.GOOGLE_DRIVE_FOLDER_ID || "";
 
-  let taskDefinitions: { id: string; name: string; type: "kelompok" | "individu"; keyword: string; deadline?: string }[] = [
-    { id: "task-1", name: "Video Yel-Yel Kelompok", type: "kelompok" as const, keyword: "yel-yel" },
-    { id: "task-2", name: "Dokumen Jargon & Tagline", type: "kelompok" as const, keyword: "jargon" },
-    { id: "task-3", name: "Rekaman Gerakan Flashmob", type: "kelompok" as const, keyword: "flashmob" },
-    { id: "task-4", name: "Berkas Pengunggah Tugas Kelompok", type: "kelompok" as const, keyword: "tugas" },
-    { id: "task-5", name: "ID Card & Twibbon (Individu)", type: "individu" as const, keyword: "idcard" },
-  ];
+  let taskDefinitions: { id: string; name: string; type: "kelompok" | "individu"; keyword: string; deadline?: string }[] = [];
 
   if (supabase) {
     try {
@@ -288,30 +282,15 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // FALLBACK DEMO MODE
-  const isDemoCompleted = groupName.toLowerCase().includes("1") || groupName.toLowerCase().includes("demo");
-
-  const demoTasks: GroupTaskStatus[] = taskDefinitions.map((t, idx) => ({
-    taskId: t.id,
-    taskName: t.name,
-    taskType: t.type,
-    isCompleted: t.type === "individu" ? true : idx % 2 === 0 ? isDemoCompleted : false,
-    driveLink: isDemoCompleted ? "https://drive.google.com" : undefined,
-    fileName: isDemoCompleted ? `${t.name}_${groupName}.pdf` : undefined,
-    lastUpdated: new Date().toISOString(),
-  }));
-
-  const demoCompleted = demoTasks.filter(t => t.isCompleted).length;
-
+  // Return clean empty result if Google Drive credentials are not active
   return NextResponse.json({
     groupName,
-    folderFound: isDemoCompleted,
+    folderFound: false,
     isRealDrive: false,
-    demoNotice: "Google Drive Service Account / Folder belum disetel. Menampilkan mode simulasi.",
-    tasks: demoTasks,
+    tasks: [],
     summary: {
-      completed: demoCompleted,
-      total: demoTasks.length
+      completed: 0,
+      total: 0
     }
   });
 }

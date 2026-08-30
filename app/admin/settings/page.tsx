@@ -27,7 +27,21 @@ import {
   LayoutGrid,
   ChevronUp,
   ChevronDown,
-  Music
+  Music,
+  ExternalLink,
+  Plus,
+  Trash2,
+  Camera,
+  Image as ImageIcon,
+  ArrowUp,
+  ArrowDown,
+  Copy,
+  RotateCcw,
+  Milestone,
+  Compass,
+  Minus,
+  Search,
+  UsersRound
 } from "lucide-react";
 import { Link } from "next-view-transitions";
 import ImoLogo from "@/components/ImoLogo";
@@ -66,6 +80,9 @@ export default function AdminSettingsCommandCenter() {
   const [gdriveParentFolder, setGdriveParentFolder] = useState("");
   const [totalGroupsCount, setTotalGroupsCount] = useState(20);
   const [targetMembersPerGroup, setTargetMembersPerGroup] = useState(10);
+  const [groupMemberCounts, setGroupMemberCounts] = useState<Record<string, number>>({});
+  const [groupNames, setGroupNames] = useState<Record<string, string>>({});
+  const [showCustomGroupCounts, setShowCustomGroupCounts] = useState(false);
   const [notificationSettings, setNotificationSettings] = useState({
     enableNewTaskNotif: true,
     enableAnnouncementNotif: true,
@@ -126,6 +143,12 @@ export default function AdminSettingsCommandCenter() {
         setGdriveParentFolder(data.gdriveParentFolder || "");
         setTotalGroupsCount(data.totalGroupsCount || 20);
         setTargetMembersPerGroup(data.targetMembersPerGroup || 10);
+        if (data.groupMemberCounts && typeof data.groupMemberCounts === "object") {
+          setGroupMemberCounts(data.groupMemberCounts);
+        }
+        if (data.groupNames && typeof data.groupNames === "object") {
+          setGroupNames(data.groupNames);
+        }
         if (data.notificationSettings) {
           setNotificationSettings(data.notificationSettings);
         }
@@ -153,6 +176,8 @@ export default function AdminSettingsCommandCenter() {
           gdriveParentFolder,
           totalGroupsCount,
           targetMembersPerGroup,
+          groupMemberCounts,
+          groupNames,
           notificationSettings,
         }),
       });
@@ -197,29 +222,7 @@ export default function AdminSettingsCommandCenter() {
     }
   };
 
-  const handleRegenerateVapid = async () => {
-    if (!window.confirm("WARNING: Regenerating VAPID keys will invalidate ALL existing push subscriptions. Users will need to re-subscribe. Are you sure you want to proceed?")) return;
-    
-    setSaving(true);
-    try {
-      const res = await fetch("/api/admin/settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "regenerate_vapid" }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        alert("VAPID Keys regenerated successfully.");
-        fetchSettings();
-      } else {
-        alert("Failed to regenerate VAPID: " + data.error);
-      }
-    } catch (e: any) {
-      alert("Error: " + e.message);
-    } finally {
-      setSaving(false);
-    }
-  };
+
 
   const handleSendPushBroadcast = async (e: React.FormEvent, isTest: boolean = false) => {
     e.preventDefault();
@@ -632,27 +635,41 @@ export default function AdminSettingsCommandCenter() {
                     <div className="bg-black/50 border border-slate-800/80 rounded-xl p-5">
                       <div className="flex items-center justify-between mb-4">
                         <h3 className="text-xs font-bold text-slate-300 flex items-center space-x-2 tracking-wider">
-                          <Lock className="h-4 w-4 text-emerald-400" />
-                          <span>VAPID CRYPTO ENGINE</span>
+                          <Lock className="h-4 w-4 text-cyan-400" />
+                          <span>FIREBASE CLOUD MESSAGING (FCM)</span>
                         </h3>
-                        <span className="text-[9px] font-bold bg-emerald-500/10 text-emerald-400 px-2 py-1 rounded-full border border-emerald-500/20 uppercase tracking-widest">
-                          {pushSubscribersCount} Active
+                        <span className="text-[9px] font-bold bg-cyan-500/10 text-cyan-400 px-2.5 py-1 rounded-full border border-cyan-500/20 uppercase tracking-widest">
+                          {pushSubscribersCount} Devices Active
                         </span>
                       </div>
                       <div className="space-y-4">
-                        <div>
-                          <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Public Signature</label>
-                          <code className="block w-full p-2.5 bg-black/70 border border-slate-800 rounded-lg text-[10px] text-slate-300 break-all">{notificationSettings.vapidPublicKey || "NULL"}</code>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Firebase Project ID</label>
+                            <code className="block w-full p-2.5 bg-black/70 border border-slate-800 rounded-lg text-[10px] text-cyan-300 font-mono">imo-info</code>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Sender ID</label>
+                            <code className="block w-full p-2.5 bg-black/70 border border-slate-800 rounded-lg text-[10px] text-slate-300 font-mono">1061088435535</code>
+                          </div>
                         </div>
+
                         <div>
-                          <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Private Key (Hidden)</label>
-                          <code className="block w-full p-2.5 bg-black/70 border border-slate-800 rounded-lg text-[10px] text-slate-500 break-all">{notificationSettings.vapidPrivateKey ? "*******************************************" : "NULL"}</code>
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Service Account Status</label>
+                          <div className="p-2.5 bg-emerald-950/20 border border-emerald-500/30 rounded-lg text-[10px] text-emerald-400 flex items-center justify-between">
+                            <span>OAuth2 Google Service Account Active</span>
+                            <span className="font-mono text-[9px] bg-emerald-500/20 px-2 py-0.5 rounded">HTTP v1 API</span>
+                          </div>
                         </div>
+
                         <div className="pt-2">
-                          <button onClick={handleRegenerateVapid} className="w-full justify-center py-2.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-xl text-[10px] tracking-wider font-bold transition flex items-center space-x-2">
-                            <RefreshCw className="h-3.5 w-3.5" />
-                            <span>RE-ROLL VAPID KEYS</span>
-                          </button>
+                          <a
+                            href="/admin/fcm-debug"
+                            className="w-full justify-center py-2.5 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 rounded-xl text-[10px] tracking-wider font-bold transition flex items-center space-x-2 cursor-pointer shadow-[0_0_15px_rgba(6,182,212,0.15)]"
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" />
+                            <span>BUKA FCM DIAGNOSTICS & TESTING CONSOLE (/admin/fcm-debug)</span>
+                          </a>
                         </div>
                       </div>
                     </div>
@@ -713,13 +730,51 @@ export default function AdminSettingsCommandCenter() {
                   <div className="space-y-6">
                     <div className="bg-black/50 border border-slate-800/80 rounded-xl p-5">
                       <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-xs font-bold text-slate-300 tracking-wider">CINEMATIC OFFLINE</h3>
+                        <h3 className="text-xs font-bold text-slate-300 tracking-wider">CINEMATIC OFFLINE (LOCKDOWN)</h3>
                         <button onClick={() => setCoreConfig({ ...coreConfig, maintenanceMode: !coreConfig.maintenanceMode })} className={`px-3.5 py-1.5 rounded-xl text-[10px] tracking-widest font-bold transition ${coreConfig.maintenanceMode ? "bg-rose-500/20 text-rose-400 border border-rose-500/50 animate-pulse shadow-[0_0_15px_rgba(244,63,94,0.2)]" : "bg-black/70 text-slate-400 border border-slate-800"}`}>
-                          {coreConfig.maintenanceMode ? "ORBIT LOST" : "ORBIT STABLE"}
+                          {coreConfig.maintenanceMode ? "ORBIT LOST (LOCKDOWN ON)" : "ORBIT STABLE (ONLINE)"}
                         </button>
                       </div>
                       <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Terminal Message</label>
-                      <input type="text" value={coreConfig.maintenanceMessage} onChange={(e) => setCoreConfig({ ...coreConfig, maintenanceMessage: e.target.value })} className="w-full px-3 py-2 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition" />
+                      <input type="text" value={coreConfig.maintenanceMessage} onChange={(e) => setCoreConfig({ ...coreConfig, maintenanceMessage: e.target.value })} className="w-full px-3 py-2 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition mb-4" />
+
+                      {/* Dev Bypass URL Info Box */}
+                      <div className={`p-3.5 rounded-xl border text-xs font-mono transition-all ${coreConfig.maintenanceMode ? "bg-amber-950/25 border-amber-500/40 text-amber-200" : "bg-black/40 border-slate-800 text-slate-500"}`}>
+                        <div className="flex items-center justify-between gap-2 mb-1.5">
+                          <div className="flex items-center space-x-2">
+                            <span className={`h-2 w-2 rounded-full ${coreConfig.maintenanceMode ? "bg-amber-400 animate-ping" : "bg-slate-600"}`} />
+                            <span className="font-bold text-[11px] tracking-wider uppercase">
+                              URL KHUSUS PENGUJI (DEVELOPMENT BYPASS)
+                            </span>
+                          </div>
+                          <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${coreConfig.maintenanceMode ? "bg-amber-500/20 text-amber-300 border border-amber-400/40" : "bg-slate-800 text-slate-500"}`}>
+                            {coreConfig.maintenanceMode ? "AKTIF" : "NONAKTIF (404)"}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-400 leading-relaxed mb-2.5">
+                          {coreConfig.maintenanceMode
+                            ? "Lockdown sedang aktif. Anda dapat menggunakan URL khusus berikut untuk menguji website dalam status Development Mode."
+                            : "URL bypass penguji otomatis dinonaktifkan saat website dalam keadaan normal (tidak lockdown)."}
+                        </p>
+                        <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-800/60">
+                          <code className="text-[11px] px-2 py-1 rounded bg-black/60 border border-slate-800 text-cyan-300 font-bold select-all">
+                            /preview
+                          </code>
+                          {coreConfig.maintenanceMode ? (
+                            <a
+                              href="/preview"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center space-x-1 px-3 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-[10px] font-bold tracking-wider transition"
+                            >
+                              <span>Buka Penguji</span>
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          ) : (
+                            <span className="text-[10px] text-slate-600 italic">Mati hingga lockdown aktif</span>
+                          )}
+                        </div>
+                      </div>
                     </div>
 
                     <div className="bg-black/50 border border-slate-800/80 rounded-xl p-5">
@@ -739,18 +794,124 @@ export default function AdminSettingsCommandCenter() {
                   <div className="space-y-6">
                     <div className="bg-black/50 border border-slate-800/80 rounded-xl p-5 space-y-4">
                       <div>
-                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">GDrive Root Matrix ID</label>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">GDrive Root Matrix ID / Link</label>
                         <input type="text" value={gdriveParentFolder} onChange={(e) => setGdriveParentFolder(e.target.value)} className="w-full px-3 py-2 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition" />
                       </div>
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">Total Groups</label>
-                          <input type="number" value={totalGroupsCount} onChange={(e) => setTotalGroupsCount(Number(e.target.value))} className="w-full px-3 py-2 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">Total Groups (Kelompok)</label>
+                          <input type="number" min={1} max={100} value={totalGroupsCount} onChange={(e) => setTotalGroupsCount(Number(e.target.value))} className="w-full px-3 py-2 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
                         </div>
                         <div>
-                          <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">Members Per Group</label>
-                          <input type="number" value={targetMembersPerGroup} onChange={(e) => setTargetMembersPerGroup(Number(e.target.value))} className="w-full px-3 py-2 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">Target Default Peserta / Kelompok</label>
+                          <input type="number" min={1} max={1000} value={targetMembersPerGroup} onChange={(e) => setTargetMembersPerGroup(Number(e.target.value))} className="w-full px-3 py-2 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
+                          <span className="text-[9px] text-slate-500 mt-1 block">Standar acuan kuota jika kelompok belum dikustom</span>
                         </div>
+                      </div>
+
+                      {/* Custom Per-Group Counts */}
+                      <div className="bg-black/70 border border-slate-800 rounded-xl p-4 space-y-3 pt-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <UsersRound className="h-4 w-4 text-cyan-400" />
+                            <span className="text-xs font-bold text-slate-200">Kustomisasi Kuota Khusus Per Kelompok</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setShowCustomGroupCounts(!showCustomGroupCounts)}
+                            className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[10px] font-mono font-bold text-slate-300 transition"
+                          >
+                            {showCustomGroupCounts ? "Sembunyikan" : "Buka Matrix Kelompok"}
+                          </button>
+                        </div>
+
+                        {showCustomGroupCounts && (
+                          <div className="space-y-3 pt-2 border-t border-slate-800">
+                            <div className="flex items-center justify-between text-[10px] font-mono text-slate-400">
+                              <span>Atur jumlah anggota unik untuk masing-masing kelompok (1 - {totalGroupsCount})</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (confirm(`Reset semua kelompok ke nilai default (${targetMembersPerGroup})?`)) {
+                                    setGroupMemberCounts({});
+                                  }
+                                }}
+                                className="text-cyan-400 hover:underline"
+                              >
+                                Reset Semua ke Default
+                              </button>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5 max-h-[340px] overflow-y-auto pr-1">
+                              {Array.from({ length: totalGroupsCount }, (_, idx) => {
+                                const groupNum = idx + 1;
+                                const defaultName = `Kelompok ${groupNum}`;
+                                const customName = groupNames[String(groupNum)] || "";
+                                const currentVal = groupMemberCounts[String(groupNum)] ?? targetMembersPerGroup;
+                                const isCustomQuota = groupMemberCounts[String(groupNum)] !== undefined && groupMemberCounts[String(groupNum)] !== targetMembersPerGroup;
+                                const isCustomName = !!customName.trim() && customName.trim() !== defaultName;
+
+                                return (
+                                  <div key={groupNum} className={`p-2.5 rounded-lg border flex flex-col justify-between space-y-1.5 ${isCustomName || isCustomQuota ? "bg-purple-950/30 border-purple-500/50" : "bg-slate-900/50 border-slate-800"}`}>
+                                    <div className="flex items-center justify-between text-[10px] font-mono">
+                                      <span className="font-bold text-slate-300">#{groupNum < 10 ? `0${groupNum}` : groupNum}</span>
+                                      {(isCustomName || isCustomQuota) && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const nCounts = { ...groupMemberCounts };
+                                            delete nCounts[String(groupNum)];
+                                            setGroupMemberCounts(nCounts);
+                                            const nNames = { ...groupNames };
+                                            delete nNames[String(groupNum)];
+                                            setGroupNames(nNames);
+                                          }}
+                                          className="text-[8px] text-purple-300 hover:text-white"
+                                        >
+                                          Reset ↺
+                                        </button>
+                                      )}
+                                    </div>
+                                    <input
+                                      type="text"
+                                      value={customName}
+                                      placeholder={defaultName}
+                                      onChange={(e) => setGroupNames({ ...groupNames, [String(groupNum)]: e.target.value })}
+                                      className="w-full px-2 py-1 bg-black/80 border border-slate-700 rounded text-xs text-slate-100 outline-none"
+                                    />
+                                    {isCustomName && (() => {
+                                      const trimmed = customName.trim();
+                                      let previewFolder = `${trimmed} (Kelompok ${groupNum})`;
+                                      if (new RegExp(`\\(Kelompok\\s*${groupNum}\\)`, "i").test(trimmed)) {
+                                        previewFolder = trimmed;
+                                      } else if (new RegExp(`\\bKelompok\\s*${groupNum}\\b`, "i").test(trimmed)) {
+                                        previewFolder = trimmed.replace(new RegExp(`\\s*\\(?Kelompok\\s*${groupNum}\\)?`, "i"), ` (Kelompok ${groupNum})`);
+                                      }
+                                      return (
+                                        <div className="text-[8px] font-mono text-cyan-400 truncate" title={`Nama folder GDrive: ${previewFolder}`}>
+                                          📁 {previewFolder}
+                                        </div>
+                                      );
+                                    })()}
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-[9px] text-slate-400 font-mono">Kuota:</span>
+                                      <input
+                                        type="number"
+                                        min={1}
+                                        value={currentVal}
+                                        onChange={(e) => {
+                                          const val = Math.max(1, parseInt(e.target.value) || 1);
+                                          setGroupMemberCounts({ ...groupMemberCounts, [String(groupNum)]: val });
+                                        }}
+                                        className="w-16 px-1 py-0.5 bg-black/80 border border-slate-700 rounded text-center text-xs font-mono text-cyan-300 outline-none"
+                                      />
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -829,50 +990,440 @@ export default function AdminSettingsCommandCenter() {
                        <div className="space-y-2 p-3 bg-slate-900/40 rounded-lg border border-slate-800/60">
                          <label className="block text-[10px] font-bold text-slate-400 uppercase">Card 3: Judul & Deskripsi</label>
                          <input type="text" value={coreConfig.homeCard3Title} onChange={(e) => setCoreConfig({ ...coreConfig, homeCard3Title: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
-                         <textarea rows={2} value={coreConfig.homeCard3Desc} onChange={(e) => setCoreConfig({ ...coreConfig, homeCard3Desc: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
+                          <textarea rows={2} value={coreConfig.homeCard3Desc} onChange={(e) => setCoreConfig({ ...coreConfig, homeCard3Desc: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
                        </div>
                      </div>
 
-                     <div className="bg-black/50 border border-slate-800/80 rounded-xl p-5 space-y-4">
-                       <h3 className="text-xs font-bold text-amber-400 tracking-wider mb-2 border-b border-slate-800/60 pb-2">HERO SECTION - HALAMAN LAIN</h3>
-                       
-                       <div className="space-y-2 p-3 bg-slate-900/40 rounded-lg border border-slate-800/60">
-                         <label className="block text-[10px] font-bold text-slate-400 uppercase">Status & Info Page (Title, Subtitle, Warning)</label>
-                         <input type="text" value={coreConfig.infoHeroTitle} onChange={(e) => setCoreConfig({ ...coreConfig, infoHeroTitle: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
-                         <input type="text" value={coreConfig.infoHeroSubtitle} onChange={(e) => setCoreConfig({ ...coreConfig, infoHeroSubtitle: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
-                         <input type="text" value={coreConfig.infoWarningNotice} placeholder="Warning Notice..." onChange={(e) => setCoreConfig({ ...coreConfig, infoWarningNotice: e.target.value })} className="w-full px-3 py-1.5 bg-rose-950/20 border border-rose-900/50 rounded-lg text-xs focus:border-rose-500 text-rose-300 outline-none transition mt-1" />
-                       </div>
+                      <div className="bg-black/50 border border-slate-800/80 rounded-xl p-5 space-y-5">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-800/60 pb-3">
+                          <div className="flex items-center space-x-2.5">
+                            <Milestone className="h-5 w-5 text-cyan-400 animate-pulse" />
+                            <div>
+                              <h3 className="text-xs font-bold text-cyan-300 tracking-wider uppercase">
+                                ALUR KISAH PENJELAJAHAN (STORYLINE BERANDA)
+                              </h3>
+                              <p className="text-[10px] text-slate-400">
+                                Kelola seluruh parameter narasi, foto Google Drive, urutan babak, dan jumlah slot cerita.
+                              </p>
+                            </div>
+                          </div>
 
-                       <div className="space-y-2 p-3 bg-slate-900/40 rounded-lg border border-slate-800/60">
-                         <label className="block text-[10px] font-bold text-slate-400 uppercase">Pusat Hub Page (Title, Subtitle, Search)</label>
-                         <input type="text" value={coreConfig.hubHeroTitle} onChange={(e) => setCoreConfig({ ...coreConfig, hubHeroTitle: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
-                         <input type="text" value={coreConfig.hubHeroSubtitle} onChange={(e) => setCoreConfig({ ...coreConfig, hubHeroSubtitle: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
-                         <input type="text" value={coreConfig.hubSearchPlaceholder} onChange={(e) => setCoreConfig({ ...coreConfig, hubSearchPlaceholder: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
-                       </div>
+                          <div className="flex items-center space-x-2">
+                            <button
+                              type="button"
+                              onClick={() => setCoreConfig({ ...coreConfig, homePhotoSlotsEnabled: !coreConfig.homePhotoSlotsEnabled })}
+                              className={`px-3 py-1.5 rounded-lg text-[10px] tracking-widest font-bold transition flex items-center space-x-1.5 ${
+                                coreConfig.homePhotoSlotsEnabled !== false
+                                  ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-[0_0_12px_rgba(16,185,129,0.2)]"
+                                  : "bg-rose-500/20 text-rose-300 border border-rose-500/40"
+                              }`}
+                            >
+                              <span className={`h-1.5 w-1.5 rounded-full ${coreConfig.homePhotoSlotsEnabled !== false ? "bg-emerald-400" : "bg-rose-400"}`} />
+                              <span>{coreConfig.homePhotoSlotsEnabled !== false ? "SECTION AKTIF" : "SECTION NONAKTIF"}</span>
+                            </button>
 
-                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                         <div className="space-y-2 p-3 bg-slate-900/40 rounded-lg border border-slate-800/60">
-                           <label className="block text-[10px] font-bold text-slate-400 uppercase">Panduan Page</label>
-                           <input type="text" value={coreConfig.guideHeroTitle} onChange={(e) => setCoreConfig({ ...coreConfig, guideHeroTitle: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition mb-1" />
-                           <input type="text" value={coreConfig.guideHeroSubtitle} onChange={(e) => setCoreConfig({ ...coreConfig, guideHeroSubtitle: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
-                         </div>
-                         <div className="space-y-2 p-3 bg-slate-900/40 rounded-lg border border-slate-800/60">
-                           <label className="block text-[10px] font-bold text-slate-400 uppercase">Contact LO Page</label>
-                           <input type="text" value={coreConfig.contactHeroTitle} onChange={(e) => setCoreConfig({ ...coreConfig, contactHeroTitle: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition mb-1" />
-                           <input type="text" value={coreConfig.contactHeroSubtitle} onChange={(e) => setCoreConfig({ ...coreConfig, contactHeroSubtitle: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
-                         </div>
-                         <div className="space-y-2 p-3 bg-slate-900/40 rounded-lg border border-slate-800/60">
-                           <label className="block text-[10px] font-bold text-slate-400 uppercase">ID Card Page</label>
-                           <input type="text" value={coreConfig.idCardHeroTitle} onChange={(e) => setCoreConfig({ ...coreConfig, idCardHeroTitle: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition mb-1" />
-                           <input type="text" value={coreConfig.idCardHeroSubtitle} onChange={(e) => setCoreConfig({ ...coreConfig, idCardHeroSubtitle: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
-                         </div>
-                         <div className="space-y-2 p-3 bg-slate-900/40 rounded-lg border border-slate-800/60">
-                           <label className="block text-[10px] font-bold text-slate-400 uppercase">Documents Page</label>
-                           <input type="text" value={coreConfig.documentsHeroTitle} onChange={(e) => setCoreConfig({ ...coreConfig, documentsHeroTitle: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition mb-1" />
-                           <input type="text" value={coreConfig.documentsHeroSubtitle} onChange={(e) => setCoreConfig({ ...coreConfig, documentsHeroSubtitle: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
-                         </div>
-                       </div>
-                     </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newSlots = [...(coreConfig.homePhotoSlots || [])];
+                                const nextNum = newSlots.length + 1;
+                                const stepStr = String(nextNum).padStart(2, "0");
+                                newSlots.push({
+                                  id: `slot-${Date.now()}`,
+                                  badge: `Chapter ${stepStr} // Babak Baru`,
+                                  title: `Judul Babak Cerita ${nextNum}`,
+                                  description: "Tuliskan narasi perjalanan atau momentum penting mahasiswa baru pada babak ini...",
+                                  gdriveUrl: "https://images.unsplash.com/photo-1523240795612-9a054b0db644?q=80&w=1000&auto=format&fit=crop",
+                                  coordinateLabel: `KOORDINAT ALUR ${stepStr}`,
+                                  dateTag: "Status: Terverifikasi dalam Babad Penjelajahan IMO 2026",
+                                });
+                                setCoreConfig({ ...coreConfig, homePhotoSlots: newSlots });
+                              }}
+                              className="px-3 py-1.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-[10px] font-bold tracking-wider transition flex items-center space-x-1"
+                            >
+                              <Plus className="h-3.5 w-3.5" />
+                              <span>Tambah Chapter</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (window.confirm("Kembalikan seluruh slot cerita ke template bawaan IMO 2026?")) {
+                                  setCoreConfig({
+                                    ...coreConfig,
+                                    homePhotoSlotsTitle: "ALUR KISAH PENJELAJAHAN ORBIT",
+                                    homePhotoSlotsSubtitle: "Rekam jejak kronologis dan narasi momentum penjelajahan Mahasiswa Baru IMO 2026 dari awal keberangkatan hingga puncak inovasi.",
+                                    homePhotoSlots: [
+                                      {
+                                        id: "slot-1",
+                                        badge: "Chapter 01 // Inisiasi Orbit",
+                                        title: "Pemberangkatan & Orientasi Perdana",
+                                        description: "Langkah mula ribuan pemuda dari berbagai penjuru berkumpul dalam satu atmosfer orbit baru. Di sini, semangat kebersamaan dinyalakan dan komitmen IMO 2026 ditanamkan bersama para LO pendamping.",
+                                        gdriveUrl: "https://images.unsplash.com/photo-1523240795612-9a054b0db644?q=80&w=1000&auto=format&fit=crop",
+                                        coordinateLabel: "KOORDINAT ALUR 01 - GEDUNG UTAMA",
+                                        dateTag: "Status: H-7 Fase Pengkondisian",
+                                      },
+                                      {
+                                        id: "slot-2",
+                                        badge: "Chapter 02 // Sinergi & Dinamika Kelompok",
+                                        title: "Simulasi Misi & Penyusunan Berkas",
+                                        description: "Setiap kelompok menguji ketangguhan kolaborasi mereka dalam merampungkan tugas terstruktur, menyelesaikan Auto-Form, serta menyelaraskan frekuensi pemikiran menuju satu visi misi bersama.",
+                                        gdriveUrl: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?q=80&w=1000&auto=format&fit=crop",
+                                        coordinateLabel: "KOORDINAT ALUR 02 - LAB SIMULASI",
+                                        dateTag: "Status: H-Day Penjelajahan Berkas",
+                                      },
+                                      {
+                                        id: "slot-3",
+                                        badge: "Chapter 03 // Puncak Konstelasi",
+                                        title: "Sidang Pleno & Deklarasi Generasi Inovator",
+                                        description: "Panggung pembuktian di mana karya, gagasan, dan inovasi terbaik dipresentasikan di hadapan dewan penguji. Menandai lahirnya generasi penjelajah baru yang siap mengukir sejarah gemilang.",
+                                        gdriveUrl: "https://images.unsplash.com/photo-1511578314322-379afb476865?q=80&w=1000&auto=format&fit=crop",
+                                        coordinateLabel: "KOORDINAT ALUR 03 - AUDITORIUM UTAMA",
+                                        dateTag: "Status: Pasca Sidang Pleno",
+                                      },
+                                    ],
+                                  });
+                                }
+                              }}
+                              className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 border border-slate-700 text-[10px] font-bold transition flex items-center space-x-1"
+                              title="Reset ke Default Alur Cerita"
+                            >
+                              <RotateCcw className="h-3 w-3" />
+                              <span className="hidden sm:inline">Reset</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Global Section Titles */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3.5 bg-black/40 rounded-xl border border-slate-800/60">
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-300 uppercase mb-1">Judul Utama Storyline</label>
+                            <input
+                              type="text"
+                              value={coreConfig.homePhotoSlotsTitle || ""}
+                              onChange={(e) => setCoreConfig({ ...coreConfig, homePhotoSlotsTitle: e.target.value })}
+                              className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs font-bold text-cyan-300 focus:border-cyan-500 outline-none transition"
+                              placeholder="ALUR KISAH PENJELAJAHAN ORBIT"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-300 uppercase mb-1">Sub-judul / Deskripsi Pembuka</label>
+                            <input
+                              type="text"
+                              value={coreConfig.homePhotoSlotsSubtitle || ""}
+                              onChange={(e) => setCoreConfig({ ...coreConfig, homePhotoSlotsSubtitle: e.target.value })}
+                              className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs text-slate-300 focus:border-cyan-500 outline-none transition"
+                              placeholder="Rekam jejak kronologis dan narasi momentum penjelajahan..."
+                            />
+                          </div>
+                        </div>
+
+                        {/* Chapter Cards List */}
+                        <div className="space-y-4 pt-1">
+                          <div className="flex items-center justify-between text-xs text-slate-400 font-mono">
+                            <span>DAFTAR CHAPTER CHRONICLES ({coreConfig.homePhotoSlots?.length || 0} BABAK)</span>
+                            <span className="text-[10px] text-cyan-400">Gunakan panah ⬆ ⬇ untuk mengubah urutan kronologis</span>
+                          </div>
+
+                          {(coreConfig.homePhotoSlots || []).map((slot, index) => {
+                            const stepStr = String(index + 1).padStart(2, "0");
+                            const total = (coreConfig.homePhotoSlots || []).length;
+
+                            return (
+                              <div 
+                                key={slot.id || index} 
+                                className="p-4 bg-slate-900/60 hover:bg-slate-900/90 rounded-2xl border border-slate-800 hover:border-slate-700 transition-all space-y-3.5"
+                              >
+                                {/* Chapter Top Header with Control Buttons */}
+                                <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
+                                  <div className="flex items-center space-x-2.5">
+                                    <span className="h-6 w-6 rounded-lg bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 text-xs font-mono font-bold flex items-center justify-center">
+                                      {stepStr}
+                                    </span>
+                                    <span className="text-xs font-bold text-slate-200 uppercase tracking-wide">
+                                      {slot.title || `Chapter ${stepStr}`}
+                                    </span>
+                                  </div>
+
+                                  {/* Ordering & Action Toolbar */}
+                                  <div className="flex items-center space-x-1.5">
+                                    {/* Move Up */}
+                                    <button
+                                      type="button"
+                                      disabled={index === 0}
+                                      onClick={() => {
+                                        if (index === 0) return;
+                                        const updated = [...(coreConfig.homePhotoSlots || [])];
+                                        const temp = updated[index - 1];
+                                        updated[index - 1] = updated[index];
+                                        updated[index] = temp;
+                                        setCoreConfig({ ...coreConfig, homePhotoSlots: updated });
+                                      }}
+                                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                                      title="Geser Naik (Sebelumnya)"
+                                    >
+                                      <ArrowUp className="h-3.5 w-3.5" />
+                                    </button>
+
+                                    {/* Move Down */}
+                                    <button
+                                      type="button"
+                                      disabled={index === total - 1}
+                                      onClick={() => {
+                                        if (index === total - 1) return;
+                                        const updated = [...(coreConfig.homePhotoSlots || [])];
+                                        const temp = updated[index + 1];
+                                        updated[index + 1] = updated[index];
+                                        updated[index] = temp;
+                                        setCoreConfig({ ...coreConfig, homePhotoSlots: updated });
+                                      }}
+                                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                                      title="Geser Turun (Berikutnya)"
+                                    >
+                                      <ArrowDown className="h-3.5 w-3.5" />
+                                    </button>
+
+                                    {/* Duplicate */}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const updated = [...(coreConfig.homePhotoSlots || [])];
+                                        const cloned = {
+                                          ...slot,
+                                          id: `slot-${Date.now()}`,
+                                          title: `${slot.title} (Salinan)`,
+                                        };
+                                        updated.splice(index + 1, 0, cloned);
+                                        setCoreConfig({ ...coreConfig, homePhotoSlots: updated });
+                                      }}
+                                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
+                                      title="Duplikat Babak Ini"
+                                    >
+                                      <Copy className="h-3.5 w-3.5" />
+                                    </button>
+
+                                    {/* Delete */}
+                                    {total > 1 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const updated = (coreConfig.homePhotoSlots || []).filter((_, i) => i !== index);
+                                          setCoreConfig({ ...coreConfig, homePhotoSlots: updated });
+                                        }}
+                                        className="p-1.5 rounded-lg bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 hover:text-rose-300 border border-rose-900/40 transition"
+                                        title="Hapus Chapter"
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Form Fields Grid */}
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
+                                  
+                                  {/* Left/Middle Column: Inputs */}
+                                  <div className="lg:col-span-2 space-y-3">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                      <div>
+                                        <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1">
+                                          Badge Tag / Babak
+                                        </label>
+                                        <input
+                                          type="text"
+                                          value={slot.badge || ""}
+                                          onChange={(e) => {
+                                            const updated = [...(coreConfig.homePhotoSlots || [])];
+                                            updated[index] = { ...updated[index], badge: e.target.value };
+                                            setCoreConfig({ ...coreConfig, homePhotoSlots: updated });
+                                          }}
+                                          className="w-full px-2.5 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs font-mono text-purple-300 focus:border-purple-500 outline-none transition"
+                                          placeholder={`Chapter ${stepStr} // Inisiasi Orbit`}
+                                        />
+                                      </div>
+                                      <div>
+                                        <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1">
+                                          Judul Babak Cerita
+                                        </label>
+                                        <input
+                                          type="text"
+                                          value={slot.title}
+                                          onChange={(e) => {
+                                            const updated = [...(coreConfig.homePhotoSlots || [])];
+                                            updated[index] = { ...updated[index], title: e.target.value };
+                                            setCoreConfig({ ...coreConfig, homePhotoSlots: updated });
+                                          }}
+                                          className="w-full px-2.5 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs font-bold text-slate-100 focus:border-cyan-500 outline-none transition"
+                                          placeholder="Pemberangkatan & Orientasi Perdana"
+                                        />
+                                      </div>
+                                    </div>
+
+                                    <div>
+                                      <div className="flex items-center justify-between mb-1">
+                                        <label className="block text-[9px] font-bold text-slate-400 uppercase">
+                                          URL Foto Google Drive / Image
+                                        </label>
+                                        {slot.gdriveUrl && (
+                                          <a
+                                            href={slot.gdriveUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-[9px] text-cyan-400 hover:underline flex items-center space-x-0.5"
+                                          >
+                                            <span>Buka Sumber</span>
+                                            <ExternalLink className="h-2.5 w-2.5" />
+                                          </a>
+                                        )}
+                                      </div>
+                                      <input
+                                        type="text"
+                                        value={slot.gdriveUrl}
+                                        onChange={(e) => {
+                                          const updated = [...(coreConfig.homePhotoSlots || [])];
+                                          updated[index] = { ...updated[index], gdriveUrl: e.target.value };
+                                          setCoreConfig({ ...coreConfig, homePhotoSlots: updated });
+                                        }}
+                                        className="w-full px-2.5 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs font-mono text-cyan-300 focus:border-cyan-500 outline-none transition"
+                                        placeholder="https://drive.google.com/file/d/1abc.../view?usp=sharing"
+                                      />
+                                      <p className="text-[9px] text-slate-500 mt-1">
+                                        Mendukung link Google Drive (/file/d/ID/view), ID Drive, atau direct image URL. Diproteksi non-interaktif di tampilan publik.
+                                      </p>
+                                    </div>
+
+                                    <div>
+                                      <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1">
+                                        Deskripsi Narasi Cerita (Lengkap)
+                                      </label>
+                                      <textarea
+                                        rows={3}
+                                        value={slot.description}
+                                        onChange={(e) => {
+                                          const updated = [...(coreConfig.homePhotoSlots || [])];
+                                          updated[index] = { ...updated[index], description: e.target.value };
+                                          setCoreConfig({ ...coreConfig, homePhotoSlots: updated });
+                                        }}
+                                        className="w-full px-2.5 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs text-slate-300 focus:border-cyan-500 outline-none transition leading-relaxed"
+                                        placeholder="Tuliskan cerita lengkap momen perjalanan pada babak ini..."
+                                      />
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                      <div>
+                                        <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1">
+                                          Label Koordinat / Lokasi
+                                        </label>
+                                        <input
+                                          type="text"
+                                          value={slot.coordinateLabel || ""}
+                                          onChange={(e) => {
+                                            const updated = [...(coreConfig.homePhotoSlots || [])];
+                                            updated[index] = { ...updated[index], coordinateLabel: e.target.value };
+                                            setCoreConfig({ ...coreConfig, homePhotoSlots: updated });
+                                          }}
+                                          className="w-full px-2.5 py-1 bg-black/70 border border-slate-800 rounded-lg text-xs font-mono text-slate-300 focus:border-cyan-500 outline-none transition"
+                                          placeholder={`KOORDINAT ALUR ${stepStr} - LOKASI`}
+                                        />
+                                      </div>
+                                      <div>
+                                        <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1">
+                                          Label Waktu / Tanggal
+                                        </label>
+                                        <input
+                                          type="text"
+                                          value={slot.dateTag || ""}
+                                          onChange={(e) => {
+                                            const updated = [...(coreConfig.homePhotoSlots || [])];
+                                            updated[index] = { ...updated[index], dateTag: e.target.value };
+                                            setCoreConfig({ ...coreConfig, homePhotoSlots: updated });
+                                          }}
+                                          className="w-full px-2.5 py-1 bg-black/70 border border-slate-800 rounded-lg text-xs font-mono text-slate-300 focus:border-cyan-500 outline-none transition"
+                                          placeholder="Status: H-7 Fase Pengkondisian"
+                                        />
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Right Column: Live Thumbnail Preview */}
+                                  <div className="bg-black/60 border border-slate-800/80 rounded-xl p-3 flex flex-col items-center justify-center space-y-2">
+                                    <div className="text-[10px] font-mono text-slate-400 font-bold uppercase flex items-center space-x-1 self-start">
+                                      <ImageIcon className="h-3 w-3 text-cyan-400" />
+                                      <span>LIVE THUMBNAIL PREVIEW</span>
+                                    </div>
+
+                                    <div className="relative w-full aspect-[16/10] rounded-lg bg-slate-950 overflow-hidden border border-slate-800 flex items-center justify-center">
+                                      {slot.gdriveUrl ? (
+                                        <img
+                                          src={
+                                            slot.gdriveUrl.includes("drive.google.com")
+                                              ? `https://lh3.googleusercontent.com/d/${(slot.gdriveUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || slot.gdriveUrl.match(/[?&]id=([a-zA-Z0-9_-]+)/) || [])[1] || ""}=w400`
+                                              : slot.gdriveUrl
+                                          }
+                                          alt={slot.title}
+                                          className="w-full h-full object-cover select-none pointer-events-none"
+                                          onError={(e) => {
+                                            // Fallback graphic
+                                            (e.currentTarget as HTMLElement).style.display = "none";
+                                          }}
+                                        />
+                                      ) : (
+                                        <span className="text-[10px] text-slate-600 font-mono">Belum ada URL</span>
+                                      )}
+                                    </div>
+
+                                    <div className="text-[9px] font-mono text-slate-500 text-center truncate w-full">
+                                      {slot.badge || `Chapter ${stepStr}`}
+                                    </div>
+                                  </div>
+
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div className="bg-black/50 border border-slate-800/80 rounded-xl p-5 space-y-4">
+                        <h3 className="text-xs font-bold text-amber-400 tracking-wider mb-2 border-b border-slate-800/60 pb-2">HERO SECTION - HALAMAN LAIN</h3>
+                        
+                        <div className="space-y-2 p-3 bg-slate-900/40 rounded-lg border border-slate-800/60">
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase">Status & Info Page (Title, Subtitle, Warning)</label>
+                          <input type="text" value={coreConfig.infoHeroTitle} onChange={(e) => setCoreConfig({ ...coreConfig, infoHeroTitle: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
+                          <input type="text" value={coreConfig.infoHeroSubtitle} onChange={(e) => setCoreConfig({ ...coreConfig, infoHeroSubtitle: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
+                          <input type="text" value={coreConfig.infoWarningNotice} placeholder="Warning Notice..." onChange={(e) => setCoreConfig({ ...coreConfig, infoWarningNotice: e.target.value })} className="w-full px-3 py-1.5 bg-rose-950/20 border border-rose-900/50 rounded-lg text-xs focus:border-rose-500 text-rose-300 outline-none transition mt-1" />
+                        </div>
+
+                        <div className="space-y-2 p-3 bg-slate-900/40 rounded-lg border border-slate-800/60">
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase">Pusat Hub Page (Title, Subtitle, Search)</label>
+                          <input type="text" value={coreConfig.hubHeroTitle} onChange={(e) => setCoreConfig({ ...coreConfig, hubHeroTitle: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
+                          <input type="text" value={coreConfig.hubHeroSubtitle} onChange={(e) => setCoreConfig({ ...coreConfig, hubHeroSubtitle: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
+                          <input type="text" value={coreConfig.hubSearchPlaceholder} onChange={(e) => setCoreConfig({ ...coreConfig, hubSearchPlaceholder: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2 p-3 bg-slate-900/40 rounded-lg border border-slate-800/60">
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase">Panduan Page</label>
+                            <input type="text" value={coreConfig.guideHeroTitle} onChange={(e) => setCoreConfig({ ...coreConfig, guideHeroTitle: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition mb-1" />
+                            <input type="text" value={coreConfig.guideHeroSubtitle} onChange={(e) => setCoreConfig({ ...coreConfig, guideHeroSubtitle: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
+                          </div>
+                          <div className="space-y-2 p-3 bg-slate-900/40 rounded-lg border border-slate-800/60">
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase">Contact LO Page</label>
+                            <input type="text" value={coreConfig.contactHeroTitle} onChange={(e) => setCoreConfig({ ...coreConfig, contactHeroTitle: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition mb-1" />
+                            <input type="text" value={coreConfig.contactHeroSubtitle} onChange={(e) => setCoreConfig({ ...coreConfig, contactHeroSubtitle: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
+                          </div>
+                          <div className="space-y-2 p-3 bg-slate-900/40 rounded-lg border border-slate-800/60">
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase">ID Card Page</label>
+                            <input type="text" value={coreConfig.idCardHeroTitle} onChange={(e) => setCoreConfig({ ...coreConfig, idCardHeroTitle: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition mb-1" />
+                            <input type="text" value={coreConfig.idCardHeroSubtitle} onChange={(e) => setCoreConfig({ ...coreConfig, idCardHeroSubtitle: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
+                          </div>
+                          <div className="space-y-2 p-3 bg-slate-900/40 rounded-lg border border-slate-800/60">
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase">Documents Page</label>
+                            <input type="text" value={coreConfig.documentsHeroTitle} onChange={(e) => setCoreConfig({ ...coreConfig, documentsHeroTitle: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition mb-1" />
+                            <input type="text" value={coreConfig.documentsHeroSubtitle} onChange={(e) => setCoreConfig({ ...coreConfig, documentsHeroSubtitle: e.target.value })} className="w-full px-3 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
+                          </div>
+                        </div>
+                      </div>
 
                      <div className="bg-black/50 border border-slate-800/80 rounded-xl p-5 space-y-4">
                        <h3 className="text-xs font-bold text-rose-400 tracking-wider mb-2 border-b border-slate-800/60 pb-2">GLOBAL TEXT</h3>

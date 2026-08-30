@@ -1,0 +1,11 @@
+VAPID: BFwvgskoInkx2PPRLgL5FO9INRWJpGILoagbUAhjJ2rV74Hw4yNGHVJ7aLWRIWcSVtXoy31SKIN4G4ShyfjAUA0
+sender id : 1061088435535
+Project ID : imo-info
+firebase admin SDK :
+var admin = require("firebase-admin");
+
+var serviceAccount = require("path/to/serviceAccountKey.json");
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});

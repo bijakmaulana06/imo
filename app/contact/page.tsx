@@ -19,28 +19,16 @@ interface ContactPerson {
   sort_order: number;
 }
 
-const DEFAULT_CONTACTS: ContactPerson[] = [
-  { id: "1", name: "Siti Rahmawati", role: "LO", group_name: "Kelompok 1", whatsapp: "081234567890", sort_order: 1 },
-  { id: "2", name: "Ahmad Fauzi", role: "LO", group_name: "Kelompok 2", whatsapp: "081298765432", sort_order: 2 },
-  { id: "3", name: "Budi Pratama", role: "KOOR", group_name: "Kelompok 3", whatsapp: "081311223344", sort_order: 3 },
-  { id: "4", name: "Dina Lestari", role: "LO", group_name: "Kelompok 4", whatsapp: "081355667788", sort_order: 4 },
-  { id: "5", name: "Eko Wijaya", role: "Ketua Pelaksana", group_name: "Panitia Inti", whatsapp: "081399001122", sort_order: 5 },
-  { id: "6", name: "Fifi Nurhaliza", role: "LO", group_name: "Kelompok 6", whatsapp: "081244556677", sort_order: 6 },
-  { id: "7", name: "Gilang Ramadhan", role: "KOOR", group_name: "Kelompok 7", whatsapp: "081288990011", sort_order: 7 },
-  { id: "8", name: "Hany Permata", role: "LO", group_name: "Kelompok 8", whatsapp: "081322334455", sort_order: 8 },
-  { id: "9", name: "Indra Kusuma", role: "LO", group_name: "Kelompok 9", whatsapp: "081366778899", sort_order: 9 },
-  { id: "10", name: "Jasmine Putri", role: "LO", group_name: "Kelompok 10", whatsapp: "081200112233", sort_order: 10 },
-];
-
 export default function ContactPage() {
   const { config } = useSiteConfig();
   const supabase = createClient();
-  const [contacts, setContacts] = useState<ContactPerson[]>(DEFAULT_CONTACTS);
-  const [loading, setLoading] = useState(false);
+  const [contacts, setContacts] = useState<ContactPerson[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
   const fetchContacts = async () => {
+    setLoading(true);
     try {
       const { data, error: fetchErr } = await supabase
         .from("contact_persons")
@@ -48,11 +36,13 @@ export default function ContactPage() {
         .order("sort_order", { ascending: true })
         .order("name", { ascending: true });
 
-      if (!fetchErr && data && data.length > 0) {
+      if (!fetchErr && data) {
         setContacts(data);
       }
     } catch (err: any) {
-      console.warn("Using default LO contacts due to fetch error:", err);
+      console.warn("Error fetching LO contacts:", err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -127,6 +117,14 @@ export default function ContactPage() {
             >
               Coba Lagi
             </button>
+          </Card>
+        ) : contacts.length === 0 ? (
+          <Card glowColor="purple" className="text-center py-16 max-w-md mx-auto">
+            <Users className="h-12 w-12 text-accent-purple/50 mx-auto mb-4" />
+            <h3 className="font-display font-bold text-lg text-slate-200 mb-2">Belum Ada Kontak Pendamping</h3>
+            <p className="text-sm text-slate-400 font-sans">
+              Saat ini belum ada data LO atau kontak pendamping kelompok yang ditambahkan oleh panitia.
+            </p>
           </Card>
         ) : filteredContacts.length === 0 ? (
           <Card glowColor="purple" className="text-center py-16 max-w-md mx-auto">

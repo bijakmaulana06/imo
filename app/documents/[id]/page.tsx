@@ -20,6 +20,19 @@ import {
 import { Link } from "next-view-transitions";
 import { useRouter } from "next/navigation";
 
+function getFieldPlaceholder(field: DocumentFieldConfig): string {
+  if (field.placeholder && field.placeholder.trim()) return field.placeholder;
+  const labelLower = (field.label || "").toLowerCase();
+  const tagLower = (field.tag || "").toLowerCase();
+  if (labelLower.includes("nama") || tagLower.includes("nama")) {
+    return "Nama: Xaviera Putri";
+  }
+  if (labelLower.includes("nim") || tagLower.includes("nim")) {
+    return "NIM : 260xxxxxxxx";
+  }
+  return `Masukkan ${field.label}...`;
+}
+
 export default function FillDocumentFormPage({
   params,
 }: {
@@ -231,7 +244,7 @@ export default function FillDocumentFormPage({
                   {field.type === "text" && (
                     <input
                       type="text"
-                      placeholder={field.placeholder || `Masukkan ${field.label}...`}
+                      placeholder={getFieldPlaceholder(field)}
                       value={formData[field.tag] || ""}
                       onChange={(e) => handleInputChange(field.tag, e.target.value)}
                       required={field.required !== false}
@@ -288,7 +301,7 @@ export default function FillDocumentFormPage({
                   {field.type === "textarea" && (
                     <textarea
                       rows={3}
-                      placeholder={field.placeholder || `Masukkan ${field.label}...`}
+                      placeholder={getFieldPlaceholder(field)}
                       value={formData[field.tag] || ""}
                       onChange={(e) => handleInputChange(field.tag, e.target.value)}
                       required={field.required !== false}

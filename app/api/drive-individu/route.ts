@@ -50,46 +50,29 @@ function extractFolderId(inputStr?: string | null): string {
 }
 
 // Helper untuk mengekstrak Nama Orang dari Nama File
-function extractPersonName(filename: string, taskDefs: IndividuTaskDef[]): string {
+// Aturan: HANYA membaca nama file sebelum "_", diluar itu tidak dibaca
+function extractPersonName(filename: string): string {
   // 1. Hapus ekstensi file
-  let nameWithoutExt = filename.replace(/\.[^/.]+$/, "");
+  const nameWithoutExt = filename.replace(/\.[^/.]+$/, "").trim();
   
-  // 2. Ganti separator _ dan - dengan spasi
-  let cleaned = nameWithoutExt.replace(/[_]/g, " ").replace(/-/g, " ");
-
-  // 3. Hapus kata kunci tugas dari nama file
-  taskDefs.forEach((t) => {
-    if (t.keyword) {
-      const regKw = new RegExp(t.keyword, "gi");
-      cleaned = cleaned.replace(regKw, "");
+  // 2. Ambil HANYA teks sebelum karakter "_" pertama
+  if (nameWithoutExt.includes("_")) {
+    const namePart = nameWithoutExt.split("_")[0].trim();
+    if (namePart.length > 0) {
+      return namePart
+        .split(/\s+/)
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+        .join(" ");
     }
-    if (t.name) {
-      const regName = new RegExp(t.name, "gi");
-      cleaned = cleaned.replace(regName, "");
-    }
-  });
-
-  // 4. Hapus kata-kata umum seperti Kelompok X, Tugas, Berkas, dll.
-  cleaned = cleaned
-    .replace(/kelompok\s*\d+/gi, "")
-    .replace(/tugas/gi, "")
-    .replace(/berkas/gi, "")
-    .replace(/dokumen/gi, "")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  // Kapitalisasi Nama
-  if (cleaned.length >= 2) {
-    return cleaned
-      .split(" ")
-      .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-      .join(" ");
   }
 
-  // Fallback jika tidak terdeteksi spesifik
-  const parts = nameWithoutExt.split(/[-_]/);
-  if (parts.length > 1) {
-    return parts[parts.length - 1].trim();
+  // 3. Fallback jika file tidak memiliki karakter "_" sama sekali
+  const fallback = nameWithoutExt.replace(/\s+/g, " ").trim();
+  if (fallback.length > 0) {
+    return fallback
+      .split(/\s+/)
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+      .join(" ");
   }
 
   return "Anggota (Tidak Teridentifikasi)";
@@ -151,18 +134,14 @@ export async function GET(request: NextRequest) {
   let folderId = process.env.GOOGLE_DRIVE_FOLDER_ID || "";
 
   let targetMembersCount = 10;
-  let taskDefs: IndividuTaskDef[] = [
-    { id: "ind-1", name: "Jurnal Harian & Resume", keyword: "jurnal", is_active: true },
-    { id: "ind-2", name: "Berkas Administrasi Mandiri", keyword: "administrasi", is_active: true },
-    { id: "ind-3", name: "Twibbon & ID Card", keyword: "twibbon", is_active: true },
-  ];
+  let taskDefs: IndividuTaskDef[] = [];
 
   if (supabase) {
     try {
       const { data: settingData } = await supabase
         .from("system_settings")
         .select("key, value")
-        .in("key", ["gdrive_parent_folder", "target_members_per_group", "task_definitions_individu"]);
+        .in("key", ["gdrive_parent_folder", "target_members_per_group", "group_member_counts", "task_definitions_individu"]);
 
       if (settingData && settingData.length > 0) {
         const folderSetting = settingData.find((s: any) => s.key === "gdrive_parent_folder");
@@ -174,6 +153,22 @@ export async function GET(request: NextRequest) {
         const membersSetting = settingData.find((s: any) => s.key === "target_members_per_group");
         if (membersSetting && membersSetting.value && !isNaN(Number(membersSetting.value))) {
           targetMembersCount = Number(membersSetting.value);
+        }
+
+        // Custom group member counts if defined by admin
+        const groupCountsSetting = settingData.find((s: any) => s.key === "group_member_counts");
+        if (groupCountsSetting && groupCountsSetting.value) {
+          try {
+            const countsMap = typeof groupCountsSetting.value === "string" ? JSON.parse(groupCountsSetting.value) : groupCountsSetting.value;
+            const groupNum = groupName.replace(/\D/g, "");
+            if (countsMap[groupName] !== undefined && !isNaN(Number(countsMap[groupName]))) {
+              targetMembersCount = Math.max(1, Number(countsMap[groupName]));
+            } else if (groupNum && countsMap[`Kelompok ${groupNum}`] !== undefined && !isNaN(Number(countsMap[`Kelompok ${groupNum}`]))) {
+              targetMembersCount = Math.max(1, Number(countsMap[`Kelompok ${groupNum}`]));
+            } else if (groupNum && countsMap[groupNum] !== undefined && !isNaN(Number(countsMap[groupNum]))) {
+              targetMembersCount = Math.max(1, Number(countsMap[groupNum]));
+            }
+          } catch {}
         }
 
         const individuTasksSetting = settingData.find((s: any) => s.key === "task_definitions_individu");
@@ -298,7 +293,7 @@ export async function GET(request: NextRequest) {
       const personMap = new Map<string, IndividuFileItem[]>();
 
       filesList.forEach((file) => {
-        const personName = extractPersonName(file.name, taskDefs);
+        const personName = extractPersonName(file.name);
         if (!personMap.has(personName)) {
           personMap.set(personName, []);
         }
@@ -422,59 +417,19 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // FALLBACK DEMO MODE DENGAN PENGELOMPOKAN ANGGOTA (PERSON TREE)
-  const demoPersons: PersonGroupedData[] = [
-    {
-      personName: "Ahmad Fauzi",
-      submittedCount: 2,
-      totalRequired: taskDefs.length,
-      completionPercentage: 67,
-      tasks: [
-        { taskId: taskDefs[0]?.id || "1", taskName: taskDefs[0]?.name || "Jurnal Harian", isCompleted: true, fileName: `Jurnal_Harian_Ahmad_Fauzi.pdf`, driveLink: "https://drive.google.com", mimeType: "application/pdf", size: "1200000" },
-        { taskId: taskDefs[1]?.id || "2", taskName: taskDefs[1]?.name || "Resume Materi", isCompleted: true, fileName: `Resume_Materi_Ahmad_Fauzi.pdf`, driveLink: "https://drive.google.com", mimeType: "application/pdf", size: "950000" },
-        { taskId: taskDefs[2]?.id || "3", taskName: taskDefs[2]?.name || "Twibbon & ID Card", isCompleted: false }
-      ],
-      allFiles: [
-        { id: "d1", name: `Jurnal_Harian_Ahmad_Fauzi.pdf`, mimeType: "application/pdf", webViewLink: "https://drive.google.com", size: "1200000" },
-        { id: "d2", name: `Resume_Materi_Ahmad_Fauzi.pdf`, mimeType: "application/pdf", webViewLink: "https://drive.google.com", size: "950000" }
-      ]
-    },
-    {
-      personName: "Budi Santoso",
-      submittedCount: 3,
-      totalRequired: taskDefs.length,
-      completionPercentage: 100,
-      tasks: [
-        { taskId: taskDefs[0]?.id || "1", taskName: taskDefs[0]?.name || "Jurnal Harian", isCompleted: true, fileName: `Jurnal_Harian_Budi_Santoso.pdf`, driveLink: "https://drive.google.com", mimeType: "application/pdf", size: "1500000" },
-        { taskId: taskDefs[1]?.id || "2", taskName: taskDefs[1]?.name || "Resume Materi", isCompleted: true, fileName: `Resume_Materi_Budi_Santoso.pdf`, driveLink: "https://drive.google.com", mimeType: "application/pdf", size: "890000" },
-        { taskId: taskDefs[2]?.id || "3", taskName: taskDefs[2]?.name || "Twibbon & ID Card", isCompleted: true, fileName: `Twibbon_Budi_Santoso.png`, driveLink: "https://drive.google.com", mimeType: "image/png", size: "2100000" }
-      ],
-      allFiles: [
-        { id: "d3", name: `Jurnal_Harian_Budi_Santoso.pdf`, mimeType: "application/pdf", webViewLink: "https://drive.google.com", size: "1500000" },
-        { id: "d4", name: `Resume_Materi_Budi_Santoso.pdf`, mimeType: "application/pdf", webViewLink: "https://drive.google.com", size: "890000" },
-        { id: "d5", name: `Twibbon_Budi_Santoso.png`, mimeType: "image/png", webViewLink: "https://drive.google.com", size: "2100000" }
-      ]
-    }
-  ];
-
-  const demoSubmittedPersons = demoPersons.length;
-  const demoCompletion = Math.min(100, Math.round((demoSubmittedPersons / targetMembersCount) * 100));
-
+  // Return clean empty result if Google Drive credentials are not active
   return NextResponse.json({
     groupName,
-    groupFolderLink: "https://drive.google.com",
-    individuFolderLink: "https://drive.google.com",
-    folderFound: true,
-    individuFolderFound: true,
-    isDemoMode: true,
+    folderFound: false,
+    individuFolderFound: false,
     taskDefinitions: taskDefs,
-    persons: demoPersons,
-    files: demoPersons.flatMap((p) => p.allFiles),
-    totalFiles: demoPersons.reduce((acc, p) => acc + p.allFiles.length, 0),
+    persons: [],
+    files: [],
+    totalFiles: 0,
     summary: {
       targetMembers: targetMembersCount,
-      submittedPersonsCount: demoSubmittedPersons,
-      completionPercentage: demoCompletion
+      submittedPersonsCount: 0,
+      completionPercentage: 0
     }
   });
 }

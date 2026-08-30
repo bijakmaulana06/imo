@@ -37,102 +37,11 @@ interface HubLink {
   is_active: boolean;
 }
 
-const DEFAULT_HUB_LINKS: HubLink[] = [
-  {
-    id: "guide-0",
-    label: "Pusat Informasi & Panduan (Artikel)",
-    url: "/guide",
-    icon_key: "sparkles",
-    category: "Panduan & Berkas",
-    description: "Artikel dan highlight penting seputar pembagian gesang (kendaraan), jadwal acara, dan perlengkapan.",
-    sort_order: 0,
-    is_active: true,
-  },
-  {
-    id: "1",
-    label: "Buku Panduan IMO 2026",
-    url: "https://drive.google.com",
-    icon_key: "book",
-    category: "Panduan & Berkas",
-    description: "Panduan lengkap regulasi, jadwal kegiatan, dan tata tertib IMO 2026.",
-    sort_order: 1,
-    is_active: true,
-  },
-  {
-    id: "2",
-    label: "ID Card Generator Client Engine",
-    url: "/id-card",
-    icon_key: "qrcode",
-    category: "Generator & Tools",
-    description: "Cetak & unduh kartu identitas peserta IMO 2026 100% instan di perangkat Anda.",
-    sort_order: 2,
-    is_active: true,
-  },
-  {
-    id: "3",
-    label: "Summary & Scanner Tugas Kelompok",
-    url: "/info",
-    icon_key: "folder",
-    category: "Pengumpulan Tugas",
-    description: "Pantau status pengumpulan tugas kelompok secara real-time via Google Drive Scanner.",
-    sort_order: 3,
-    is_active: true,
-  },
-  {
-    id: "4",
-    label: "Kontak LO & Pendamping",
-    url: "/contact",
-    icon_key: "users",
-    category: "Media & Komunikasi",
-    description: "Daftar kontak WhatsApp resmi pendamping kelompok & Liaison Officer.",
-    sort_order: 4,
-    is_active: true,
-  },
-  {
-    id: "5",
-    label: "Group Chat Telegram Peserta",
-    url: "https://t.me",
-    icon_key: "telegram",
-    category: "Media & Komunikasi",
-    description: "Saluran komunikasi resmi & pengumuman cepat untuk seluruh Mahasiswa Baru.",
-    sort_order: 5,
-    is_active: true,
-  },
-  {
-    id: "6",
-    label: "Official Instagram @imo2026",
-    url: "https://instagram.com",
-    icon_key: "instagram",
-    category: "Media & Komunikasi",
-    description: "Dapatkan update dokumentasi visual, sorotan kegiatan, dan pengumuman media.",
-    sort_order: 6,
-    is_active: true,
-  },
-  {
-    id: "7",
-    label: "Twibbon Resmi IMO 2026",
-    url: "https://twibbonize.com",
-    icon_key: "sparkles",
-    category: "Generator & Tools",
-    description: "Pasang Twibbon resmi IMO 2026 dan bagikan ke jejaring sosial Anda.",
-    sort_order: 7,
-    is_active: true,
-  },
-  {
-    id: "8",
-    label: "Formulir Helpdesk & Pertanyaan",
-    url: "https://forms.google.com",
-    icon_key: "help",
-    category: "Panduan & Berkas",
-    description: "Punya pertanyaan seputar kendala pengumpulan tugas? Ajukan melalui form ini.",
-    sort_order: 8,
-    is_active: true,
-  },
-];
+const DEFAULT_HUB_LINKS: HubLink[] = [];
 
 export default function HubPage() {
   const { config } = useSiteConfig();
-  const [links, setLinks] = useState<HubLink[]>(DEFAULT_HUB_LINKS);
+  const [links, setLinks] = useState<HubLink[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedCategory, setSelectedCategory] = useState<string>("Semua Penjelajahan");
   const [loading, setLoading] = useState<boolean>(true);
@@ -162,6 +71,7 @@ export default function HubPage() {
 
   useEffect(() => {
     const fetchHubLinks = async () => {
+      setLoading(true);
       try {
         const supabase = createClient();
         const { data, error } = await supabase
@@ -171,12 +81,12 @@ export default function HubPage() {
           .order("sort_order", { ascending: true });
 
         if (error) {
-          console.warn("Supabase fetch error for hub_links (using defaults):", error.message);
-        } else if (data && data.length > 0) {
+          console.warn("Supabase fetch error for hub_links:", error.message);
+        } else if (data) {
           setLinks(data as HubLink[]);
         }
       } catch (err) {
-        console.warn("Fallback to default hub links:", err);
+        console.warn("Error fetching hub links:", err);
       } finally {
         setLoading(false);
       }
@@ -251,7 +161,20 @@ export default function HubPage() {
           </div>
         </div>
 
-        {filteredLinks.length === 0 ? (
+        {loading ? (
+          <div className="py-20 text-center text-slate-400 flex flex-col items-center gap-3">
+            <div className="w-10 h-10 border-4 border-accent-purple/30 border-t-accent-purple rounded-full animate-spin" />
+            <p className="font-mono text-sm">Memuat modul penjelajahan...</p>
+          </div>
+        ) : links.length === 0 ? (
+          <Card glowColor="purple" className="text-center py-16 max-w-md mx-auto">
+            <Layers className="h-12 w-12 text-accent-purple/50 mx-auto mb-4" />
+            <h3 className="font-display font-bold text-lg text-slate-200 mb-2">Belum Ada Modul Penjelajahan</h3>
+            <p className="text-sm text-slate-400 font-sans">
+              Saat ini belum ada tautan atau modul penjelajahan yang dipublikasikan oleh admin.
+            </p>
+          </Card>
+        ) : filteredLinks.length === 0 ? (
           <Card glowColor="yellow" className="text-center p-12">
             <Search className="h-10 w-10 text-accent-yellow mx-auto mb-3" />
             <h3 className="font-display font-bold text-slate-100 text-lg">Tidak Ada Modul Ditemukan</h3>

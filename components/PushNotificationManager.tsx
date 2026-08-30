@@ -1,24 +1,10 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Bell, BellOff, Check, X, ShieldAlert, Sparkles } from "lucide-react";
+import { Bell, BellOff, X, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePathname } from "next/navigation";
-
-function urlBase64ToUint8Array(base64String: string) {
-  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding)
-    .replace(/\-/g, "+")
-    .replace(/_/g, "/");
-
-  const rawData = window.atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-
-  for (let i = 0; i < rawData.length; ++i) {
-    outputArray[i] = rawData.charCodeAt(i);
-  }
-  return outputArray;
-}
+import { saveFcmTokenToServer } from "@/hooks/useFcmNotification";
 
 export default function PushNotificationManager() {
   const pathname = usePathname();
@@ -27,27 +13,24 @@ export default function PushNotificationManager() {
   const [isSubscribed, setIsSubscribed] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [showPromptBanner, setShowPromptBanner] = useState<boolean>(false);
-  const [statusMsg, setStatusMsg] = useState<string>("");
 
   useEffect(() => {
-    if (typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window) {
+    if (typeof window !== "undefined" && "serviceWorker" in navigator && "Notification" in window) {
       setIsSupported(true);
       setPermission(Notification.permission);
 
-      // Register Service Worker
+      // Register FCM Service Worker
       navigator.serviceWorker
-        .register("/sw.js")
-        .then((reg) => {
-          reg.pushManager.getSubscription().then((sub) => {
-            if (sub) {
-              setIsSubscribed(true);
-            } else if (Notification.permission === "default") {
-              const timer = setTimeout(() => setShowPromptBanner(true), 500);
-              return () => clearTimeout(timer);
-            }
-          });
+        .register("/firebase-messaging-sw.js", { scope: "/" })
+        .then(() => {
+          if (Notification.permission === "granted") {
+            setIsSubscribed(true);
+          } else if (Notification.permission === "default") {
+            const timer = setTimeout(() => setShowPromptBanner(true), 1000);
+            return () => clearTimeout(timer);
+          }
         })
-        .catch((err) => console.warn("Service Worker registration failed:", err));
+        .catch((err) => console.warn("FCM Service Worker registration failed:", err));
     }
   }, []);
 
@@ -63,58 +46,28 @@ export default function PushNotificationManager() {
     }
 
     setLoading(true);
-    setStatusMsg("");
 
     try {
       const permResult = await Notification.requestPermission();
       setPermission(permResult);
 
       if (permResult !== "granted") {
-        setStatusMsg("Izin notifikasi ditolak. Anda dapat mengaktifkannya di setelan browser.");
         setLoading(false);
         return;
       }
 
-      // Ambil VAPID public key dari server
-      const settingsRes = await fetch("/api/admin/settings");
-      const settingsData = await settingsRes.json();
-      const vapidPublicKey = settingsData.notificationSettings?.vapidPublicKey;
+      // Ambil token FCM
+      const { requestFcmToken } = await import("@/lib/firebase");
+      const token = await requestFcmToken();
 
-      if (!vapidPublicKey) {
-        setStatusMsg("VAPID Key belum dikonfigurasi oleh admin.");
-        setLoading(false);
-        return;
+      if (token) {
+        await saveFcmTokenToServer(token, { userAgent: navigator.userAgent });
       }
 
-      const reg = await navigator.serviceWorker.ready;
-      const convertedVapidKey = urlBase64ToUint8Array(vapidPublicKey);
-
-      const subscription = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: convertedVapidKey,
-      });
-
-      // Kirim subscription ke backend API
-      const subRes = await fetch("/api/push/subscribe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          subscription,
-          userName: "Pengguna IMO 2026",
-        }),
-      });
-
-      if (subRes.ok) {
-        setIsSubscribed(true);
-        setShowPromptBanner(false);
-        setStatusMsg("Notifikasi berhasil diaktifkan untuk perangkat ini!");
-      } else {
-        const errData = await subRes.json();
-        setStatusMsg("Gagal menyimpan langganan: " + errData.error);
-      }
+      setIsSubscribed(true);
+      setShowPromptBanner(false);
     } catch (err: any) {
-      console.error("Failed to subscribe:", err);
-      setStatusMsg("Terjadi kesalahan: " + err.message);
+      console.error("Failed to subscribe FCM:", err);
     } finally {
       setLoading(false);
     }
@@ -123,23 +76,20 @@ export default function PushNotificationManager() {
   const handleUnsubscribe = async () => {
     setLoading(true);
     try {
-      const reg = await navigator.serviceWorker.ready;
-      const sub = await reg.pushManager.getSubscription();
-
-      if (sub) {
-        await fetch("/api/push/subscribe", {
+      // Hapus token lokal jika ada
+      const { requestFcmToken } = await import("@/lib/firebase");
+      const token = await requestFcmToken();
+      if (token) {
+        await fetch("/api/push/fcm-token", {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ endpoint: sub.endpoint }),
+          body: JSON.stringify({ token }),
         });
-        await sub.unsubscribe();
       }
 
       setIsSubscribed(false);
-      setStatusMsg("Notifikasi perangkat telah dinonaktifkan.");
     } catch (err: any) {
       console.error("Failed to unsubscribe:", err);
-      setStatusMsg("Gagal membatalkan notifikasi: " + err.message);
     } finally {
       setLoading(false);
     }
@@ -156,26 +106,26 @@ export default function PushNotificationManager() {
             initial={{ opacity: 0, y: 50, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 50, scale: 0.95 }}
-            className="fixed bottom-5 right-5 left-5 md:left-auto md:max-w-md z-50 p-4 rounded-2xl bg-slate-950/95 border border-accent-cyan/40 backdrop-blur-2xl shadow-[0_0_30px_rgba(125,249,255,0.25)] flex flex-col space-y-3"
+            className="fixed bottom-5 right-5 left-5 md:left-auto md:max-w-md z-50 p-4 rounded-2xl bg-slate-950/95 border border-cyan-500/40 backdrop-blur-2xl shadow-[0_0_30px_rgba(6,182,212,0.25)] flex flex-col space-y-3"
           >
             <div className="flex items-start justify-between">
               <div className="flex items-center space-x-3">
-                <div className="p-2.5 rounded-xl bg-accent-cyan/20 text-accent-cyan border border-accent-cyan/40 animate-pulse">
+                <div className="p-2.5 rounded-xl bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 animate-pulse">
                   <Bell className="h-5 w-5" />
                 </div>
                 <div>
                   <h4 className="text-xs font-mono font-bold text-white flex items-center space-x-1.5">
-                    <span>Aktifkan Push Notification</span>
-                    <Sparkles className="h-3 w-3 text-accent-cyan" />
+                    <span>Aktifkan Notifikasi Portal</span>
+                    <Sparkles className="h-3 w-3 text-cyan-400" />
                   </h4>
                   <p className="text-[11px] text-slate-300 mt-0.5 leading-snug">
-                    Dapatkan peringatan tenggat waktu tugas H-1 & pengumuman baru langsung di perangkat Anda.
+                    Dapatkan pengingat deadline tugas & pengumuman mendadak langsung di perangkat Anda.
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setShowPromptBanner(false)}
-                className="text-slate-400 hover:text-white p-1"
+                className="text-slate-400 hover:text-white p-1 cursor-pointer"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -184,14 +134,14 @@ export default function PushNotificationManager() {
             <div className="flex items-center justify-end space-x-2 pt-1">
               <button
                 onClick={() => setShowPromptBanner(false)}
-                className="px-3 py-1.5 rounded-xl text-xs font-mono text-slate-400 hover:text-slate-200 transition"
+                className="px-3 py-1.5 rounded-xl text-xs font-mono text-slate-400 hover:text-slate-200 transition cursor-pointer"
               >
                 Nanti Saja
               </button>
               <button
                 onClick={handleSubscribe}
                 disabled={loading}
-                className="px-4 py-1.5 rounded-xl bg-accent-cyan text-black font-mono font-extrabold text-xs hover:bg-cyan-300 transition shadow-[0_0_15px_rgba(125,249,255,0.4)] flex items-center space-x-1.5 cursor-pointer"
+                className="px-4 py-1.5 rounded-xl bg-cyan-500 text-black font-mono font-extrabold text-xs hover:bg-cyan-400 transition shadow-[0_0_15px_rgba(6,182,212,0.4)] flex items-center space-x-1.5 cursor-pointer"
               >
                 <Bell className="h-3.5 w-3.5" />
                 <span>{loading ? "Mengaktifkan..." : "Aktifkan Sekarang"}</span>
@@ -201,7 +151,7 @@ export default function PushNotificationManager() {
         )}
       </AnimatePresence>
 
-      {/* Floating Mini Toggle Button (Always Available) */}
+      {/* Floating Mini Toggle Button */}
       <div className="fixed bottom-5 left-5 z-40">
         <button
           onClick={isSubscribed ? handleUnsubscribe : handleSubscribe}
@@ -209,19 +159,19 @@ export default function PushNotificationManager() {
           className={`p-3 rounded-full border backdrop-blur-xl transition duration-300 shadow-xl flex items-center space-x-2 text-xs font-mono font-bold cursor-pointer ${
             isSubscribed
               ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.3)]"
-              : "bg-slate-900/90 border-white/10 text-slate-300 hover:text-accent-cyan hover:border-accent-cyan/40"
+              : "bg-slate-900/90 border-white/10 text-slate-300 hover:text-cyan-400 hover:border-cyan-500/40"
           }`}
-          title={isSubscribed ? "Push Notification Aktif (Klik untuk matikan)" : "Aktifkan Push Notification"}
+          title={isSubscribed ? "Notifikasi FCM Aktif (Klik untuk nonaktifkan)" : "Aktifkan Notifikasi Portal"}
         >
           {isSubscribed ? (
             <>
               <Bell className="h-4 w-4 text-emerald-400 animate-bounce" />
-              <span className="hidden sm:inline">Push Notif Active</span>
+              <span className="hidden sm:inline">Notif Aktif</span>
             </>
           ) : (
             <>
               <BellOff className="h-4 w-4 text-slate-400" />
-              <span className="hidden sm:inline">{loading ? "Loading..." : "Notifikasi Device"}</span>
+              <span className="hidden sm:inline">{loading ? "Loading..." : "Aktifkan Notif"}</span>
             </>
           )}
         </button>

@@ -55,6 +55,12 @@ export async function GET() {
       homeCard3Title: "Hubungi LO",
       homeCard3Desc: "Kehilangan arah dalam perjalanan luar angkasa ini? Hubungi LO/Pendamping kelompok Anda secara langsung melalui satu tombol WhatsApp.",
 
+      // Home Photo Slots (GDrive Showcase & Storyline)
+      homePhotoSlotsEnabled: true,
+      homePhotoSlotsTitle: "ALUR KISAH PENJELAJAHAN ORBIT",
+      homePhotoSlotsSubtitle: "Rekam jejak kronologis dan narasi momentum penjelajahan Mahasiswa Baru IMO 2026 dari awal keberangkatan hingga puncak inovasi.",
+      homePhotoSlots: [],
+
       // Copywriting - Info Page
       infoHeroTitle: "Status Hub & Pengumpulan",
       infoHeroSubtitle: "Verifikasi kelengkapan pengumpulan tugas kelompok dan berkas individu real-time.",
@@ -121,6 +127,16 @@ export async function GET() {
     }
     if (settingsMap["target_members_per_group"]) {
       (parsedConfig as any).targetMembersPerGroup = Number(settingsMap["target_members_per_group"]);
+    }
+    if (settingsMap["group_member_counts"]) {
+      try {
+        (parsedConfig as any).groupMemberCounts = JSON.parse(settingsMap["group_member_counts"]);
+      } catch (e) {}
+    }
+    if (settingsMap["group_names"]) {
+      try {
+        (parsedConfig as any).groupNames = JSON.parse(settingsMap["group_names"]);
+      } catch (e) {}
     }
     if (settingsMap["total_groups_count"]) {
       (parsedConfig as any).totalGroupsCount = Number(settingsMap["total_groups_count"]);

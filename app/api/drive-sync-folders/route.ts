@@ -34,11 +34,13 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
 
-    // 1. Fetch system_settings for gdrive_parent_folder & total_groups_count
+    // 1. Fetch system_settings for gdrive_parent_folder, total_groups_count & group_names
     const { data: settingData } = await supabase
       .from("system_settings")
       .select("key, value")
-      .in("key", ["gdrive_parent_folder", "total_groups_count"]);
+      .in("key", ["gdrive_parent_folder", "total_groups_count", "group_names"]);
+
+    let customGroupNamesMap: Record<string, string> = {};
 
     if (settingData && settingData.length > 0) {
       const gdriveSetting = settingData.find((s: any) => s.key === "gdrive_parent_folder");
@@ -55,6 +57,13 @@ export async function POST(request: NextRequest) {
           totalGroupsCount = Number(countSetting.value);
         }
       }
+
+      const namesSetting = settingData.find((s: any) => s.key === "group_names");
+      if (namesSetting && namesSetting.value) {
+        try {
+          customGroupNamesMap = typeof namesSetting.value === "string" ? JSON.parse(namesSetting.value) : namesSetting.value;
+        } catch {}
+      }
     }
 
     if (!clientEmail || !privateKey || !folderId) {
@@ -64,11 +73,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2. Build complete list of groups
+    // 2. Build complete list of groups (using custom names formatted as "{namacustom} (Kelompok {nomor})")
     const groupNamesSet = new Set<string>();
 
     for (let i = 1; i <= totalGroupsCount; i++) {
-      groupNamesSet.add(`${groupPrefix} ${i}`);
+      const rawCustom = customGroupNamesMap[String(i)] || customGroupNamesMap[`Kelompok ${i}`];
+      let folderName = `${groupPrefix} ${i}`;
+
+      if (rawCustom && rawCustom.trim()) {
+        const trimmed = rawCustom.trim();
+        if (new RegExp(`\\(${groupPrefix}\\s*${i}\\)`, "i").test(trimmed)) {
+          folderName = trimmed;
+        } else if (new RegExp(`\\b${groupPrefix}\\s*${i}\\b`, "i").test(trimmed)) {
+          folderName = trimmed.replace(new RegExp(`\\s*\\(?${groupPrefix}\\s*${i}\\)?`, "i"), ` (${groupPrefix} ${i})`);
+        } else if (new RegExp(`^${groupPrefix}\\s+\\d+$`, "i").test(trimmed)) {
+          folderName = trimmed;
+        } else {
+          folderName = `${trimmed} (${groupPrefix} ${i})`;
+        }
+      }
+
+      groupNamesSet.add(folderName);
     }
 
     const { data: contactsData } = await supabase

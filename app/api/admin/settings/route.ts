@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
-import webpush from "web-push";
 
 export async function GET() {
   try {
@@ -119,7 +118,7 @@ export async function GET() {
 
     const [settingsResult, subscriberResult] = await Promise.all([
       supabase.from("system_settings").select("key, value"),
-      supabase.from("push_subscriptions").select("*", { count: "exact", head: true }),
+      supabase.from("fcm_tokens").select("*", { count: "exact", head: true }),
     ]);
 
     const settingsMap: Record<string, string> = {};
@@ -142,6 +141,16 @@ export async function GET() {
     }
     if (settingsMap["target_members_per_group"]) {
       parsedConfig.targetMembersPerGroup = Number(settingsMap["target_members_per_group"]);
+    }
+    if (settingsMap["group_member_counts"]) {
+      try {
+        (parsedConfig as any).groupMemberCounts = JSON.parse(settingsMap["group_member_counts"]);
+      } catch (e) {}
+    }
+    if (settingsMap["group_names"]) {
+      try {
+        (parsedConfig as any).groupNames = JSON.parse(settingsMap["group_names"]);
+      } catch (e) {}
     }
     if (settingsMap["total_groups_count"]) {
       parsedConfig.totalGroupsCount = Number(settingsMap["total_groups_count"]);
@@ -166,7 +175,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { siteCoreConfig, gdriveParentFolder, totalGroupsCount, targetMembersPerGroup, notificationSettings, action } = body;
+    const { siteCoreConfig, gdriveParentFolder, totalGroupsCount, targetMembersPerGroup, groupMemberCounts, groupNames, notificationSettings, action } = body;
 
     let supabase: any = null;
     try {
@@ -177,32 +186,6 @@ export async function POST(request: NextRequest) {
 
     if (!supabase) {
       return NextResponse.json({ error: "Supabase client tidak dapat diinisialisasi." }, { status: 500 });
-    }
-
-    if (action === "regenerate_vapid") {
-      const generated = webpush.generateVAPIDKeys();
-      
-      const { data: existing } = await supabase
-        .from("system_settings")
-        .select("value")
-        .eq("key", "notification_settings")
-        .maybeSingle();
-
-      let curSettings = existing && existing.value ? (typeof existing.value === "string" ? JSON.parse(existing.value) : existing.value) : {};
-      curSettings.vapidPublicKey = generated.publicKey;
-      curSettings.vapidPrivateKey = generated.privateKey;
-
-      await supabase.from("system_settings").upsert(
-        {
-          key: "notification_settings",
-          value: JSON.stringify(curSettings),
-          description: "Pengaturan Global Push Notification & VAPID Keys",
-          updated_at: new Date().toISOString()
-        },
-        { onConflict: "key" }
-      );
-      
-      return NextResponse.json({ success: true, message: "VAPID Keys berhasil diregenerate ulang secara paksa." });
     }
 
     const settingsToUpsert: any[] = [];
@@ -238,7 +221,25 @@ export async function POST(request: NextRequest) {
       settingsToUpsert.push({
         key: "target_members_per_group",
         value: String(targetMembersPerGroup),
-        description: "Target Anggota Per Kelompok",
+        description: "Target Anggota Per Kelompok (Default)",
+        updated_at: new Date().toISOString(),
+      });
+    }
+
+    if (groupMemberCounts !== undefined) {
+      settingsToUpsert.push({
+        key: "group_member_counts",
+        value: typeof groupMemberCounts === "string" ? groupMemberCounts : JSON.stringify(groupMemberCounts),
+        description: "Jumlah Peserta Per Kelompok (Kustomisasi Tiap Kelompok)",
+        updated_at: new Date().toISOString(),
+      });
+    }
+
+    if (groupNames !== undefined) {
+      settingsToUpsert.push({
+        key: "group_names",
+        value: typeof groupNames === "string" ? groupNames : JSON.stringify(groupNames),
+        description: "Nama Kustom Masing-Masing Kelompok",
         updated_at: new Date().toISOString(),
       });
     }

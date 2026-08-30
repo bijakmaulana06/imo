@@ -8,6 +8,7 @@ import { Link } from "next-view-transitions";
 import { Rocket, Sparkles, BookOpen, Compass, Contact, ArrowRight, ChevronDown, ClipboardCheck, IdCard, FileText } from "lucide-react";
 import { useSiteConfig } from "@/components/SiteConfigProvider";
 import { motion, useScroll, useTransform } from "framer-motion";
+import HomePhotoSpotlight from "@/components/HomePhotoSpotlight";
 
 function HomeNodeCard({ node }: { node: any }) {
   const cardRef = useRef<HTMLDivElement>(null);
@@ -239,12 +240,21 @@ export default function Home() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1, y: [0, 8, 0] }}
             transition={{ duration: 2, repeat: Infinity, delay: 1 }}
-            className="absolute bottom-10 left-1/2 transform -translate-x-1/2 text-slate-400 flex flex-col items-center pointer-events-none"
+            className="absolute bottom-6 left-1/2 transform -translate-x-1/2 text-slate-400 flex flex-col items-center pointer-events-none"
           >
-            <span className="text-xs font-mono uppercase tracking-widest mb-2">Scroll ke Bawah</span>
-            <ChevronDown className="h-6 w-6" />
+            <span className="text-[10px] font-mono uppercase tracking-widest mb-1.5 opacity-70">Scroll ke Bawah</span>
+            <ChevronDown className="h-5 w-5 text-accent-cyan/70" />
           </motion.div>
         </section>
+
+        {/* Section 1.5: Photo Slots Spotlight (Google Drive Showcase with Non-Interactive Shields & Descriptions) */}
+        {config.homePhotoSlotsEnabled !== false && (
+          <HomePhotoSpotlight 
+            slots={config.homePhotoSlots}
+            sectionTitle={config.homePhotoSlotsTitle}
+            sectionSubtitle={config.homePhotoSlotsSubtitle}
+          />
+        )}
 
         {/* Section 2: Constellation / Node Graph Map */}
         <section className="min-h-screen flex flex-col items-center justify-center px-4 py-20 relative">

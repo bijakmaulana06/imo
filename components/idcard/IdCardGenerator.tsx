@@ -32,15 +32,28 @@ interface IdCardGeneratorProps {
   allowUserUpload?: boolean;
 }
 
-const DEFAULT_SAMPLE_VALUES: Record<string, string> = {
-  nama: 'Budi Santoso',
-  nim: '2026010042',
-  kelompok: 'Kelompok 01',
-  jurusan: 'Informatika / STEI',
-  peran: 'Peserta Resmi',
-  quote: 'Different Minds, One Generation Chasing Glories',
-  motto: 'Different Minds, One Generation Chasing Glories',
-};
+function getTagPlaceholder(tag: string): string {
+  const lower = tag.toLowerCase().trim();
+  if (lower === 'nama' || lower === 'name' || lower.includes('nama')) {
+    return 'Nama: Xaviera Putri';
+  }
+  if (lower === 'nim' || lower === 'nrp' || lower.includes('nim')) {
+    return 'NIM : 260xxxxxxxx';
+  }
+  if (lower === 'kelompok' || lower === 'group') {
+    return 'Kelompok: Kelompok 01';
+  }
+  if (lower === 'jurusan' || lower === 'prodi') {
+    return 'Jurusan: Teknologi Pendidikan';
+  }
+  if (lower === 'peran' || lower === 'role') {
+    return 'Peran: Peserta';
+  }
+  if (lower === 'quote' || lower === 'motto') {
+    return 'Motto: Chasing Glories';
+  }
+  return `Masukkan ${tag}...`;
+}
 
 export default function IdCardGenerator({ templateUrl, allowUserUpload = false }: IdCardGeneratorProps) {
   const [parsed, setParsed] = useState<ParsedTemplate | null>(null);
@@ -81,10 +94,10 @@ export default function IdCardGenerator({ templateUrl, allowUserUpload = false }
       const result = parseTemplate(source);
       setParsed(result);
 
-      // Inisialisasi value form dari tag yang terdeteksi
+      // Inisialisasi value form dari tag yang terdeteksi (kosong, tanpa dummy placeholder content)
       const initialValues: Record<string, string> = {};
       result.textTags.forEach((tag) => {
-        initialValues[tag] = DEFAULT_SAMPLE_VALUES[tag] || '';
+        initialValues[tag] = '';
       });
       setValues(initialValues);
 
@@ -107,6 +120,7 @@ export default function IdCardGenerator({ templateUrl, allowUserUpload = false }
   useEffect(() => {
     if (!templateUrl) return;
     setLoading(true);
+    setError(null);
     fetch(templateUrl)
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP error! status: ${r.status}`);
@@ -118,7 +132,25 @@ export default function IdCardGenerator({ templateUrl, allowUserUpload = false }
       })
       .catch((err) => {
         console.warn('Template URL tidak dapat dimuat otomatis:', err);
-        setLoading(false);
+        if (templateUrl !== '/templates/id-card.psd') {
+          console.log('Mencoba memuat templat cadangan: /templates/id-card.psd...');
+          fetch('/templates/id-card.psd')
+            .then((r) => {
+              if (!r.ok) throw new Error(`Fallback status: ${r.status}`);
+              return r.arrayBuffer();
+            })
+            .then((buffer) => {
+              loadTemplateBuffer(buffer, 'id-card.psd');
+            })
+            .catch((fallbackErr) => {
+              console.error('Fallback templat juga gagal:', fallbackErr);
+              setError('Gagal memuat templat ID Card. Silakan muat ulang halaman.');
+              setLoading(false);
+            });
+        } else {
+          setError('Gagal memuat templat ID Card.');
+          setLoading(false);
+        }
       });
   }, [templateUrl, loadTemplateBuffer]);
 
@@ -483,7 +515,7 @@ export default function IdCardGenerator({ templateUrl, allowUserUpload = false }
                       type="text"
                       value={values[tag] ?? ''}
                       onChange={(e) => setValues((v) => ({ ...v, [tag]: e.target.value }))}
-                      placeholder={`Masukkan ${tag}...`}
+                      placeholder={getTagPlaceholder(tag)}
                       className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-white placeholder-slate-500 text-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 focus:outline-none transition-all"
                     />
                     {/* Collapsible Per-tag font + bold/italic */}

@@ -33,11 +33,26 @@ import {
   XCircle,
   CheckCircle,
   Bell,
-  Video
+  Video,
+  Milestone,
+  Compass,
+  Camera,
+  Image as ImageIcon,
+  ArrowUp,
+  ArrowDown,
+  Copy,
+  RotateCcw,
+  Minus,
+  Search,
+  Sliders,
+  ChevronDown,
+  ChevronUp,
+  UsersRound
 } from "lucide-react";
 import { DEFAULT_ID_CARD_TEMPLATE } from "@/lib/defaultTemplate";
+import { HomePhotoSlot } from "@/components/SiteConfigProvider";
 
-type ActiveTab = "links" | "contacts" | "announcements" | "templates" | "tasks" | "doc_templates" | "notifications";
+type ActiveTab = "links" | "contacts" | "announcements" | "templates" | "tasks" | "doc_templates" | "storyline" | "notifications";
 
 const DEFAULT_ADMIN_HTML_TEMPLATE = DEFAULT_ID_CARD_TEMPLATE;
 
@@ -55,6 +70,10 @@ export default function AdminDashboardPage() {
   const [gdriveLink, setGdriveLink] = useState<string>("");
   const [targetTotalGroups, setTargetTotalGroups] = useState<number>(20);
   const [targetMembersPerGroup, setTargetMembersPerGroup] = useState<number>(10);
+  const [groupMemberCounts, setGroupMemberCounts] = useState<Record<string, number>>({});
+  const [groupNames, setGroupNames] = useState<Record<string, string>>({});
+  const [showCustomGroupCounts, setShowCustomGroupCounts] = useState<boolean>(false);
+  const [groupSearchQuery, setGroupSearchQuery] = useState<string>("");
   const [savingGdrive, setSavingGdrive] = useState<boolean>(false);
   const [syncingFolders, setSyncingFolders] = useState<boolean>(false);
   const [syncNotice, setSyncNotice] = useState<string | null>(null);
@@ -87,6 +106,42 @@ export default function AdminDashboardPage() {
   // Admin Custom HTML Template State
   const [adminTemplateHtml, setAdminTemplateHtml] = useState<string>(DEFAULT_ADMIN_HTML_TEMPLATE);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
+
+  // Storyline (Alur Kisah Beranda) State
+  const [storylineEnabled, setStorylineEnabled] = useState<boolean>(true);
+  const [storylineTitle, setStorylineTitle] = useState<string>("ALUR KISAH PENJELAJAHAN ORBIT");
+  const [storylineSubtitle, setStorylineSubtitle] = useState<string>("Rekam jejak kronologis dan narasi momentum penjelajahan Mahasiswa Baru IMO 2026 dari awal keberangkatan hingga puncak inovasi.");
+  const [storylineSlots, setStorylineSlots] = useState<HomePhotoSlot[]>([
+    {
+      id: "slot-1",
+      badge: "Chapter 01 // Inisiasi Orbit",
+      title: "Pemberangkatan & Orientasi Perdana",
+      description: "Langkah mula ribuan pemuda dari berbagai penjuru berkumpul dalam satu atmosfer orbit baru. Di sini, semangat kebersamaan dinyalakan dan komitmen IMO 2026 ditanamkan bersama para LO pendamping.",
+      gdriveUrl: "https://images.unsplash.com/photo-1523240795612-9a054b0db644?q=80&w=1000&auto=format&fit=crop",
+      coordinateLabel: "KOORDINAT ALUR 01 - GEDUNG UTAMA",
+      dateTag: "Status: H-7 Fase Pengkondisian",
+    },
+    {
+      id: "slot-2",
+      badge: "Chapter 02 // Sinergi & Dinamika Kelompok",
+      title: "Simulasi Misi & Penyusunan Berkas",
+      description: "Setiap kelompok menguji ketangguhan kolaborasi mereka dalam merampungkan tugas terstruktur, menyelesaikan Auto-Form, serta menyelaraskan frekuensi pemikiran menuju satu visi misi bersama.",
+      gdriveUrl: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?q=80&w=1000&auto=format&fit=crop",
+      coordinateLabel: "KOORDINAT ALUR 02 - LAB SIMULASI",
+      dateTag: "Status: H-Day Penjelajahan Berkas",
+    },
+    {
+      id: "slot-3",
+      badge: "Chapter 03 // Puncak Konstelasi",
+      title: "Sidang Pleno & Deklarasi Generasi Inovator",
+      description: "Panggung pembuktian di mana karya, gagasan, dan inovasi terbaik dipresentasikan di hadapan dewan penguji. Menandai lahirnya generasi penjelajah baru yang siap mengukir sejarah gemilang.",
+      gdriveUrl: "https://images.unsplash.com/photo-1511578314322-379afb476865?q=80&w=1000&auto=format&fit=crop",
+      coordinateLabel: "KOORDINAT ALUR 03 - AUDITORIUM UTAMA",
+      dateTag: "Status: Pasca Sidang Pleno",
+    },
+  ]);
+  const [savingStoryline, setSavingStoryline] = useState<boolean>(false);
+  const [storylineSuccessMsg, setStorylineSuccessMsg] = useState<string | null>(null);
 
   // PSD Template Manager State
   const [psdTemplates, setPsdTemplates] = useState<any[]>([]);
@@ -137,11 +192,11 @@ export default function AdminDashboardPage() {
   // Render preview sample
   const renderedAdminPreviewHtml = React.useMemo(() => {
     const sampleValues: Record<string, string> = {
-      nama: "Budi Santoso",
-      nim: "2026010042",
+      nama: "Xaviera Putri",
+      nim: "260xxxxxxxx",
       kelompok: "Kelompok 1",
-      jurusan: "Informatika / STEI",
-      peran: "Peserta Resmi",
+      jurusan: "Teknologi Pendidikan",
+      peran: "Peserta",
       quote: "Different Minds, One Generation Chasing Glories",
     };
 
@@ -325,7 +380,7 @@ export default function AdminDashboardPage() {
       const { data: docData } = await supabase.from("document_templates").select("*").order("created_at", { ascending: false });
       setDocTemplates(docData || []);
 
-      const { data: settingData } = await supabase.from("system_settings").select("key, value").in("key", ["gdrive_parent_folder", "total_groups_count", "target_members_per_group", "task_definitions_individu", "notification_settings"]);
+      const { data: settingData } = await supabase.from("system_settings").select("key, value").in("key", ["gdrive_parent_folder", "total_groups_count", "target_members_per_group", "group_member_counts", "group_names", "task_definitions_individu", "notification_settings", "site_core_config"]);
       if (settingData) {
         const folderSetting = settingData.find((s: any) => s.key === "gdrive_parent_folder");
         if (folderSetting) setGdriveLink(folderSetting.value || "");
@@ -336,6 +391,24 @@ export default function AdminDashboardPage() {
         const membersSetting = settingData.find((s: any) => s.key === "target_members_per_group");
         if (membersSetting && membersSetting.value && !isNaN(Number(membersSetting.value))) {
           setTargetMembersPerGroup(Number(membersSetting.value));
+        }
+        const groupCountsSetting = settingData.find((s: any) => s.key === "group_member_counts");
+        if (groupCountsSetting && groupCountsSetting.value) {
+          try {
+            const parsed = typeof groupCountsSetting.value === "string" ? JSON.parse(groupCountsSetting.value) : groupCountsSetting.value;
+            if (parsed && typeof parsed === "object") {
+              setGroupMemberCounts(parsed);
+            }
+          } catch { }
+        }
+        const groupNamesSetting = settingData.find((s: any) => s.key === "group_names");
+        if (groupNamesSetting && groupNamesSetting.value) {
+          try {
+            const parsed = typeof groupNamesSetting.value === "string" ? JSON.parse(groupNamesSetting.value) : groupNamesSetting.value;
+            if (parsed && typeof parsed === "object") {
+              setGroupNames(parsed);
+            }
+          } catch { }
         }
         const individuSetting = settingData.find((s: any) => s.key === "task_definitions_individu");
         if (individuSetting && individuSetting.value) {
@@ -353,12 +426,67 @@ export default function AdminDashboardPage() {
             setNotifSettings((prev: any) => ({ ...prev, ...parsed }));
           } catch { }
         }
+        const coreSetting = settingData.find((s: any) => s.key === "site_core_config");
+        if (coreSetting && coreSetting.value) {
+          try {
+            const parsed = JSON.parse(coreSetting.value);
+            if (parsed.homePhotoSlotsEnabled !== undefined) setStorylineEnabled(parsed.homePhotoSlotsEnabled);
+            if (parsed.homePhotoSlotsTitle) setStorylineTitle(parsed.homePhotoSlotsTitle);
+            if (parsed.homePhotoSlotsSubtitle) setStorylineSubtitle(parsed.homePhotoSlotsSubtitle);
+            if (Array.isArray(parsed.homePhotoSlots) && parsed.homePhotoSlots.length > 0) {
+              setStorylineSlots(parsed.homePhotoSlots);
+            }
+          } catch { }
+        }
       }
 
     } catch (err) {
       console.error("Dashboard Load Error:", err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSaveStoryline = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setSavingStoryline(true);
+    setStorylineSuccessMsg(null);
+    try {
+      // 1. Get current site_core_config
+      const { data: currentSetting } = await supabase.from("system_settings").select("value").eq("key", "site_core_config").maybeSingle();
+      let currentConfig: any = {};
+      if (currentSetting?.value) {
+        try {
+          currentConfig = JSON.parse(currentSetting.value);
+        } catch (e) {}
+      }
+
+      const updatedConfig = {
+        ...currentConfig,
+        homePhotoSlotsEnabled: storylineEnabled,
+        homePhotoSlotsTitle: storylineTitle,
+        homePhotoSlotsSubtitle: storylineSubtitle,
+        homePhotoSlots: storylineSlots,
+      };
+
+      const { error } = await supabase.from("system_settings").upsert({
+        key: "site_core_config",
+        value: JSON.stringify(updatedConfig),
+        description: "Pengaturan Teknis Utama Web & Kustomisasi Seluruh UI",
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "key" });
+
+      if (error) throw error;
+
+      // Trigger cache refresh
+      fetch("/api/site-config").catch(() => {});
+
+      setStorylineSuccessMsg("Alur Cerita (Storyline) berhasil disimpan & langsung aktif di Beranda!");
+      setTimeout(() => setStorylineSuccessMsg(null), 4000);
+    } catch (err: any) {
+      alert("Gagal menyimpan alur cerita: " + err.message);
+    } finally {
+      setSavingStoryline(false);
     }
   };
 
@@ -520,7 +648,19 @@ export default function AdminDashboardPage() {
         {
           key: "target_members_per_group",
           value: String(targetMembersPerGroup),
-          description: "Target Jumlah Anggota Per Kelompok untuk Tugas Individu",
+          description: "Target Standar Jumlah Anggota Per Kelompok untuk Tugas Individu",
+          updated_at: new Date().toISOString(),
+        },
+        {
+          key: "group_member_counts",
+          value: JSON.stringify(groupMemberCounts),
+          description: "Jumlah Peserta Kustom Per Kelompok (Individu)",
+          updated_at: new Date().toISOString(),
+        },
+        {
+          key: "group_names",
+          value: JSON.stringify(groupNames),
+          description: "Nama Kustom Masing-Masing Kelompok",
           updated_at: new Date().toISOString(),
         }
       ]);
@@ -1013,12 +1153,12 @@ export default function AdminDashboardPage() {
               <line x1="500" y1="0" x2="500" y2="35" stroke="#7df9ff" strokeWidth="2.5" strokeDasharray="5 3" className="animate-pulse" />
               <circle cx="500" cy="35" r="4" fill="#7df9ff" className="shadow-[0_0_12px_#7df9ff]" />
 
-              {/* Horizontal Bus Line across all 6 nodes (y=35, x=65 to x=935) */}
-              <line x1="65" y1="35" x2="935" y2="35" stroke="rgba(125,249,255,0.35)" strokeWidth="2" />
+              {/* Horizontal Bus Line across all 8 nodes (y=35, x=55 to x=945) */}
+              <line x1="55" y1="35" x2="945" y2="35" stroke="rgba(125,249,255,0.35)" strokeWidth="2" />
 
-              {/* Vertical Drop Lines to 7 Nodes */}
-              {[65, 210, 355, 500, 645, 790, 935].map((x, idx) => {
-                const nodeIds: ActiveTab[] = ["links", "contacts", "announcements", "templates", "tasks", "doc_templates", "notifications"];
+              {/* Vertical Drop Lines to 8 Nodes */}
+              {[55, 182, 309, 436, 563, 690, 817, 945].map((x, idx) => {
+                const nodeIds: ActiveTab[] = ["links", "contacts", "announcements", "templates", "tasks", "doc_templates", "storyline", "notifications"];
                 const isSelected = activeTab === nodeIds[idx];
                 return (
                   <g key={idx}>
@@ -1042,8 +1182,8 @@ export default function AdminDashboardPage() {
             </svg>
           </div>
 
-          {/* Node Buttons Bar (Desktop - 6 Nodes) */}
-          <div className="relative w-full max-w-4xl flex justify-between items-start mt-2 z-10 hidden sm:flex">
+          {/* Node Buttons Bar (Desktop - 8 Nodes) */}
+          <div className="relative w-full max-w-5xl flex justify-between items-start mt-2 z-10 hidden sm:flex gap-1.5">
             {[
               { id: "links", label: "Menu Links", icon: Layers, count: links.length, color: "text-blue-400", border: "border-blue-500/50", shadow: "shadow-[0_0_20px_rgba(59,130,246,0.3)]" },
               { id: "contacts", label: "Kontak LO", icon: Users, count: contacts.length, color: "text-emerald-400", border: "border-emerald-500/50", shadow: "shadow-[0_0_20px_rgba(16,185,129,0.3)]" },
@@ -1051,41 +1191,43 @@ export default function AdminDashboardPage() {
               { id: "templates", label: "Template ID", icon: CreditCard, count: templates.length, color: "text-purple-400", border: "border-purple-500/50", shadow: "shadow-[0_0_20px_rgba(168,85,247,0.3)]" },
               { id: "tasks", label: "Penugasan", icon: ListChecks, count: tasks.length, color: "text-rose-400", border: "border-rose-500/50", shadow: "shadow-[0_0_20px_rgba(244,63,114,0.3)]" },
               { id: "doc_templates", label: "Auto-Form", icon: FileCode2, count: docTemplates.length, color: "text-cyan-400", border: "border-cyan-500/50", shadow: "shadow-[0_0_20px_rgba(125,249,255,0.3)]" },
+              { id: "storyline", label: "Storyline", icon: Milestone, count: storylineSlots.length, color: "text-cyan-300", border: "border-cyan-500/50", shadow: "shadow-[0_0_20px_rgba(125,249,255,0.3)]" },
               { id: "notifications", label: "Notifikasi", icon: Bell, count: 0, color: "text-rose-500", border: "border-rose-500/50", shadow: "shadow-[0_0_20px_rgba(244,63,114,0.3)]" },
             ].map((t) => {
               const Icon = t.icon;
               const isCurrent = activeTab === t.id;
 
               return (
-                <div key={t.id} className="relative flex flex-col items-center group cursor-pointer" onClick={() => setActiveTab(t.id as ActiveTab)}>
+                <div key={t.id} className="relative flex flex-col items-center group cursor-pointer flex-1" onClick={() => setActiveTab(t.id as ActiveTab)}>
                   <motion.div
                     whileHover={{ scale: 1.08 }}
                     whileTap={{ scale: 0.95 }}
                     transition={{ type: "spring", stiffness: 400, damping: 25 }}
-                    className={`h-16 w-16 flex flex-col items-center justify-center rounded-2xl border transition-all duration-300 z-10 ${isCurrent
+                    className={`h-15 w-15 sm:h-16 sm:w-16 flex flex-col items-center justify-center rounded-2xl border transition-all duration-300 z-10 ${isCurrent
                       ? `bg-slate-800 ${t.border} ${t.shadow} scale-110 ring-2 ring-white/10`
                       : `bg-slate-900/90 border-card-border/50 group-hover:border-slate-500`
                       }`}
                   >
-                    <Icon className={`h-6 w-6 mb-1 transition-colors ${isCurrent ? t.color : 'text-slate-400 group-hover:text-slate-200'}`} />
+                    <Icon className={`h-5 w-5 sm:h-6 sm:w-6 mb-1 transition-colors ${isCurrent ? t.color : 'text-slate-400 group-hover:text-slate-200'}`} />
                     <span className="text-[9px] font-mono font-bold bg-black/40 px-1.5 rounded text-slate-300">{t.count}</span>
                   </motion.div>
-                  <span className={`mt-3 text-[11px] font-bold tracking-wider text-center ${isCurrent ? t.color : 'text-slate-400 group-hover:text-slate-200'} transition-colors`}>{t.label}</span>
+                  <span className={`mt-2.5 text-[10.5px] font-bold tracking-wider text-center ${isCurrent ? t.color : 'text-slate-400 group-hover:text-slate-200'} transition-colors`}>{t.label}</span>
                 </div>
               );
             })}
           </div>
 
-          {/* Mobile Node Buttons Grid */}
-          <div className="w-full grid grid-cols-3 sm:hidden gap-3 mt-6 px-2">
+          {/* Mobile Node Buttons Grid (2 rows of 4) */}
+          <div className="w-full grid grid-cols-4 sm:hidden gap-2 mt-6 px-1">
             {[
               { id: "links", label: "Menu", icon: Layers, count: links.length, color: "text-blue-400", border: "border-blue-500/50" },
               { id: "contacts", label: "Kontak", icon: Users, count: contacts.length, color: "text-emerald-400", border: "border-emerald-500/50" },
-              { id: "announcements", label: "Pengumuman", icon: Megaphone, count: announcements.length, color: "text-amber-400", border: "border-amber-500/50" },
-              { id: "templates", label: "Template", icon: CreditCard, count: templates.length, color: "text-purple-400", border: "border-purple-500/50" },
+              { id: "announcements", label: "Warta", icon: Megaphone, count: announcements.length, color: "text-amber-400", border: "border-amber-500/50" },
+              { id: "templates", label: "ID Card", icon: CreditCard, count: templates.length, color: "text-purple-400", border: "border-purple-500/50" },
               { id: "tasks", label: "Tugas", icon: ListChecks, count: tasks.length, color: "text-rose-400", border: "border-rose-500/50" },
-              { id: "doc_templates", label: "Auto-Form", icon: FileCode2, count: docTemplates.length, color: "text-cyan-400", border: "border-cyan-500/50" },
-              { id: "notifications", label: "Notifikasi", icon: Bell, count: 0, color: "text-rose-500", border: "border-rose-500/50" },
+              { id: "doc_templates", label: "Form", icon: FileCode2, count: docTemplates.length, color: "text-cyan-400", border: "border-cyan-500/50" },
+              { id: "storyline", label: "Story", icon: Milestone, count: storylineSlots.length, color: "text-cyan-300", border: "border-cyan-500/50" },
+              { id: "notifications", label: "Notif", icon: Bell, count: 0, color: "text-rose-500", border: "border-rose-500/50" },
             ].map((t) => {
               const Icon = t.icon;
               const isCurrent = activeTab === t.id;
@@ -1097,10 +1239,10 @@ export default function AdminDashboardPage() {
                     : `bg-slate-900/90 border-card-border/50`
                     }`}
                   >
-                    <Icon className={`h-5 w-5 mb-0.5 ${isCurrent ? t.color : 'text-slate-400'}`} />
+                    <Icon className={`h-4 w-4 mb-0.5 ${isCurrent ? t.color : 'text-slate-400'}`} />
                     <span className="text-[8px] font-mono font-bold bg-black/40 px-1 rounded text-slate-300">{t.count}</span>
                   </div>
-                  <span className={`mt-1.5 text-[10px] font-bold text-center ${isCurrent ? t.color : 'text-slate-400'}`}>{t.label}</span>
+                  <span className={`mt-1 text-[9px] font-bold text-center truncate w-full ${isCurrent ? t.color : 'text-slate-400'}`}>{t.label}</span>
                 </div>
               );
             })}
@@ -1649,17 +1791,24 @@ export default function AdminDashboardPage() {
                 )}
 
                 {/* Google Drive Parent Folder & Group Count Configuration */}
-                <div className="glass rounded-2xl p-6 border border-accent-cyan/30">
-                  <h3 className="font-display font-bold text-sm text-accent-cyan uppercase tracking-wider mb-2 flex items-center gap-2">
-                    <ExternalLink className="h-4 w-4" />
-                    <span>Sumber Google Drive & Parameter Kelompok</span>
-                  </h3>
-                  <p className="text-xs text-slate-400 mb-4">
-                    Atur Link Folder Google Drive Utama dan Jumlah Kelompok (misal: 20 kelompok). Saat menekan <strong>"Sinkronkan Folder Kelompok"</strong>, sistem akan membuat folder dari <strong>Kelompok 1 s/d Kelompok {targetTotalGroups}</strong> sekaligus (folder yang sudah ada tidak dibuat ulang).
+                <div className="glass rounded-2xl p-6 border border-accent-cyan/30 space-y-5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-card-border/30 pb-3">
+                    <h3 className="font-display font-bold text-sm text-accent-cyan uppercase tracking-wider flex items-center gap-2">
+                      <ExternalLink className="h-4 w-4" />
+                      <span>Sumber Google Drive & Parameter Jumlah Peserta Kelompok</span>
+                    </h3>
+                    <span className="text-[10px] font-mono text-purple-300 bg-purple-500/10 border border-purple-500/30 px-2.5 py-0.5 rounded-full font-bold">
+                      Dynamic Group Member Allocation
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-slate-400">
+                    Atur link Folder Google Drive Induk, jumlah kelompok, dan kuota anggota. Anda dapat menetapkan <strong>jumlah peserta yang berbeda untuk masing-masing kelompok</strong> (tidak harus sama rata).
                   </p>
-                  <form onSubmit={handleSaveGdriveLink} className="space-y-3">
-                    <div className="flex flex-col sm:flex-row gap-3 items-stretch">
-                      <div className="flex-grow">
+
+                  <form onSubmit={handleSaveGdriveLink} className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                      <div className="md:col-span-6">
                         <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Link / ID Folder Induk Google Drive</label>
                         <input
                           type="text"
@@ -1670,7 +1819,7 @@ export default function AdminDashboardPage() {
                         />
                       </div>
 
-                      <div className="w-full sm:w-44">
+                      <div className="md:col-span-3">
                         <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Total Kelompok</label>
                         <input
                           type="number"
@@ -1683,8 +1832,8 @@ export default function AdminDashboardPage() {
                         />
                       </div>
 
-                      <div className="w-full sm:w-56">
-                        <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Target Anggota / Kelompok (Individu)</label>
+                      <div className="md:col-span-3">
+                        <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Target Default / Standar</label>
                         <input
                           type="number"
                           min={1}
@@ -1694,7 +1843,309 @@ export default function AdminDashboardPage() {
                           placeholder="10"
                           className="w-full px-4 py-2.5 rounded-xl bg-slate-950/80 border border-card-border text-accent-purple font-bold text-xs font-mono focus:border-accent-purple focus:outline-none"
                         />
+                        <span className="text-[9px] text-slate-500 mt-0.5 block">Fallback jika kelompok belum dikustom</span>
                       </div>
+                    </div>
+
+                    {/* ─────────────────────────────────────────────────────────────────────────────
+                        PER-GROUP CUSTOM MEMBER COUNT & NAME MATRIX (Accordion & Custom Grid)
+                        ───────────────────────────────────────────────────────────────────────────── */}
+                    <div className="bg-slate-950/70 border border-card-border/60 rounded-2xl p-4 space-y-3.5">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-center space-x-2.5">
+                          <UsersRound className="h-4 w-4 text-accent-purple" />
+                          <div>
+                            <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wide">
+                              Kustomisasi Nama & Kuota Anggota Per Kelompok
+                            </h4>
+                            <p className="text-[10px] text-slate-400">
+                              Atur nama khusus dan jumlah anggota unik untuk setiap kelompok 1 s/d {targetTotalGroups}.
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                          {/* Summary pill */}
+                          {(() => {
+                            let totalMembersSum = 0;
+                            let customQuotaCount = 0;
+                            let customNameCount = 0;
+                            for (let i = 1; i <= targetTotalGroups; i++) {
+                              const specific = groupMemberCounts[String(i)] ?? groupMemberCounts[`Kelompok ${i}`];
+                              if (specific !== undefined) {
+                                totalMembersSum += specific;
+                                if (specific !== targetMembersPerGroup) customQuotaCount++;
+                              } else {
+                                totalMembersSum += targetMembersPerGroup;
+                              }
+                              const cName = groupNames[String(i)] || groupNames[`Kelompok ${i}`];
+                              if (cName && cName.trim() && cName.trim() !== `Kelompok ${i}`) {
+                                customNameCount++;
+                              }
+                            }
+                            return (
+                              <div className="flex items-center space-x-1.5">
+                                <span className="text-[10px] font-mono bg-purple-500/20 text-purple-300 border border-purple-500/40 px-2.5 py-1 rounded-lg font-bold">
+                                  ∑ Total: {totalMembersSum} Peserta
+                                </span>
+                                {(customQuotaCount > 0 || customNameCount > 0) && (
+                                  <span className="text-[10px] font-mono bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2.5 py-1 rounded-lg font-bold">
+                                    {customQuotaCount} Kuota / {customNameCount} Nama Kustom
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })()}
+
+                          <button
+                            type="button"
+                            onClick={() => setShowCustomGroupCounts(!showCustomGroupCounts)}
+                            className="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-mono font-bold transition flex items-center space-x-1"
+                          >
+                            <span>{showCustomGroupCounts ? "Tutup Grid" : "Buka Grid Kelompok"}</span>
+                            {showCustomGroupCounts ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                          </button>
+                        </div>
+                      </div>
+
+                      {showCustomGroupCounts && (
+                        <div className="space-y-3 pt-2 border-t border-card-border/40">
+                          {/* Quick Toolbar */}
+                          <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-2">
+                            <div className="relative flex-1 max-w-xs">
+                              <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-slate-500" />
+                              <input
+                                type="text"
+                                value={groupSearchQuery}
+                                onChange={(e) => setGroupSearchQuery(e.target.value)}
+                                placeholder="Cari nomor / nama kelompok..."
+                                className="w-full pl-8 pr-3 py-1.5 bg-black/60 border border-card-border rounded-lg text-xs text-slate-200 focus:border-accent-cyan outline-none"
+                              />
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (confirm(`Reset semua nama kelompok ke standar default (Kelompok 1, Kelompok 2, dst)?`)) {
+                                    setGroupNames({});
+                                  }
+                                }}
+                                className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-[10px] font-mono transition flex items-center space-x-1"
+                              >
+                                <RotateCcw className="h-3 w-3 text-amber-400" />
+                                <span>Reset Nama ke Default</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (confirm(`Samakan seluruh ${targetTotalGroups} kelompok ke kuota default (${targetMembersPerGroup} orang)?`)) {
+                                    const nextCounts: Record<string, number> = {};
+                                    for (let i = 1; i <= targetTotalGroups; i++) {
+                                      nextCounts[String(i)] = targetMembersPerGroup;
+                                    }
+                                    setGroupMemberCounts(nextCounts);
+                                  }
+                                }}
+                                className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-[10px] font-mono transition flex items-center space-x-1"
+                              >
+                                <RotateCcw className="h-3 w-3 text-cyan-400" />
+                                <span>Setel Kuota Default ({targetMembersPerGroup})</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const nextCounts = { ...groupMemberCounts };
+                                  for (let i = 1; i <= targetTotalGroups; i++) {
+                                    const curr = nextCounts[String(i)] ?? targetMembersPerGroup;
+                                    nextCounts[String(i)] = curr + 1;
+                                  }
+                                  setGroupMemberCounts(nextCounts);
+                                }}
+                                className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-mono transition"
+                                title="Tambah 1 peserta untuk semua kelompok"
+                              >
+                                +1 Semua
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const nextCounts = { ...groupMemberCounts };
+                                  for (let i = 1; i <= targetTotalGroups; i++) {
+                                    const curr = nextCounts[String(i)] ?? targetMembersPerGroup;
+                                    nextCounts[String(i)] = Math.max(1, curr - 1);
+                                  }
+                                  setGroupMemberCounts(nextCounts);
+                                }}
+                                className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-mono transition"
+                                title="Kurangi 1 peserta untuk semua kelompok"
+                              >
+                                -1 Semua
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Groups Card Matrix */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 max-h-[420px] overflow-y-auto pr-1">
+                            {Array.from({ length: targetTotalGroups }, (_, idx) => {
+                              const groupNum = idx + 1;
+                              const defaultGroupName = `Kelompok ${groupNum}`;
+                              const customName = groupNames[String(groupNum)] || groupNames[defaultGroupName] || "";
+                              const effectiveName = customName.trim() || defaultGroupName;
+                              const currentQuota = groupMemberCounts[String(groupNum)] ?? groupMemberCounts[defaultGroupName] ?? targetMembersPerGroup;
+                              const isCustomQuota = (groupMemberCounts[String(groupNum)] !== undefined && groupMemberCounts[String(groupNum)] !== targetMembersPerGroup) ||
+                                                    (groupMemberCounts[defaultGroupName] !== undefined && groupMemberCounts[defaultGroupName] !== targetMembersPerGroup);
+                              const isCustomName = !!customName.trim() && customName.trim() !== defaultGroupName;
+
+                              if (groupSearchQuery) {
+                                const q = groupSearchQuery.toLowerCase();
+                                if (!defaultGroupName.toLowerCase().includes(q) &&
+                                    !effectiveName.toLowerCase().includes(q) &&
+                                    !String(groupNum).includes(q)) {
+                                  return null;
+                                }
+                              }
+
+                              return (
+                                <div
+                                  key={groupNum}
+                                  className={`p-3 rounded-xl border transition-all flex flex-col justify-between space-y-2.5 ${
+                                    isCustomName || isCustomQuota
+                                      ? "bg-purple-950/20 border-purple-500/50 shadow-[0_0_15px_rgba(168,85,247,0.15)]"
+                                      : "bg-slate-900/60 border-slate-800 hover:border-slate-700"
+                                  }`}
+                                >
+                                  {/* Card Header */}
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center space-x-1.5">
+                                      <span className="text-[10px] font-mono font-extrabold bg-slate-800 text-cyan-300 px-1.5 py-0.5 rounded border border-slate-700">
+                                        #{groupNum < 10 ? `0${groupNum}` : groupNum}
+                                      </span>
+                                      {isCustomName && (
+                                        <span className="text-[9px] font-mono text-purple-300 bg-purple-500/20 px-1.5 py-0.5 rounded">
+                                          Nama Kustom
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    {(isCustomName || isCustomQuota) ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const nextCounts = { ...groupMemberCounts };
+                                          delete nextCounts[String(groupNum)];
+                                          delete nextCounts[defaultGroupName];
+                                          setGroupMemberCounts(nextCounts);
+
+                                          const nextNames = { ...groupNames };
+                                          delete nextNames[String(groupNum)];
+                                          delete nextNames[defaultGroupName];
+                                          setGroupNames(nextNames);
+                                        }}
+                                        className="text-[9px] font-mono text-purple-400 hover:text-purple-200 bg-purple-500/20 px-1.5 py-0.5 rounded transition"
+                                        title="Kembalikan nama & kuota kelompok ini ke default"
+                                      >
+                                        Reset ↺
+                                      </button>
+                                    ) : (
+                                      <span className="text-[9px] font-mono text-slate-500">
+                                        Default
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {/* Custom Name Input Field */}
+                                  <div>
+                                    <label className="block text-[9px] font-mono text-slate-400 uppercase mb-0.5">
+                                      Nama Kelompok
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={customName}
+                                      placeholder={defaultGroupName}
+                                      onChange={(e) => {
+                                        setGroupNames({
+                                          ...groupNames,
+                                          [String(groupNum)]: e.target.value
+                                        });
+                                      }}
+                                      className="w-full px-2 py-1 bg-black/80 border border-slate-700 focus:border-accent-cyan rounded text-xs font-semibold text-slate-100 outline-none transition"
+                                    />
+                                    {isCustomName && (() => {
+                                      const trimmed = customName.trim();
+                                      let previewFolder = `${trimmed} (Kelompok ${groupNum})`;
+                                      if (new RegExp(`\\(Kelompok\\s*${groupNum}\\)`, "i").test(trimmed)) {
+                                        previewFolder = trimmed;
+                                      } else if (new RegExp(`\\bKelompok\\s*${groupNum}\\b`, "i").test(trimmed)) {
+                                        previewFolder = trimmed.replace(new RegExp(`\\s*\\(?Kelompok\\s*${groupNum}\\)?`, "i"), ` (Kelompok ${groupNum})`);
+                                      }
+                                      return (
+                                        <div className="text-[9px] font-mono text-cyan-400/90 mt-1 truncate" title={`Nama folder di Google Drive: ${previewFolder}`}>
+                                          📁 {previewFolder}
+                                        </div>
+                                      );
+                                    })()}
+                                  </div>
+
+                                  {/* Stepper Inputs for Quota */}
+                                  <div>
+                                    <div className="flex items-center justify-between mb-0.5">
+                                      <label className="text-[9px] font-mono text-slate-400 uppercase">
+                                        Kuota Peserta
+                                      </label>
+                                      <span className="text-[9px] font-mono text-accent-purple font-bold">
+                                        {currentQuota} Peserta
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center space-x-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const next = { ...groupMemberCounts };
+                                          next[String(groupNum)] = Math.max(1, currentQuota - 1);
+                                          setGroupMemberCounts(next);
+                                        }}
+                                        className="h-7 w-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center text-xs font-bold transition"
+                                      >
+                                        -
+                                      </button>
+
+                                      <input
+                                        type="number"
+                                        min={1}
+                                        max={500}
+                                        value={currentQuota}
+                                        onChange={(e) => {
+                                          const parsed = Math.max(1, parseInt(e.target.value) || 1);
+                                          const next = { ...groupMemberCounts };
+                                          next[String(groupNum)] = parsed;
+                                          setGroupMemberCounts(next);
+                                        }}
+                                        className="w-full h-7 px-1 bg-black/80 border border-slate-700 rounded-lg text-center text-xs font-mono font-bold text-cyan-300 focus:border-cyan-500 outline-none"
+                                      />
+
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const next = { ...groupMemberCounts };
+                                          next[String(groupNum)] = currentQuota + 1;
+                                          setGroupMemberCounts(next);
+                                        }}
+                                        className="h-7 w-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center text-xs font-bold transition"
+                                      >
+                                        +
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex justify-end pt-1">
@@ -1704,7 +2155,7 @@ export default function AdminDashboardPage() {
                         className="px-5 py-2.5 rounded-xl bg-accent-cyan text-black font-extrabold text-xs hover:bg-accent-cyan/90 transition flex items-center justify-center space-x-1.5 cursor-pointer disabled:opacity-50"
                       >
                         <Save className="h-4 w-4" />
-                        <span>{savingGdrive ? "Menyimpan..." : "Simpan Pengaturan"}</span>
+                        <span>{savingGdrive ? "Menyimpan..." : "Simpan Pengaturan Kelompok & Kuota"}</span>
                       </button>
                     </div>
                   </form>
@@ -1873,6 +2324,447 @@ export default function AdminDashboardPage() {
                   )}
                 </div>
 
+              </div>
+            )}
+
+            {activeTab === "storyline" && (
+              <div className="space-y-6">
+                {/* Header & Global Controls */}
+                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                  <div>
+                    <h2 className="font-display font-black text-xl text-slate-100 flex items-center gap-2">
+                      <Milestone className="h-6 w-6 text-cyan-400 animate-pulse" />
+                      <span>Kelola Alur Kisah (Storyline Beranda)</span>
+                    </h2>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Atur narasi kronologis, foto Google Drive, deskripsi babak cerita, urutan, dan jumlah slot cerita di Beranda.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* Toggle Section Active */}
+                    <button
+                      type="button"
+                      onClick={() => setStorylineEnabled(!storylineEnabled)}
+                      className={`px-3 py-2 rounded-xl text-xs font-mono font-bold transition flex items-center space-x-1.5 cursor-pointer ${
+                        storylineEnabled
+                          ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 shadow-[0_0_15px_rgba(16,185,129,0.2)]"
+                          : "bg-rose-500/15 text-rose-300 border border-rose-500/40"
+                      }`}
+                    >
+                      <span className={`h-2 w-2 rounded-full ${storylineEnabled ? "bg-emerald-400 animate-ping" : "bg-rose-400"}`} />
+                      <span>{storylineEnabled ? "SECTION AKTIF" : "SECTION NONAKTIF"}</span>
+                    </button>
+
+                    {/* Add Chapter Button */}
+                    <Button
+                      variant="galaxy"
+                      size="sm"
+                      onClick={() => {
+                        const newSlots = [...storylineSlots];
+                        const nextNum = newSlots.length + 1;
+                        const stepStr = String(nextNum).padStart(2, "0");
+                        newSlots.push({
+                          id: `slot-${Date.now()}`,
+                          badge: `Chapter ${stepStr} // Babak Baru`,
+                          title: `Judul Babak Cerita ${nextNum}`,
+                          description: "Tuliskan narasi perjalanan atau momentum penting mahasiswa baru pada babak ini...",
+                          gdriveUrl: "https://images.unsplash.com/photo-1523240795612-9a054b0db644?q=80&w=1000&auto=format&fit=crop",
+                          coordinateLabel: `KOORDINAT ALUR ${stepStr}`,
+                          dateTag: "Status: Terverifikasi dalam Babad Penjelajahan IMO 2026",
+                        });
+                        setStorylineSlots(newSlots);
+                      }}
+                    >
+                      <Plus className="h-4 w-4 mr-1.5" />
+                      <span>Tambah Chapter</span>
+                    </Button>
+
+                    {/* Save Button */}
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => handleSaveStoryline()}
+                      disabled={savingStoryline}
+                    >
+                      <Save className="h-4 w-4 mr-1.5" />
+                      <span>{savingStoryline ? "Menyimpan..." : "Simpan Storyline"}</span>
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Success Notification Alert */}
+                {storylineSuccessMsg && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="p-4 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-xs font-mono flex items-center justify-between shadow-[0_0_20px_rgba(16,185,129,0.2)]"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <CheckCircle className="h-4 w-4 text-emerald-400" />
+                      <span>{storylineSuccessMsg}</span>
+                    </div>
+                    <button onClick={() => setStorylineSuccessMsg(null)} className="text-slate-400 hover:text-white">
+                      <XCircle className="h-4 w-4" />
+                    </button>
+                  </motion.div>
+                )}
+
+                {/* Global Section Titles Card */}
+                <div className="glass rounded-2xl p-6 border border-card-border/40 space-y-4">
+                  <h3 className="font-display font-bold text-sm text-cyan-300 uppercase tracking-wider flex items-center space-x-2 border-b border-card-border/30 pb-2">
+                    <Sparkles className="h-4 w-4 text-cyan-400" />
+                    <span>Judul & Narasi Pembuka Section Beranda</span>
+                  </h3>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">
+                        Judul Utama Storyline
+                      </label>
+                      <input
+                        type="text"
+                        value={storylineTitle}
+                        onChange={(e) => setStorylineTitle(e.target.value)}
+                        placeholder="ALUR KISAH PENJELAJAHAN ORBIT"
+                        className="w-full px-4 py-2 rounded-xl bg-slate-950/80 border border-card-border text-cyan-300 font-bold text-xs focus:border-cyan-500 focus:outline-none transition"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">
+                        Sub-judul / Deskripsi Pembuka
+                      </label>
+                      <input
+                        type="text"
+                        value={storylineSubtitle}
+                        onChange={(e) => setStorylineSubtitle(e.target.value)}
+                        placeholder="Rekam jejak kronologis dan narasi momentum penjelajahan..."
+                        className="w-full px-4 py-2 rounded-xl bg-slate-950/80 border border-card-border text-slate-200 text-xs focus:border-cyan-500 focus:outline-none transition"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Chapters List */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between text-xs text-slate-400 font-mono">
+                    <span className="font-bold text-slate-300">
+                      DAFTAR BABAK CHRONICLES ({storylineSlots.length} BABAK TERDAFTAR)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (confirm("Kembalikan alur cerita ke konfigurasi standar IMO 2026?")) {
+                          setStorylineTitle("ALUR KISAH PENJELAJAHAN ORBIT");
+                          setStorylineSubtitle("Rekam jejak kronologis dan narasi momentum penjelajahan Mahasiswa Baru IMO 2026 dari awal keberangkatan hingga puncak inovasi.");
+                          setStorylineSlots([
+                            {
+                              id: "slot-1",
+                              badge: "Chapter 01 // Inisiasi Orbit",
+                              title: "Pemberangkatan & Orientasi Perdana",
+                              description: "Langkah mula ribuan pemuda dari berbagai penjuru berkumpul dalam satu atmosfer orbit baru. Di sini, semangat kebersamaan dinyalakan dan komitmen IMO 2026 ditanamkan bersama para LO pendamping.",
+                              gdriveUrl: "https://images.unsplash.com/photo-1523240795612-9a054b0db644?q=80&w=1000&auto=format&fit=crop",
+                              coordinateLabel: "KOORDINAT ALUR 01 - GEDUNG UTAMA",
+                              dateTag: "Status: H-7 Fase Pengkondisian",
+                            },
+                            {
+                              id: "slot-2",
+                              badge: "Chapter 02 // Sinergi & Dinamika Kelompok",
+                              title: "Simulasi Misi & Penyusunan Berkas",
+                              description: "Setiap kelompok menguji ketangguhan kolaborasi mereka dalam merampungkan tugas terstruktur, menyelesaikan Auto-Form, serta menyelaraskan frekuensi pemikiran menuju satu visi misi bersama.",
+                              gdriveUrl: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?q=80&w=1000&auto=format&fit=crop",
+                              coordinateLabel: "KOORDINAT ALUR 02 - LAB SIMULASI",
+                              dateTag: "Status: H-Day Penjelajahan Berkas",
+                            },
+                            {
+                              id: "slot-3",
+                              badge: "Chapter 03 // Puncak Konstelasi",
+                              title: "Sidang Pleno & Deklarasi Generasi Inovator",
+                              description: "Panggung pembuktian di mana karya, gagasan, dan inovasi terbaik dipresentasikan di hadapan dewan penguji. Menandai lahirnya generasi penjelajah baru yang siap mengukir sejarah gemilang.",
+                              gdriveUrl: "https://images.unsplash.com/photo-1511578314322-379afb476865?q=80&w=1000&auto=format&fit=crop",
+                              coordinateLabel: "KOORDINAT ALUR 03 - AUDITORIUM UTAMA",
+                              dateTag: "Status: Pasca Sidang Pleno",
+                            },
+                          ]);
+                        }
+                      }}
+                      className="text-[11px] text-slate-400 hover:text-cyan-300 flex items-center space-x-1 transition"
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" />
+                      <span>Reset ke Default IMO 2026</span>
+                    </button>
+                  </div>
+
+                  {storylineSlots.map((slot, index) => {
+                    const stepStr = String(index + 1).padStart(2, "0");
+                    const total = storylineSlots.length;
+
+                    return (
+                      <div
+                        key={slot.id || index}
+                        className="glass rounded-2xl p-5 border border-card-border/50 hover:border-accent-cyan/40 transition-all duration-300 space-y-4"
+                      >
+                        {/* Chapter Card Header */}
+                        <div className="flex items-center justify-between border-b border-card-border/30 pb-3">
+                          <div className="flex items-center space-x-2.5">
+                            <span className="h-7 w-7 rounded-xl bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 text-xs font-mono font-bold flex items-center justify-center">
+                              {stepStr}
+                            </span>
+                            <div>
+                              <h4 className="text-sm font-display font-bold text-slate-100 uppercase tracking-wide">
+                                {slot.title || `Chapter ${stepStr}`}
+                              </h4>
+                              <span className="text-[10px] font-mono text-slate-400">{slot.badge || `Chapter ${stepStr}`}</span>
+                            </div>
+                          </div>
+
+                          {/* Action Toolbar */}
+                          <div className="flex items-center space-x-1.5">
+                            {/* Move Up */}
+                            <button
+                              type="button"
+                              disabled={index === 0}
+                              onClick={() => {
+                                if (index === 0) return;
+                                const updated = [...storylineSlots];
+                                const temp = updated[index - 1];
+                                updated[index - 1] = updated[index];
+                                updated[index] = temp;
+                                setStorylineSlots(updated);
+                              }}
+                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer"
+                              title="Geser Naik (Sebelumnya)"
+                            >
+                              <ArrowUp className="h-4 w-4" />
+                            </button>
+
+                            {/* Move Down */}
+                            <button
+                              type="button"
+                              disabled={index === total - 1}
+                              onClick={() => {
+                                if (index === total - 1) return;
+                                const updated = [...storylineSlots];
+                                const temp = updated[index + 1];
+                                updated[index + 1] = updated[index];
+                                updated[index] = temp;
+                                setStorylineSlots(updated);
+                              }}
+                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer"
+                              title="Geser Turun (Berikutnya)"
+                            >
+                              <ArrowDown className="h-4 w-4" />
+                            </button>
+
+                            {/* Duplicate */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updated = [...storylineSlots];
+                                const cloned = {
+                                  ...slot,
+                                  id: `slot-${Date.now()}`,
+                                  title: `${slot.title} (Salinan)`,
+                                };
+                                updated.splice(index + 1, 0, cloned);
+                                setStorylineSlots(updated);
+                              }}
+                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition cursor-pointer"
+                              title="Duplikat Babak Ini"
+                            >
+                              <Copy className="h-4 w-4" />
+                            </button>
+
+                            {/* Delete */}
+                            {total > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updated = storylineSlots.filter((_, i) => i !== index);
+                                  setStorylineSlots(updated);
+                                }}
+                                className="p-1.5 rounded-lg bg-rose-500/15 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30 transition cursor-pointer"
+                                title="Hapus Chapter"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Chapter Inputs and Live Preview Grid */}
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
+                          {/* Form Inputs (Left & Middle) */}
+                          <div className="lg:col-span-2 space-y-3 font-sans text-xs">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div>
+                                <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">
+                                  Badge Tag / Babak
+                                </label>
+                                <input
+                                  type="text"
+                                  value={slot.badge || ""}
+                                  onChange={(e) => {
+                                    const updated = [...storylineSlots];
+                                    updated[index] = { ...updated[index], badge: e.target.value };
+                                    setStorylineSlots(updated);
+                                  }}
+                                  placeholder={`Chapter ${stepStr} // Inisiasi Orbit`}
+                                  className="w-full px-3.5 py-2 rounded-xl bg-slate-950/80 border border-card-border text-purple-300 font-mono text-xs focus:border-purple-500 focus:outline-none transition"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">
+                                  Judul Babak Cerita
+                                </label>
+                                <input
+                                  type="text"
+                                  value={slot.title}
+                                  onChange={(e) => {
+                                    const updated = [...storylineSlots];
+                                    updated[index] = { ...updated[index], title: e.target.value };
+                                    setStorylineSlots(updated);
+                                  }}
+                                  placeholder="Pemberangkatan & Orientasi Perdana"
+                                  className="w-full px-3.5 py-2 rounded-xl bg-slate-950/80 border border-card-border text-slate-100 font-bold text-xs focus:border-cyan-500 focus:outline-none transition"
+                                />
+                              </div>
+                            </div>
+
+                            <div>
+                              <div className="flex items-center justify-between mb-1">
+                                <label className="block text-[10px] font-mono text-slate-400 uppercase">
+                                  URL Foto Google Drive / Image
+                                </label>
+                                {slot.gdriveUrl && (
+                                  <a
+                                    href={slot.gdriveUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-[10px] text-cyan-400 hover:underline flex items-center space-x-1"
+                                  >
+                                    <span>Buka Sumber</span>
+                                    <ExternalLink className="h-3 w-3" />
+                                  </a>
+                                )}
+                              </div>
+                              <input
+                                type="text"
+                                value={slot.gdriveUrl}
+                                onChange={(e) => {
+                                  const updated = [...storylineSlots];
+                                  updated[index] = { ...updated[index], gdriveUrl: e.target.value };
+                                  setStorylineSlots(updated);
+                                }}
+                                placeholder="https://drive.google.com/file/d/1abc.../view?usp=sharing"
+                                className="w-full px-3.5 py-2 rounded-xl bg-slate-950/80 border border-card-border text-cyan-300 font-mono text-xs focus:border-cyan-500 focus:outline-none transition"
+                              />
+                              <p className="text-[10px] text-slate-500 mt-1">
+                                Mendukung link sharing Google Drive (/file/d/ID/view), link preview, ID Drive, atau direct image URL. Diproteksi non-interaktif di Beranda publik.
+                              </p>
+                            </div>
+
+                            <div>
+                              <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">
+                                Narasi Kisah Lengkap
+                              </label>
+                              <textarea
+                                rows={3}
+                                value={slot.description}
+                                onChange={(e) => {
+                                  const updated = [...storylineSlots];
+                                  updated[index] = { ...updated[index], description: e.target.value };
+                                  setStorylineSlots(updated);
+                                }}
+                                placeholder="Tuliskan cerita lengkap momen perjalanan pada babak ini..."
+                                className="w-full px-3.5 py-2 rounded-xl bg-slate-950/80 border border-card-border text-slate-200 text-xs focus:border-cyan-500 focus:outline-none transition leading-relaxed"
+                              />
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div>
+                                <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">
+                                  Label Koordinat / Lokasi
+                                </label>
+                                <input
+                                  type="text"
+                                  value={slot.coordinateLabel || ""}
+                                  onChange={(e) => {
+                                    const updated = [...storylineSlots];
+                                    updated[index] = { ...updated[index], coordinateLabel: e.target.value };
+                                    setStorylineSlots(updated);
+                                  }}
+                                  placeholder={`KOORDINAT ALUR ${stepStr} - GEDUNG UTAMA`}
+                                  className="w-full px-3 py-1.5 rounded-xl bg-slate-950/80 border border-card-border text-slate-300 font-mono text-xs focus:border-cyan-500 focus:outline-none transition"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">
+                                  Label Waktu / Tanggal
+                                </label>
+                                <input
+                                  type="text"
+                                  value={slot.dateTag || ""}
+                                  onChange={(e) => {
+                                    const updated = [...storylineSlots];
+                                    updated[index] = { ...updated[index], dateTag: e.target.value };
+                                    setStorylineSlots(updated);
+                                  }}
+                                  placeholder="Status: H-7 Fase Pengkondisian"
+                                  className="w-full px-3 py-1.5 rounded-xl bg-slate-950/80 border border-card-border text-slate-300 font-mono text-xs focus:border-cyan-500 focus:outline-none transition"
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Live Thumbnail Preview (Right) */}
+                          <div className="bg-slate-950/90 border border-card-border/60 rounded-2xl p-3.5 flex flex-col items-center justify-center space-y-2.5">
+                            <div className="text-[10px] font-mono text-slate-400 font-bold uppercase flex items-center space-x-1.5 self-start">
+                              <ImageIcon className="h-3.5 w-3.5 text-cyan-400" />
+                              <span>LIVE PREVIEW FOTO</span>
+                            </div>
+
+                            <div className="relative w-full aspect-[16/10] rounded-xl bg-black overflow-hidden border border-slate-800 flex items-center justify-center shadow-inner">
+                              {slot.gdriveUrl ? (
+                                <img
+                                  src={
+                                    slot.gdriveUrl.includes("drive.google.com")
+                                      ? `https://lh3.googleusercontent.com/d/${(slot.gdriveUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || slot.gdriveUrl.match(/[?&]id=([a-zA-Z0-9_-]+)/) || [])[1] || ""}=w500`
+                                      : slot.gdriveUrl
+                                  }
+                                  alt={slot.title}
+                                  className="w-full h-full object-cover select-none pointer-events-none"
+                                  onError={(e) => {
+                                    (e.currentTarget as HTMLElement).style.display = "none";
+                                  }}
+                                />
+                              ) : (
+                                <span className="text-[10px] text-slate-600 font-mono">Belum ada URL</span>
+                              )}
+                            </div>
+
+                            <div className="text-[10px] font-mono text-cyan-300/80 text-center truncate w-full">
+                              {slot.badge || `Chapter ${stepStr}`}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Bottom Save Bar */}
+                <div className="flex justify-end pt-4 border-t border-card-border/30">
+                  <Button
+                    variant="primary"
+                    size="md"
+                    onClick={() => handleSaveStoryline()}
+                    disabled={savingStoryline}
+                  >
+                    <Save className="h-4 w-4 mr-2" />
+                    <span>{savingStoryline ? "Menyimpan Alur Cerita..." : "Simpan Perubahan Storyline"}</span>
+                  </Button>
+                </div>
               </div>
             )}
 

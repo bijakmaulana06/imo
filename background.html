@@ -507,13 +507,16 @@
       }
 
       // Animation Loop
-      const clock = new THREE.Clock();
+      let lastTime = performance.now();
+      const startTime = lastTime;
 
       function animate() {
         requestAnimationFrame(animate);
 
-        const delta = clock.getDelta();
-        const elapsed = clock.getElapsedTime();
+        const now = performance.now();
+        const delta = Math.min((now - lastTime) / 1000, 0.1);
+        lastTime = now;
+        const elapsed = (now - startTime) / 1000;
 
         // Rotations
         galaxyParticles.rotation.y = elapsed * 0.045;
