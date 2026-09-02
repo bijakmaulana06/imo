@@ -27,7 +27,6 @@ import {
   LayoutGrid,
   ChevronUp,
   ChevronDown,
-  Music,
   ExternalLink,
   Plus,
   Trash2,
@@ -47,7 +46,7 @@ import { Link } from "next-view-transitions";
 import ImoLogo from "@/components/ImoLogo";
 import StarfieldBackground from "@/components/StarfieldBackground";
 
-type TabId = "root_system" | "push" | "security" | "theme" | "branding" | "copywriting" | "drive" | "status" | "home_nodes" | "audio_player";
+type TabId = "root_system" | "push" | "security" | "theme" | "branding" | "copywriting" | "drive" | "status" | "home_nodes";
 
 // Organic offsets & distinct custom routing styles for PCB Circuit Constellation
 const NODES = [
@@ -60,7 +59,6 @@ const NODES = [
   { id: "drive" as TabId, label: "Google Drive", icon: HardDrive, angleOffset: 0, radiusOffset: 0, routeType: "h_first", cornerRatio: 0.35, color: "from-indigo-500/20 to-blue-500/20 border-indigo-500/50 text-indigo-300" },
   { id: "status" as TabId, label: "System Modes", icon: ShieldAlert, angleOffset: 0, radiusOffset: 0, routeType: "double_hv", cornerRatio: 0.6, color: "from-rose-600/20 to-red-500/20 border-rose-400/50 text-rose-300" },
   { id: "home_nodes" as TabId, label: "Menu Beranda", icon: LayoutGrid, angleOffset: 0, radiusOffset: 0, routeType: "v_first", cornerRatio: 0.75, color: "from-teal-500/20 to-emerald-500/20 border-teal-500/50 text-teal-300" },
-  { id: "audio_player" as TabId, label: "Audio Player", icon: Music, angleOffset: 45, radiusOffset: 15, routeType: "v_first", cornerRatio: 0.8, color: "from-fuchsia-500/20 to-purple-500/20 border-fuchsia-500/50 text-fuchsia-300" },
 ];
 
 export default function AdminSettingsCommandCenter() {
@@ -1509,60 +1507,6 @@ export default function AdminSettingsCommandCenter() {
                            )
                         })}
                       </div>
-                    </div>
-                  </div>
-                )}
-                {activeTab === "audio_player" && (
-                  <div className="space-y-6">
-                    <div className="bg-black/50 border border-slate-800/80 rounded-xl p-5 space-y-4">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-xs font-bold text-slate-300 tracking-wider flex items-center space-x-2">
-                          <Music className="w-4 h-4 text-fuchsia-400" />
-                          <span>GLOBAL AUDIO PLAYER</span>
-                        </h3>
-                        <button onClick={() => setCoreConfig({ ...coreConfig, musicPlayerEnabled: !coreConfig.musicPlayerEnabled })} className={`px-3.5 py-1.5 rounded-xl text-[10px] tracking-widest font-bold transition ${coreConfig.musicPlayerEnabled ? "bg-fuchsia-500/20 text-fuchsia-400 border border-fuchsia-500/50 shadow-[0_0_15px_rgba(217,70,239,0.2)]" : "bg-black/70 text-slate-400 border border-slate-800"}`}>
-                          {coreConfig.musicPlayerEnabled ? "PLAYER ACTIVE" : "PLAYER DISABLED"}
-                        </button>
-                      </div>
-                      
-                      {coreConfig.musicPlayerEnabled && (
-                        <>
-                          <div className="space-y-4 pt-4 border-t border-slate-800/50">
-                            <div>
-                              <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">Audio Stream URL (MP3/WAV)</label>
-                              <input type="text" value={coreConfig.musicUrl} onChange={(e) => setCoreConfig({ ...coreConfig, musicUrl: e.target.value })} className="w-full px-3 py-2 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition" placeholder="https://..." />
-                              <p className="text-[9px] text-slate-500 mt-1">Direct link to audio file. Can be from Supabase Storage or external link.</p>
-                            </div>
-                            
-                            <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">Track Title</label>
-                                <input type="text" value={coreConfig.musicTitle} onChange={(e) => setCoreConfig({ ...coreConfig, musicTitle: e.target.value })} className="w-full px-3 py-2 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
-                              </div>
-                              <div>
-                                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">Artist Name</label>
-                                <input type="text" value={coreConfig.musicArtist} onChange={(e) => setCoreConfig({ ...coreConfig, musicArtist: e.target.value })} className="w-full px-3 py-2 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 outline-none transition" />
-                              </div>
-                            </div>
-                            
-                            <div>
-                              <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">Album Art (Image URL)</label>
-                              <div className="flex space-x-3">
-                                <div className="w-12 h-12 rounded-full overflow-hidden border border-slate-700 flex-shrink-0 bg-slate-900">
-                                  {coreConfig.musicAlbumArt ? (
-                                    // eslint-disable-next-line @next/next/no-img-element
-                                    <img src={coreConfig.musicAlbumArt} alt="Art" className="w-full h-full object-cover" />
-                                  ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-slate-600"><Music className="w-4 h-4" /></div>
-                                  )}
-                                </div>
-                                <input type="text" value={coreConfig.musicAlbumArt} onChange={(e) => setCoreConfig({ ...coreConfig, musicAlbumArt: e.target.value })} className="w-full px-3 py-2 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition" placeholder="https://..." />
-                              </div>
-                              <p className="text-[9px] text-slate-500 mt-1">Image will be displayed as a spinning vinyl record.</p>
-                            </div>
-                          </div>
-                        </>
-                      )}
                     </div>
                   </div>
                 )}

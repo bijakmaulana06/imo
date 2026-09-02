@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import StarfieldBackground from "@/components/StarfieldBackground";
-import PushNotificationManager from "@/components/PushNotificationManager";
 import Card from "@/components/Card";
 import Button from "@/components/Button";
 import { motion, AnimatePresence } from "framer-motion";

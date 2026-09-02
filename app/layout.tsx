@@ -2,9 +2,7 @@ import type { Metadata } from "next";
 import { Josefin_Sans, Montserrat, Cinzel_Decorative, Griffy } from "next/font/google";
 import "./globals.css";
 import "cropperjs/dist/cropper.css";
-import MandatoryNotificationBlocker from "@/components/MandatoryNotificationBlocker";
 import SiteConfigProvider from "@/components/SiteConfigProvider";
-import AudioPlayerProvider from "@/components/AudioPlayerProvider";
 import { ViewTransitions } from "next-view-transitions";
 
 const josefinSans = Josefin_Sans({
@@ -49,11 +47,7 @@ export default function RootLayout({
       >
         <body className="min-h-full flex flex-col bg-background text-foreground font-sans">
           <SiteConfigProvider>
-            <AudioPlayerProvider>
-              <MandatoryNotificationBlocker>
-                {children}
-              </MandatoryNotificationBlocker>
-            </AudioPlayerProvider>
+            {children}
           </SiteConfigProvider>
         </body>
       </html>

@@ -182,11 +182,11 @@ export const DEFAULT_SITE_CONFIG: SiteConfig = {
 
   homeNodesOrder: ["guide", "hub", "info", "idcard", "documents", "contact"],
 
-  musicPlayerEnabled: true,
-  musicUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
-  musicTitle: "Outclass Journey",
-  musicArtist: "IMO 2026",
-  musicAlbumArt: "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=500&auto=format&fit=crop",
+  musicPlayerEnabled: false,
+  musicUrl: "",
+  musicTitle: "",
+  musicArtist: "",
+  musicAlbumArt: "",
 
   footerText: "Made with Astro-Physics & Next.js.",
 };
