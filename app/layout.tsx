@@ -3,6 +3,7 @@ import { Josefin_Sans, Montserrat, Cinzel_Decorative, Griffy } from "next/font/g
 import "./globals.css";
 import "cropperjs/dist/cropper.css";
 import SiteConfigProvider from "@/components/SiteConfigProvider";
+import PushNotificationManager from "@/components/PushNotificationManager";
 import { ViewTransitions } from "next-view-transitions";
 
 const josefinSans = Josefin_Sans({
@@ -48,6 +49,7 @@ export default function RootLayout({
         <body className="min-h-full flex flex-col bg-background text-foreground font-sans">
           <SiteConfigProvider>
             {children}
+            <PushNotificationManager />
           </SiteConfigProvider>
         </body>
       </html>
