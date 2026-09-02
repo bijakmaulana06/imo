@@ -13,19 +13,19 @@ import {
   ArrowLeft,
   CheckCircle,
   AlertCircle,
-  Sparkles,
   ChevronDown,
   Eye,
   Edit3,
-  FileCheck,
   FileType,
-  Share2,
   CheckCircle2,
   AlertTriangle,
 } from "lucide-react";
 import { Link } from "next-view-transitions";
 import { useRouter } from "next/navigation";
-import { generateDocumentPreviewHtml } from "@/lib/documentPreview";
+import {
+  generateFilledDocxBuffer,
+  calculateFormProgress,
+} from "@/lib/documentPreview";
 import DocumentRealtimePreview from "@/components/documents/DocumentRealtimePreview";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -72,13 +72,10 @@ export default function FillDocumentFormPage({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  // Preview state
-  const [docxBuffer, setDocxBuffer] = useState<ArrayBuffer | null>(null);
-  const [previewHtml, setPreviewHtml] = useState<string>("");
+  // Raw docx template buffer & filled docx buffer for real preview
+  const [rawDocxBuffer, setRawDocxBuffer] = useState<ArrayBuffer | null>(null);
+  const [filledDocxBuffer, setFilledDocxBuffer] = useState<ArrayBuffer | null>(null);
   const [previewLoading, setPreviewLoading] = useState<boolean>(true);
-  const [highlightMode, setHighlightMode] = useState<boolean>(true);
-  const [missingRequired, setMissingRequired] = useState<string[]>([]);
-  const [filledCount, setFilledCount] = useState<number>(0);
 
   // Mobile View Tab: 'form' or 'preview'
   const [mobileTab, setMobileTab] = useState<"form" | "preview">("form");
@@ -138,7 +135,10 @@ export default function FillDocumentFormPage({
         }
 
         if (buffer) {
-          setDocxBuffer(buffer);
+          setRawDocxBuffer(buffer);
+          // Initial filled buffer render
+          const initialFilled = generateFilledDocxBuffer(buffer, initialForm, data.fields_config || []);
+          setFilledDocxBuffer(initialFilled);
         }
       } catch (bufErr) {
         console.warn("Could not prefetch docx buffer for preview:", bufErr);
@@ -148,44 +148,46 @@ export default function FillDocumentFormPage({
       setErrorMsg(err.message || "Gagal memuat template dokumen");
     } finally {
       setLoading(false);
+      setPreviewLoading(false);
     }
   };
 
-  // 3. Realtime preview generator with 120ms debounce
+  // 3. Realtime DOCX buffer updater with 100ms debounce
   useEffect(() => {
-    if (!docxBuffer || !template) return;
+    if (!rawDocxBuffer || !template) return;
 
     let isMounted = true;
     setPreviewLoading(true);
 
-    const timer = setTimeout(async () => {
+    const timer = setTimeout(() => {
       try {
-        const result = await generateDocumentPreviewHtml(
-          docxBuffer,
+        const updatedBuffer = generateFilledDocxBuffer(
+          rawDocxBuffer,
           formData,
-          template.fields_config || [],
-          highlightMode
+          template.fields_config || []
         );
 
         if (isMounted) {
-          setPreviewHtml(result.html);
-          setMissingRequired(result.missingRequired);
-          setFilledCount(result.filledCount);
+          setFilledDocxBuffer(updatedBuffer);
           setPreviewLoading(false);
         }
       } catch (err) {
-        console.error("Realtime preview render error:", err);
+        console.error("Realtime docx update error:", err);
         if (isMounted) {
           setPreviewLoading(false);
         }
       }
-    }, 120);
+    }, 100);
 
     return () => {
       isMounted = false;
       clearTimeout(timer);
     };
-  }, [formData, docxBuffer, template, highlightMode]);
+  }, [formData, rawDocxBuffer, template]);
+
+  const progressStats = calculateFormProgress(formData, template?.fields_config || []);
+  const { totalFields, filledCount, missingRequired } = progressStats;
+  const isFormComplete = missingRequired.length === 0 && totalFields > 0;
 
   const handleInputChange = (tag: string, value: any) => {
     setFormData((prev) => ({ ...prev, [tag]: value }));
@@ -260,7 +262,7 @@ export default function FillDocumentFormPage({
       a.remove();
       window.URL.revokeObjectURL(downloadUrl);
 
-      setSuccessMsg(`Dokumen ${format.toUpperCase()} berhasil di-generate dan siap digunakan!`);
+      setSuccessMsg(`Dokumen ${format.toUpperCase()} resmi berhasil di-generate dan siap digunakan!`);
     } catch (err: any) {
       console.error("Submit form error:", err);
       setErrorMsg(err.message || "Terjadi kesalahan saat memproses dokumen");
@@ -281,7 +283,7 @@ export default function FillDocumentFormPage({
         <StarfieldBackground />
         <div className="relative z-10 text-center text-slate-400 flex flex-col items-center gap-3">
           <div className="w-10 h-10 border-4 border-accent-cyan/30 border-t-accent-cyan rounded-full animate-spin" />
-          <p className="font-mono text-sm">Memuat formulir dokumen & pratinjau...</p>
+          <p className="font-mono text-sm">Memuat formulir dokumen & pratinjau asli...</p>
         </div>
       </div>
     );
@@ -305,9 +307,6 @@ export default function FillDocumentFormPage({
       </div>
     );
   }
-
-  const totalFields = template?.fields_config?.length || 0;
-  const isFormComplete = missingRequired.length === 0 && totalFields > 0;
 
   return (
     <div className="relative min-h-screen flex flex-col z-0 bg-[#020510] text-foreground font-sans pb-28 sm:pb-20">
@@ -335,8 +334,8 @@ export default function FillDocumentFormPage({
             </div>
           </div>
 
-          {/* Quick Stats Pill */}
-          <div className="flex items-center space-x-2 bg-slate-900/80 border border-white/10 px-3.5 py-1.5 rounded-full backdrop-blur-md w-fit">
+          {/* Quick Stats Badge */}
+          <div className="flex items-center space-x-2 bg-slate-900/90 border border-white/10 px-3.5 py-1.5 rounded-full backdrop-blur-md w-fit shadow-lg">
             <span className="text-xs font-mono text-slate-400">Data:</span>
             <span
               className={`text-xs font-mono font-bold ${
@@ -368,7 +367,7 @@ export default function FillDocumentFormPage({
           </div>
         )}
 
-        {/* Mobile View Segmented Tab Switcher (Visible on < lg) */}
+        {/* Mobile Segmented Tab Switcher (Visible on < lg) */}
         <div className="lg:hidden mb-6 p-1 bg-slate-950/80 border border-white/10 rounded-2xl backdrop-blur-xl grid grid-cols-2 gap-1 sticky top-20 z-30 shadow-xl">
           <button
             type="button"
@@ -393,7 +392,7 @@ export default function FillDocumentFormPage({
             }`}
           >
             <Eye className="w-4 h-4" />
-            <span>2. Live Preview Surat</span>
+            <span>2. Real Preview Asli</span>
             <span className="inline-flex items-center justify-center px-1.5 py-0.2 rounded-full text-[9px] bg-slate-900 text-cyan-300 border border-cyan-400/30">
               Live
             </span>
@@ -574,24 +573,23 @@ export default function FillDocumentFormPage({
             </Card>
           </div>
 
-          {/* RIGHT COLUMN: Realtime Interactive Preview */}
+          {/* RIGHT COLUMN: Real Native File Preview */}
           <div
             className={`lg:col-span-7 sticky top-24 self-start ${
               mobileTab === "form" ? "hidden lg:block" : "block"
             }`}
           >
             <DocumentRealtimePreview
-              htmlContent={previewHtml}
+              filledDocxBuffer={filledDocxBuffer}
               loading={previewLoading}
               totalFields={totalFields}
               filledCount={filledCount}
               missingRequired={missingRequired}
               templateTitle={template?.title}
-              highlightMode={highlightMode}
-              onToggleHighlightMode={() => setHighlightMode((prev) => !prev)}
               onFocusField={handleFocusField}
               onDownloadPdf={() => handleDownload("pdf")}
-              submitting={submitting}
+              onDownloadDocx={() => handleDownload("docx")}
+              submitting={submitting || submittingDocx}
             />
           </div>
         </div>
@@ -621,7 +619,7 @@ export default function FillDocumentFormPage({
           <button
             type="button"
             onClick={() => handleDownload("pdf")}
-            disabled={submitting}
+            disabled={submitting || submittingDocx}
             className="py-2.5 px-4 rounded-xl bg-gradient-to-r from-accent-cyan to-blue-600 text-slate-950 text-xs font-bold transition shadow-[0_0_15px_rgba(6,182,212,0.4)] flex items-center justify-center space-x-1.5 cursor-pointer disabled:opacity-60"
           >
             <Download className="w-4 h-4" />
