@@ -127,11 +127,37 @@ export default function ContactPhotoCropperModal({
     setError(null);
 
     try {
-      // Extract crop parameters without client canvas bottleneck
+      // 1. Client-side canvas crop & compress to 400x400 WebP blob (~30-80KB)
+      // This prevents 413 Payload Too Large error when uploading high-res camera photos.
+      let uploadBlob: Blob | File = file;
+      let uploadFilename = file.name || "avatar.webp";
+
+      try {
+        const canvas = cropperRef.current.getCroppedCanvas({
+          width: 400,
+          height: 400,
+          imageSmoothingEnabled: true,
+          imageSmoothingQuality: "high",
+        });
+
+        if (canvas) {
+          const blob = await new Promise<Blob | null>((resolve) => {
+            canvas.toBlob((b) => resolve(b), "image/webp", 0.88);
+          });
+          if (blob) {
+            uploadBlob = blob;
+            uploadFilename = uploadFilename.replace(/\.[^/.]+$/, "") + ".webp";
+          }
+        }
+      } catch (canvasErr) {
+        console.warn("Client-side canvas cropping fallback to raw file:", canvasErr);
+      }
+
+      // Extract crop parameters as metadata for server
       const cropData = cropperRef.current.getData(true);
 
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("file", uploadBlob, uploadFilename);
       formData.append("cropData", JSON.stringify(cropData));
 
       const res = await fetch("/api/admin/contact-photo", {
@@ -139,7 +165,17 @@ export default function ContactPhotoCropperModal({
         body: formData,
       });
 
-      const data = await res.json();
+      const responseText = await res.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(responseText);
+      } catch (jsonErr) {
+        if (res.status === 413 || responseText.includes("Request Entity Too Large")) {
+          throw new Error("Ukuran foto terlalu besar untuk diunggah (Maksimal 4.5MB). Silakan gunakan foto yang lebih kecil.");
+        }
+        throw new Error(`Respon server tidak valid (${res.status}): ${responseText.slice(0, 100)}`);
+      }
+
       if (!res.ok) {
         throw new Error(data.error || "Gagal memproses foto di server.");
       }
