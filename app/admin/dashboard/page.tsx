@@ -1078,7 +1078,17 @@ export default function AdminDashboardPage() {
         body: formData,
       });
 
-      const data = await res.json();
+      const responseText = await res.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(responseText);
+      } catch (jsonErr) {
+        if (res.status === 413 || responseText.includes("Request Entity Too Large")) {
+          throw new Error("Ukuran file templat PSD terlalu besar (Maksimal 4.5MB). Silakan gunakan file PSD yang lebih kecil.");
+        }
+        throw new Error(`Respon server tidak valid (${res.status}): ${responseText.slice(0, 100)}`);
+      }
+
       if (!res.ok) throw new Error(data.error || "Gagal mengunggah templat PSD.");
 
       setPsdSuccessMsg(`Templat "${data.template?.name || 'PSD'}" berhasil disimpan!`);
@@ -1097,7 +1107,9 @@ export default function AdminDashboardPage() {
     if (!confirm("Apakah Anda yakin ingin menghapus templat PSD ini?")) return;
     try {
       const res = await fetch(`/api/id-card-templates?id=${id}`, { method: "DELETE" });
-      const data = await res.json();
+      const text = await res.text();
+      let data: any = {};
+      try { data = JSON.parse(text); } catch { /* ignore non-JSON */ }
       if (!res.ok) throw new Error(data.error || "Gagal menghapus templat PSD");
       await loadPsdTemplates();
     } catch (err: any) {
@@ -1112,7 +1124,9 @@ export default function AdminDashboardPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, is_active: !currentActive }),
       });
-      const data = await res.json();
+      const text = await res.text();
+      let data: any = {};
+      try { data = JSON.parse(text); } catch { /* ignore non-JSON */ }
       if (!res.ok) throw new Error(data.error || "Gagal mengubah status");
       await loadPsdTemplates();
     } catch (err: any) {
@@ -1127,7 +1141,9 @@ export default function AdminDashboardPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, is_default: true }),
       });
-      const data = await res.json();
+      const text = await res.text();
+      let data: any = {};
+      try { data = JSON.parse(text); } catch { /* ignore non-JSON */ }
       if (!res.ok) throw new Error(data.error || "Gagal menyetel default");
       await loadPsdTemplates();
     } catch (err: any) {

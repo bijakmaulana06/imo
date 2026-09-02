@@ -182,7 +182,16 @@ export default function AdminSettingsCommandCenter() {
         }),
       });
 
-      const data = await res.json();
+      const text = await res.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(text);
+      } catch {
+        if (res.status === 413 || text.includes("Request Entity Too Large")) {
+          throw new Error("Ukuran data yang dikirim terlalu besar.");
+        }
+        throw new Error(`Respon server tidak valid (${res.status}): ${text.slice(0, 100)}`);
+      }
 
       if (res.ok) {
         setSaveSuccess("System root configurations updated successfully!");
