@@ -6,14 +6,27 @@
 
 import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
 
+const DEFAULT_FIREBASE_API_KEY = "AIzaSyC4QMoF4gIXCq0NRT32a8f-rEr_KkmiFYw";
+const DEFAULT_FIREBASE_AUTH_DOMAIN = "imo-info.firebaseapp.com";
+const DEFAULT_FIREBASE_PROJECT_ID = "imo-info";
+const DEFAULT_FIREBASE_STORAGE_BUCKET = "imo-info.firebasestorage.app";
+const DEFAULT_FIREBASE_MESSAGING_SENDER_ID = "1061088435535";
+const DEFAULT_FIREBASE_APP_ID = "1:1061088435535:web:a748eff7e939f036ba793a";
+const DEFAULT_FIREBASE_VAPID_KEY = "BFwvgskoInkx2PPRLgL5FO9INRWJpGILoagbUAhjJ2rV74Hw4yNGHVJ7aLWRIWcSVtXoy31SKIN4G4ShyfjAUA0";
+
+function cleanValue(val: string | undefined): string {
+  if (!val) return "";
+  return val.trim().replace(/^["']|["']$/g, "").trim();
+}
+
 // ─── Firebase Config ──────────────────────────────────────────────────────────
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  apiKey: cleanValue(process.env.NEXT_PUBLIC_FIREBASE_API_KEY) || DEFAULT_FIREBASE_API_KEY,
+  authDomain: cleanValue(process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN) || DEFAULT_FIREBASE_AUTH_DOMAIN,
+  projectId: cleanValue(process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID) || DEFAULT_FIREBASE_PROJECT_ID,
+  storageBucket: cleanValue(process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET) || DEFAULT_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: cleanValue(process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID) || DEFAULT_FIREBASE_MESSAGING_SENDER_ID,
+  appId: cleanValue(process.env.NEXT_PUBLIC_FIREBASE_APP_ID) || DEFAULT_FIREBASE_APP_ID,
 };
 
 // ─── Singleton Firebase App ───────────────────────────────────────────────────
@@ -57,7 +70,7 @@ export async function requestFcmToken(): Promise<string | null> {
       { scope: "/" }
     );
 
-    const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
+    const vapidKey = cleanValue(process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY) || DEFAULT_FIREBASE_VAPID_KEY;
     if (!vapidKey) {
       console.error("[FCM] NEXT_PUBLIC_FIREBASE_VAPID_KEY belum dikonfigurasi.");
       return null;
