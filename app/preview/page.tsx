@@ -30,13 +30,15 @@ export default function LockdownPreviewGateway() {
   const { config, isDevBypass, setDevBypass } = useSiteConfig();
   const [mounted, setMounted] = useState(false);
 
+  const hasActiveLockdown = config.maintenanceMode || config.lockedPages?.some((p) => p.isLocked);
+
   useEffect(() => {
     setMounted(true);
     // When visiting this page while in lockdown, auto-enable dev bypass
-    if (config.maintenanceMode) {
+    if (hasActiveLockdown) {
       setDevBypass(true);
     }
-  }, [config.maintenanceMode]);
+  }, [hasActiveLockdown]);
 
   if (!mounted) {
     return (
@@ -50,10 +52,10 @@ export default function LockdownPreviewGateway() {
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // SCENARIO 1: Lockdown is OFF (Maintenance Mode is FALSE)
-  // The bypass URL MUST BE DEAD / DISABLED until lockdown is turned back on.
+  // SCENARIO 1: Lockdown is OFF (Neither maintenance mode nor page lockdown is active)
+  // The bypass URL MUST BE DEAD / DISABLED until any lockdown is activated.
   // ─────────────────────────────────────────────────────────────────────────────
-  if (!config.maintenanceMode) {
+  if (!hasActiveLockdown) {
     return (
       <div className="relative min-h-screen flex flex-col items-center justify-center bg-[#020510] text-slate-100 px-4 text-center overflow-hidden font-mono select-none">
         <StarfieldBackground />
@@ -218,19 +220,39 @@ export default function LockdownPreviewGateway() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
             {testRoutes.map((route) => {
               const Icon = route.icon;
+              const lockedInfo = config.lockedPages?.find(
+                (p) => p.isLocked && (p.path.toLowerCase() === route.path.toLowerCase() || route.path.toLowerCase().startsWith(p.path.toLowerCase() + "/"))
+              );
+              const isRouteLocked = config.maintenanceMode || !!lockedInfo;
+
               return (
                 <Link
                   key={route.path}
                   href={route.path}
-                  className="group p-4 rounded-2xl bg-slate-900/40 hover:bg-slate-900/80 border border-slate-800/80 hover:border-amber-500/50 transition-all duration-300 flex items-center justify-between relative overflow-hidden"
+                  className={`group p-4 rounded-2xl border transition-all duration-300 flex items-center justify-between relative overflow-hidden ${
+                    isRouteLocked
+                      ? "bg-rose-950/20 border-rose-500/40 hover:border-rose-400 hover:bg-rose-950/40"
+                      : "bg-slate-900/40 hover:bg-slate-900/80 border-slate-800/80 hover:border-amber-500/50"
+                  }`}
                 >
                   <div className="flex items-center space-x-3.5">
-                    <div className="h-10 w-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-300 group-hover:scale-110 transition-transform">
+                    <div className={`h-10 w-10 rounded-xl border flex items-center justify-center group-hover:scale-110 transition-transform ${
+                      isRouteLocked
+                        ? "bg-rose-500/15 border-rose-500/30 text-rose-300"
+                        : "bg-amber-500/10 border-amber-500/30 text-amber-300"
+                    }`}>
                       <Icon className="h-5 w-5" />
                     </div>
                     <div>
-                      <div className="text-xs font-bold text-slate-200 group-hover:text-amber-300 transition-colors">
-                        {route.name}
+                      <div className="flex items-center space-x-1.5">
+                        <span className="text-xs font-bold text-slate-200 group-hover:text-amber-300 transition-colors">
+                          {route.name}
+                        </span>
+                        {isRouteLocked && (
+                          <span className="px-1.5 py-0.5 rounded text-[8px] font-mono font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40">
+                            {lockedInfo?.reason || "TERKUNCI"}
+                          </span>
+                        )}
                       </div>
                       <div className="text-[10px] text-slate-500">
                         {route.desc}

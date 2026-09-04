@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
+import { DEFAULT_LOCKED_PAGES } from "@/types/site-config";
 
 export const revalidate = 0; // Always fresh configuration
 
@@ -34,6 +35,7 @@ export async function GET() {
       maintenanceMessage: "Website IMO 2026 sedang dalam pemeliharaan sistem berkala. Mohon kembali beberapa saat lagi.",
       taskSubmissionFrozen: false,
       taskFreezeMessage: "Pengiriman dan verifikasi berkas sedang dibekukan sementara untuk rekapitulasi data.",
+      lockedPages: DEFAULT_LOCKED_PAGES,
       
       // Global Top Banner
       enableGlobalBanner: false,
@@ -140,6 +142,10 @@ export async function GET() {
     }
     if (settingsMap["total_groups_count"]) {
       (parsedConfig as any).totalGroupsCount = Number(settingsMap["total_groups_count"]);
+    }
+
+    if (!parsedConfig.lockedPages || !Array.isArray(parsedConfig.lockedPages) || parsedConfig.lockedPages.length === 0) {
+      parsedConfig.lockedPages = DEFAULT_LOCKED_PAGES;
     }
 
     return NextResponse.json(parsedConfig);

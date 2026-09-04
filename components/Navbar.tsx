@@ -12,7 +12,8 @@ import {
   CheckCircle2,
   QrCode,
   FileEdit,
-  Users
+  Users,
+  Lock
 } from "lucide-react";
 import ImoLogo from "./ImoLogo";
 import { useSiteConfig } from "@/components/SiteConfigProvider";
@@ -103,24 +104,37 @@ export default function Navbar() {
               {navigation.map((item) => {
                 const Icon = item.icon;
                 const active = isActive(item.href);
+                const isLocked = config.lockedPages?.some((p) => {
+                  if (!p.isLocked || !p.path) return false;
+                  const target = p.path.trim().toLowerCase();
+                  const current = item.href.toLowerCase();
+                  return current === target || current.startsWith(target + "/");
+                });
 
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`group flex flex-col items-center justify-center px-4 py-1.5 rounded-full transition-all duration-300 cursor-pointer border ${
+                    className={`group relative flex flex-col items-center justify-center px-4 py-1.5 rounded-full transition-all duration-300 cursor-pointer border ${
                       active
                         ? "bg-white/20 border-white/30 text-accent-cyan shadow-[0_4px_16px_rgba(125,249,255,0.25),inset_0_1px_1px_rgba(255,255,255,0.4)] glow-text-cyan scale-[1.03]"
                         : "border-transparent text-slate-300 hover:text-white hover:bg-white/10 hover:border-white/20 hover:shadow-[0_4px_12px_rgba(255,255,255,0.08)]"
                     }`}
                   >
+                    {isLocked && (
+                      <span className="absolute top-1 right-2 flex h-2 w-2" title="Sektor Terkunci">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.8)]"></span>
+                      </span>
+                    )}
                     <Icon
                       className={`h-4.5 w-4.5 transition-all duration-300 group-hover:scale-110 ${
-                        active ? "text-accent-cyan drop-shadow-[0_0_10px_rgba(125,249,255,0.9)]" : "text-slate-300 group-hover:text-accent-cyan"
+                        active ? "text-accent-cyan drop-shadow-[0_0_10px_rgba(125,249,255,0.9)]" : isLocked ? "text-rose-300/80 group-hover:text-rose-300" : "text-slate-300 group-hover:text-accent-cyan"
                       }`}
                     />
-                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider mt-0.5">
-                      {item.name}
+                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider mt-0.5 flex items-center space-x-1">
+                      <span>{item.name}</span>
+                      {isLocked && <Lock className="h-2.5 w-2.5 text-rose-400 inline" />}
                     </span>
                   </Link>
                 );
@@ -147,21 +161,34 @@ export default function Navbar() {
               {navigation.map((item) => {
                 const Icon = item.icon;
                 const active = isActive(item.href);
+                const isLocked = config.lockedPages?.some((p) => {
+                  if (!p.isLocked || !p.path) return false;
+                  const target = p.path.trim().toLowerCase();
+                  const current = item.href.toLowerCase();
+                  return current === target || current.startsWith(target + "/");
+                });
 
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
                     onClick={() => setIsOpen(false)}
-                    className={`flex flex-col items-center justify-center p-3 rounded-2xl transition-all touch-manipulation cursor-pointer border text-center ${
+                    className={`relative flex flex-col items-center justify-center p-3 rounded-2xl transition-all touch-manipulation cursor-pointer border text-center ${
                       active
                         ? "bg-white/20 text-accent-cyan border-white/30 shadow-[0_4px_16px_rgba(125,249,255,0.2)]"
                         : "bg-transparent text-slate-300 border-transparent hover:bg-white/10 hover:text-white"
                     }`}
                   >
-                    <Icon className={`h-5 w-5 mb-1.5 ${active ? "text-accent-cyan" : "text-slate-300"}`} />
-                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider line-clamp-1">
-                      {item.name}
+                    {isLocked && (
+                      <span className="absolute top-2 right-2 flex h-2 w-2" title="Sektor Terkunci">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.8)]"></span>
+                      </span>
+                    )}
+                    <Icon className={`h-5 w-5 mb-1.5 ${active ? "text-accent-cyan" : isLocked ? "text-rose-400" : "text-slate-300"}`} />
+                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider line-clamp-1 flex items-center space-x-0.5">
+                      <span>{item.name}</span>
+                      {isLocked && <Lock className="h-2 w-2 text-rose-400 inline ml-0.5" />}
                     </span>
                   </Link>
                 );

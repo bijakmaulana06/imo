@@ -3,193 +3,18 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { Link } from "next-view-transitions";
-import { Wrench, Sparkles, X, ChevronRight, AlertTriangle } from "lucide-react";
+import { Wrench, Sparkles, X, ChevronRight, AlertTriangle, Lock, ShieldAlert } from "lucide-react";
 import StarfieldBackground from "@/components/StarfieldBackground";
 import RealisticBlackHole from "@/components/RealisticBlackHole";
 
-export interface HomePhotoSlot {
-  id: string;
-  badge?: string;
-  title: string;
-  description: string;
-  gdriveUrl: string;
-  coordinateLabel?: string;
-  dateTag?: string;
-}
-
-export interface SiteConfig {
-  // Branding & Identity
-  siteName: string;
-  siteYear: string;
-  siteLogoUrl: string;
-  faviconUrl: string;
-  metaTitle: string;
-  metaDescription: string;
-  
-  // Theme & Styling
-  accentCyan: string;
-  accentPurple: string;
-  accentYellow: string;
-  backgroundColor: string;
-  enableStarfield: boolean;
-  glassBlurIntensity: string;
-
-  // Web Status & Modes
-  maintenanceMode: boolean;
-  maintenanceMessage: string;
-  taskSubmissionFrozen: boolean;
-  taskFreezeMessage: string;
-
-  // Root System Controls
-  swCacheVersion: string;
-  killServiceWorker: boolean;
-  cacheTtl: number;
-  apiLockdown: boolean;
-  
-  // Global Top Banner
-  enableGlobalBanner: boolean;
-  globalBannerText: string;
-  globalBannerStyle: "info" | "warning" | "alert" | "success";
-  globalBannerLink: string;
-
-  analyticsScriptTag: string;
-
-  // Copywriting - Home Page
-  homeMissionBadge: string;
-  homeTagline: string;
-  homeDescription: string;
-  homeCtaLabel: string;
-  homeCard1Title: string;
-  homeCard1Desc: string;
-  homeCard2Title: string;
-  homeCard2Desc: string;
-  homeCard3Title: string;
-  homeCard3Desc: string;
-
-  // Home Photo Slots (GDrive Showcase)
-  homePhotoSlotsEnabled: boolean;
-  homePhotoSlotsTitle: string;
-  homePhotoSlotsSubtitle: string;
-  homePhotoSlots: HomePhotoSlot[];
-
-  // Copywriting - Info Page
-  infoHeroTitle: string;
-  infoHeroSubtitle: string;
-  infoWarningNotice: string;
-
-  // Copywriting - Hub Page
-  hubHeroTitle: string;
-  hubHeroSubtitle: string;
-  hubSearchPlaceholder: string;
-
-  // Copywriting - Guide Page
-  guideHeroTitle: string;
-  guideHeroSubtitle: string;
-
-  // Copywriting - Contact Page
-  contactHeroTitle: string;
-  contactHeroSubtitle: string;
-
-  // Copywriting - ID Card Page
-  idCardHeroTitle: string;
-  idCardHeroSubtitle: string;
-
-  // Copywriting - Documents Page
-  documentsHeroTitle: string;
-  documentsHeroSubtitle: string;
-
-  // Home Page Node Graph
-  homeNodesOrder: string[];
-
-  // Audio Player
-  musicPlayerEnabled: boolean;
-  musicUrl: string;
-  musicTitle: string;
-  musicArtist: string;
-  musicAlbumArt: string;
-
-  // Footer
-  footerText: string;
-}
-
-export const DEFAULT_SITE_CONFIG: SiteConfig = {
-  siteName: "IMO 2026",
-  siteYear: "2026",
-  siteLogoUrl: "/Brighton.svg",
-  faviconUrl: "/favicon.ico",
-  metaTitle: "IMO 2026 - Innovative Minds Outclass",
-  metaDescription: "Portal Resmi IMO 2026: Different Minds, Different Stories, One Generation Chasing Glories.",
-  
-  accentCyan: "#7df9ff",
-  accentPurple: "#b48cff",
-  accentYellow: "#ffd166",
-  backgroundColor: "#020510",
-  enableStarfield: true,
-  glassBlurIntensity: "blur(30px)",
-
-  maintenanceMode: false,
-  maintenanceMessage: "Website IMO 2026 sedang dalam pemeliharaan sistem berkala. Mohon kembali beberapa saat lagi.",
-  taskSubmissionFrozen: false,
-  taskFreezeMessage: "Pengiriman dan verifikasi berkas sedang dibekukan sementara untuk rekapitulasi data.",
-
-  swCacheVersion: "v1.0.0",
-  killServiceWorker: false,
-  cacheTtl: 3600,
-  apiLockdown: false,
-  
-  enableGlobalBanner: false,
-  globalBannerText: "📢 Pengumuman: Jadwal pengkondisian barisan telah diperbarui. Cek menu Panduan!",
-  globalBannerStyle: "info",
-  globalBannerLink: "/guide",
-
-  analyticsScriptTag: "",
-
-  homeMissionBadge: "Innovative Minds Outclass",
-  homeTagline: '"Different Minds, Different Stories, One Generation Chasing Glories."',
-  homeDescription: "Persiapkan diri Anda untuk lepas landas! Ini adalah portal penjelajahan resmi bagi seluruh Mahasiswa Baru. Temukan semua petunjuk arah, jadwal navigasi, dan koordinat LO Anda di sini.",
-  homeCtaLabel: "Mulai Penjelajahan",
-  homeCard1Title: "Summary Tugas Kelompok",
-  homeCard1Desc: "Periksa kelengkapan pengumpulan tugas kelompok Anda yang terverifikasi otomatis dari repositori Google Drive IMO 2026.",
-  homeCard2Title: "ID Card Generator",
-  homeCard2Desc: "Kustomisasi & unduh tanda pengenal resmi IMO 2026. Diproses instan murni pada perangkat Android/iOS Anda untuk menjaga keamanan data.",
-  homeCard3Title: "Pusat Kontak",
-  homeCard3Desc: "Kehilangan arah dalam perjalanan luar angkasa ini? Hubungi kontak pendamping kelompok Anda secara langsung melalui satu tombol WhatsApp.",
-
-  homePhotoSlotsEnabled: true,
-  homePhotoSlotsTitle: "ALUR KISAH PENJELAJAHAN ORBIT",
-  homePhotoSlotsSubtitle: "Rekam jejak kronologis dan narasi momentum penjelajahan Mahasiswa Baru IMO 2026 dari awal keberangkatan hingga puncak inovasi.",
-  homePhotoSlots: [],
-
-  infoHeroTitle: "Status Hub & Pengumpulan",
-  infoHeroSubtitle: "Verifikasi kelengkapan pengumpulan tugas kelompok dan berkas individu real-time.",
-  infoWarningNotice: "Catatan: Jika ingin membuka folder, mohon menunggu loading selesai, Terimakasih.",
-
-  hubHeroTitle: "PUSAT PENJELAJAHAN",
-  hubHeroSubtitle: "Portal pusat navigasi cepat untuk mengakses semua panduan, tools generator, saluran media resmi, dan pusat berkas IMO 2026.",
-  hubSearchPlaceholder: "Cari tautan modul, generator, atau panduan penjelajahan...",
-
-  guideHeroTitle: "PANDUAN & EMBED DOKUMEN",
-  guideHeroSubtitle: "Halaman interaktif pengumuman resmi & contoh surat. Tinjau dokumen bersandingan dengan petunjuk & tombol langsung ke Auto-Form Generator.",
-
-  contactHeroTitle: "KONTAK",
-  contactHeroSubtitle: "Temukan pemandu orbit Anda. Cari berdasarkan nama kelompok atau nama pendamping untuk menghubungi langsung.",
-
-  idCardHeroTitle: "ID CARD GENERATOR",
-  idCardHeroSubtitle: "Generator tanda pengenal resmi peserta IMO 2026. Diproses 100% di browser Anda untuk keamanan data penuh.",
-
-  documentsHeroTitle: "AUTO-FORM GENERATOR",
-  documentsHeroSubtitle: "Isi formulir online dan buat dokumen PDF resmi instan tanpa mengetik ulang.",
-
-  homeNodesOrder: ["guide", "hub", "info", "idcard", "documents", "contact"],
-
-  musicPlayerEnabled: false,
-  musicUrl: "",
-  musicTitle: "",
-  musicArtist: "",
-  musicAlbumArt: "",
-
-  footerText: "Made with Astro-Physics & Next.js.",
-};
+export * from "@/types/site-config";
+import {
+  HomePhotoSlot,
+  LockedPageConfig,
+  SiteConfig,
+  DEFAULT_LOCKED_PAGES,
+  DEFAULT_SITE_CONFIG,
+} from "@/types/site-config";
 
 const SiteConfigContext = createContext<{
   config: SiteConfig;
@@ -231,7 +56,9 @@ export default function SiteConfigProvider({ children }: { children: React.React
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    if (config.maintenanceMode) {
+    const hasAnyLockdown = config.maintenanceMode || config.lockedPages?.some((p) => p.isLocked);
+
+    if (hasAnyLockdown) {
       const stored = sessionStorage.getItem("imo_lockdown_bypass");
       const urlParams = new URLSearchParams(window.location.search);
       const hasParam = urlParams.get("bypass") === "1" || urlParams.get("dev") === "1";
@@ -243,12 +70,12 @@ export default function SiteConfigProvider({ children }: { children: React.React
         document.cookie = "imo_lockdown_bypass=1; path=/; max-age=86400; SameSite=Lax";
       }
     } else {
-      // If maintenanceMode is off, clean up bypass session
+      // If no lockdown is active anywhere, clean up bypass session
       setIsDevBypass(false);
       sessionStorage.removeItem("imo_lockdown_bypass");
       document.cookie = "imo_lockdown_bypass=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
     }
-  }, [config.maintenanceMode, pathname]);
+  }, [config.maintenanceMode, config.lockedPages, pathname]);
 
   const handleSetDevBypass = (active: boolean) => {
     setIsDevBypass(active);
@@ -277,9 +104,9 @@ export default function SiteConfigProvider({ children }: { children: React.React
 
   const isAdminPath = pathname?.startsWith("/admin");
   const isPreviewPath = pathname?.startsWith("/preview");
-  const isBypassed = isDevBypass && config.maintenanceMode;
+  const isBypassed = isDevBypass;
 
-  // Check Maintenance Mode (Lockdown)
+  // 1. Check Global Maintenance Mode (Whole Site Lockdown)
   if (config.maintenanceMode && !isAdminPath && !isPreviewPath && !isBypassed) {
     return (
       <div className="relative min-h-screen flex flex-col items-center justify-center bg-black text-slate-100 px-4 text-center overflow-hidden font-mono">
@@ -329,6 +156,102 @@ export default function SiteConfigProvider({ children }: { children: React.React
     );
   }
 
+  // 2. Check Per-Page Lockdown (Granular Sector Quarantine)
+  const matchingLockedPage = (!isAdminPath && !isPreviewPath && config.lockedPages)
+    ? config.lockedPages.find((page) => {
+        if (!page.isLocked || !page.path) return false;
+        const target = page.path.trim().toLowerCase();
+        const current = (pathname || "").toLowerCase();
+        return current === target || current.startsWith(target + "/");
+      })
+    : null;
+
+  if (matchingLockedPage && !isBypassed) {
+    return (
+      <div className="relative min-h-screen flex flex-col items-center justify-center bg-[#020510] text-slate-100 px-4 text-center overflow-hidden font-mono select-none">
+        <StarfieldBackground />
+        
+        {/* Futuristic Sci-fi Grid backdrop */}
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#f43f5e10_1px,transparent_1px),linear-gradient(to_bottom,#f43f5e10_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)] pointer-events-none" />
+
+        {/* Ambient emergency amber/rose lighting */}
+        <div className="absolute inset-0 bg-gradient-to-b from-rose-950/25 via-amber-950/15 to-[#020510] mix-blend-screen pointer-events-none" />
+        <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-96 h-96 bg-rose-500/15 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="relative z-10 max-w-lg w-full flex flex-col items-center my-12">
+          {/* Header Protocol Badge */}
+          <div className="flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-rose-500/15 border border-rose-500/40 text-rose-300 text-xs font-bold tracking-widest uppercase mb-6 shadow-[0_0_20px_rgba(244,63,94,0.3)]">
+            <ShieldAlert className="h-4 w-4 text-rose-400 animate-pulse" />
+            <span>SECTOR LOCKDOWN // ISOLASI PROTOKOL</span>
+          </div>
+
+          {/* Holographic Lock Icon Box */}
+          <div className="relative mb-6">
+            <div className="absolute -inset-4 bg-rose-500/20 rounded-3xl blur-xl animate-pulse pointer-events-none" />
+            <div className="h-20 w-20 rounded-2xl bg-black/80 border-2 border-rose-500/60 flex items-center justify-center text-rose-400 shadow-[0_0_30px_rgba(244,63,94,0.4)] relative">
+              <Lock className="h-9 w-9 text-rose-400" />
+            </div>
+          </div>
+
+          <h1 className="text-3xl md:text-5xl font-display font-black tracking-widest text-slate-100 mb-2 drop-shadow-[0_0_25px_rgba(244,63,94,0.5)]">
+            SEKTOR TERKUNCI
+          </h1>
+
+          <div className="text-xs font-mono text-cyan-400 tracking-wider mb-6 bg-cyan-950/30 px-3 py-1 rounded-full border border-cyan-500/30">
+            Jalur Orbit: <span className="font-bold">{pathname}</span>
+          </div>
+
+          {/* Holographic Terminal Block */}
+          <div className="p-5 md:p-6 border-l-4 border-rose-500 bg-black/80 border border-slate-800 backdrop-blur-xl rounded-r-2xl max-w-md w-full shadow-[0_0_35px_rgba(244,63,94,0.2)] text-left mb-8">
+            <div className="flex items-center justify-between pb-3 mb-3 border-b border-rose-500/20 text-[10px] text-rose-400 font-bold uppercase tracking-wider">
+              <span>STATUS: ACCESS_RESTRICTED (423_LOCKED)</span>
+              {matchingLockedPage.reason && (
+                <span className="px-2 py-0.5 rounded bg-rose-500/20 border border-rose-500/40 text-rose-200">
+                  {matchingLockedPage.reason}
+                </span>
+              )}
+            </div>
+
+            <div className="text-rose-200/90 text-xs leading-relaxed space-y-2 mb-4 font-mono">
+              <div className="text-slate-400 text-[11px]">&gt; TARGET_SECTOR: {matchingLockedPage.title.toUpperCase()}</div>
+              <div className="text-slate-200 text-xs mt-2 bg-rose-950/30 p-3 rounded-lg border border-rose-900/40 leading-relaxed">
+                {matchingLockedPage.message || "Akses ke sektor ini ditutup sementara waktu oleh Earth Command untuk pemeliharaan data atau penyesuaian teknis."}
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-2 text-rose-400/80 text-[10px] pt-2 border-t border-slate-800">
+              <span className="h-2 w-2 bg-rose-500 rounded-full animate-ping" />
+              <span>ISOLASI OTOMATIS BERLAKU HINGGA PEMBERITAHUAN BERIKUTNYA</span>
+            </div>
+          </div>
+
+          {/* Quick Escape Actions */}
+          <div className="flex flex-wrap items-center justify-center gap-3 w-full">
+            <Link
+              href="/"
+              className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-bold text-xs tracking-widest uppercase transition-all shadow-[0_0_20px_rgba(6,182,212,0.4)]"
+            >
+              <Sparkles className="h-4 w-4" />
+              <span>Kembali ke Beranda</span>
+            </Link>
+
+            <Link
+              href="/hub"
+              className="inline-flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 border border-slate-700 text-xs font-bold tracking-widest uppercase transition"
+            >
+              <span>Pusat Navigasi Hub</span>
+              <ChevronRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+
+          <div className="mt-12 text-[10px] text-slate-600 tracking-widest uppercase">
+            &copy; {config.siteYear} {config.siteName}. SEKTOR DIISOLASI PUSAT KENDALI.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const getBannerColor = (style: string) => {
     switch (style) {
       case "warning":
@@ -345,7 +268,7 @@ export default function SiteConfigProvider({ children }: { children: React.React
   return (
     <SiteConfigContext.Provider value={{ config, refreshConfig: fetchConfig, isDevBypass, setDevBypass: handleSetDevBypass }}>
       {/* Floating DEVELOPMENT MODE Indicator HUD Bar during Lockdown Bypass */}
-      {config.maintenanceMode && isBypassed && !isAdminPath && (
+      {((config.maintenanceMode && isBypassed) || (matchingLockedPage && isBypassed)) && !isAdminPath && (
         <div className="sticky top-0 left-0 right-0 z-[200] bg-black/90 border-b border-amber-500/60 shadow-[0_4px_30px_rgba(245,158,11,0.35)] backdrop-blur-xl px-4 py-2 flex items-center justify-between font-mono text-xs text-amber-200 transition-all select-none">
           <div className="flex items-center space-x-3 max-w-4xl truncate">
             <span className="flex h-2.5 w-2.5 relative">
@@ -356,7 +279,9 @@ export default function SiteConfigProvider({ children }: { children: React.React
               DEVELOPMENT MODE
             </span>
             <span className="hidden sm:inline text-slate-400 text-[11px] truncate">
-              [LOCKDOWN BYPASS ACTIVE — ADMIN TESTING PROTOCOL]
+              {config.maintenanceMode
+                ? "[GLOBAL LOCKDOWN BYPASS ACTIVE — ADMIN TESTING PROTOCOL]"
+                : `[SECTOR LOCKDOWN BYPASS ACTIVE — "${matchingLockedPage?.title}" DIKUNCI UNTUK PUBLIK]`}
             </span>
           </div>
 

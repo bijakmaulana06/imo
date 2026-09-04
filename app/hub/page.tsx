@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { Link } from "next-view-transitions";
 import { useSiteConfig } from "@/components/SiteConfigProvider";
+import { sanitizeUrl } from "@/lib/urlHelper";
 
 interface HubLink {
   id: string;
@@ -189,7 +190,7 @@ export default function HubPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             <AnimatePresence>
               {filteredLinks.map((item, index) => {
-                const isInternal = item.url.startsWith("/");
+                const { url: safeUrl, isInternal } = sanitizeUrl(item.url);
 
                 return (
                   <motion.div
@@ -228,7 +229,7 @@ export default function HubPage() {
                       <div className="pt-4 border-t border-card-border/20 mt-auto">
                         {isInternal ? (
                           <Link
-                            href={item.url}
+                            href={safeUrl}
                             className="w-full py-2.5 px-4 rounded-xl bg-slate-950 hover:bg-accent-cyan hover:text-black border border-card-border/50 hover:border-accent-cyan text-slate-200 text-xs font-bold transition duration-300 flex items-center justify-between group-hover:shadow-[0_0_15px_rgba(125,249,255,0.3)] cursor-pointer touch-manipulation active:scale-[0.98]"
                           >
                             <span>Akses Fitur</span>
@@ -236,7 +237,7 @@ export default function HubPage() {
                           </Link>
                         ) : (
                           <a
-                            href={item.url}
+                            href={safeUrl}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="w-full py-2.5 px-4 rounded-xl bg-slate-950 hover:bg-accent-cyan hover:text-black border border-card-border/50 hover:border-accent-cyan text-slate-200 text-xs font-bold transition duration-300 flex items-center justify-between group-hover:shadow-[0_0_15px_rgba(125,249,255,0.3)] cursor-pointer touch-manipulation active:scale-[0.98]"

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Test Docx Preview</title>
+  <!-- docx-preview CDN or local bundle -->
+  <script src="https://unpkg.com/docx-preview@0.3.4/dist/docx-preview.min.js"></script>
+  <style>
+    body {
+      background: #020510;
+      color: white;
+      margin: 0;
+      padding: 20px;
+      font-family: sans-serif;
+    }
+    #container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+  </style>
+</head>
+<body>
+  <h2>Testing Real Client-Side Docx Preview</h2>
+  <div id="container"></div>
+  <script>
+    async function load() {
+      const res = await fetch("https://pcalfbxvlbmqbhhazbax.supabase.co/storage/v1/object/public/templates/document-templates/doc_tpl_1785242075928_c8amy.docx");
+      const blob = await res.blob();
+      const container = document.getElementById("container");
+      await docx.renderAsync(blob, container, null, {
+        className: "docx",
+        inWrapper: true,
+        renderHeaders: true,
+        renderFooters: true,
+      });
+      console.log("Rendered!");
+    }
+    load().catch(console.error);
+  </script>
+</body>
+</html>

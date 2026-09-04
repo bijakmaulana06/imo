@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
+import { DEFAULT_LOCKED_PAGES } from "@/types/site-config";
 
 export async function GET() {
   try {
@@ -32,6 +33,7 @@ export async function GET() {
       maintenanceMessage: "Website IMO 2026 sedang dalam pemeliharaan sistem berkala. Mohon kembali beberapa saat lagi.",
       taskSubmissionFrozen: false,
       taskFreezeMessage: "Pengiriman dan verifikasi berkas sedang dibekukan sementara untuk rekapitulasi data.",
+      lockedPages: DEFAULT_LOCKED_PAGES,
       
       // Root System Controls
       swCacheVersion: "v1.0.0",
@@ -165,6 +167,10 @@ export async function GET() {
     }
 
     parsedConfig.pushSubscribersCount = subscriberResult.count || 0;
+
+    if (!parsedConfig.lockedPages || !Array.isArray(parsedConfig.lockedPages) || parsedConfig.lockedPages.length === 0) {
+      parsedConfig.lockedPages = DEFAULT_LOCKED_PAGES;
+    }
 
     return NextResponse.json(parsedConfig);
   } catch (err: any) {

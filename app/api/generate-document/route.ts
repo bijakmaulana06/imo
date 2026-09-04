@@ -10,6 +10,13 @@ import { promisify } from "util";
 
 const execFileAsync = promisify(execFile);
 
+interface CachedTemplate {
+  template: any;
+  fileBuffer: Buffer;
+  cachedAt: number;
+}
+const templateCache = new Map<string, CachedTemplate>();
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -22,67 +29,85 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = await createClient();
-
-    // 1. Ambil metadata template dari database
-    const { data: template, error: dbError } = await supabase
-      .from("document_templates")
-      .select("*")
-      .eq("id", templateId)
-      .single();
-
-    if (dbError || !template) {
-      return NextResponse.json(
-        { error: "Template dokumen tidak ditemukan di database" },
-        { status: 404 }
-      );
-    }
-
-    // 2. Ambil file template .docx dari Supabase Storage atau fetch URL dengan fallback
+    let template: any = null;
     let fileBuffer: Buffer | null = null;
-    const targetUrl = template.file_url || template.file_path || "";
 
-    if (targetUrl.startsWith("http")) {
-      try {
-        const res = await fetch(targetUrl);
-        if (res.ok) {
-          fileBuffer = Buffer.from(await res.arrayBuffer());
-        }
-      } catch (e) {
-        console.warn("Direct HTTP fetch template URL failed, trying Supabase storage client download fallback...", e);
-      }
-    }
+    // Check in-memory cache first (valid for 1 hour)
+    const cached = templateCache.get(templateId);
+    if (cached && Date.now() - cached.cachedAt < 3600000) {
+      template = cached.template;
+      fileBuffer = cached.fileBuffer;
+    } else {
+      const supabase = await createClient();
 
-    if (!fileBuffer) {
-      // Parse path relatif dari URL jika ada
-      let relativePath = template.file_path || targetUrl;
-      if (targetUrl.includes("/templates/")) {
-        relativePath = targetUrl.split("/templates/").pop() || relativePath;
-      } else if (targetUrl.includes("/document_templates/")) {
-        relativePath = targetUrl.split("/document_templates/").pop() || relativePath;
-      }
+      // 1. Ambil metadata template dari database
+      const { data: dbTemplate, error: dbError } = await supabase
+        .from("document_templates")
+        .select("*")
+        .eq("id", templateId)
+        .single();
 
-      let { data: fileData, error: downloadError } = await supabase.storage
-        .from("templates")
-        .download(relativePath);
-
-      if ((downloadError || !fileData) && targetUrl.includes("document_templates")) {
-        const altRes = await supabase.storage
-          .from("document_templates")
-          .download(relativePath);
-        if (altRes.data) {
-          fileData = altRes.data;
-          downloadError = null;
-        }
-      }
-
-      if (downloadError || !fileData) {
-        console.error("Supabase storage download error:", downloadError);
-        throw new Error(
-          `Gagal mengunduh file template .docx dari storage. Pastikan file template tersedia di Supabase Storage.`
+      if (dbError || !dbTemplate) {
+        return NextResponse.json(
+          { error: "Template dokumen tidak ditemukan di database" },
+          { status: 404 }
         );
       }
-      fileBuffer = Buffer.from(await fileData.arrayBuffer());
+      template = dbTemplate;
+
+      // 2. Ambil file template .docx dari Supabase Storage atau fetch URL dengan fallback
+      const targetUrl = template.file_url || template.file_path || "";
+
+      if (targetUrl.startsWith("http")) {
+        try {
+          const res = await fetch(targetUrl);
+          if (res.ok) {
+            fileBuffer = Buffer.from(await res.arrayBuffer());
+          }
+        } catch (e) {
+          console.warn("Direct HTTP fetch template URL failed, trying Supabase storage client download fallback...", e);
+        }
+      }
+
+      if (!fileBuffer) {
+        let relativePath = template.file_path || targetUrl;
+        if (targetUrl.includes("/templates/")) {
+          relativePath = targetUrl.split("/templates/").pop() || relativePath;
+        } else if (targetUrl.includes("/document_templates/")) {
+          relativePath = targetUrl.split("/document_templates/").pop() || relativePath;
+        }
+
+        let { data: fileData, error: downloadError } = await supabase.storage
+          .from("templates")
+          .download(relativePath);
+
+        if ((downloadError || !fileData) && targetUrl.includes("document_templates")) {
+          const altRes = await supabase.storage
+            .from("document_templates")
+            .download(relativePath);
+          if (altRes.data) {
+            fileData = altRes.data;
+            downloadError = null;
+          }
+        }
+
+        if (downloadError || !fileData) {
+          console.error("Supabase storage download error:", downloadError);
+          throw new Error(
+            `Gagal mengunduh file template .docx dari storage. Pastikan file template tersedia di Supabase Storage.`
+          );
+        }
+        fileBuffer = Buffer.from(await fileData.arrayBuffer());
+      }
+
+      // Save to memory cache
+      if (template && fileBuffer) {
+        templateCache.set(templateId, {
+          template,
+          fileBuffer,
+          cachedAt: Date.now(),
+        });
+      }
     }
 
     // 3. Clean & Populate tag menggunakan pizzip & docxtemplater

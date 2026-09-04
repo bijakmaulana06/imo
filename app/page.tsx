@@ -5,14 +5,22 @@ import Navbar from "@/components/Navbar";
 import StarfieldBackground from "@/components/StarfieldBackground";
 import ImoLogo from "@/components/ImoLogo";
 import { Link } from "next-view-transitions";
-import { Rocket, Sparkles, BookOpen, Compass, Contact, ArrowRight, ChevronDown, ClipboardCheck, IdCard, FileText } from "lucide-react";
+import { Rocket, Sparkles, BookOpen, Compass, Contact, ArrowRight, ChevronDown, ClipboardCheck, IdCard, FileText, Lock } from "lucide-react";
 import { useSiteConfig } from "@/components/SiteConfigProvider";
 import { motion, useScroll, useTransform } from "framer-motion";
 import HomePhotoSpotlight from "@/components/HomePhotoSpotlight";
 
 function HomeNodeCard({ node }: { node: any }) {
+  const { config } = useSiteConfig();
   const cardRef = useRef<HTMLDivElement>(null);
   const [isHovered, setIsHovered] = useState(false);
+
+  const isLocked = config.lockedPages?.some((p) => {
+    if (!p.isLocked || !p.path) return false;
+    const target = p.path.trim().toLowerCase();
+    const current = node.href.toLowerCase();
+    return current === target || current.startsWith(target + "/");
+  });
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!cardRef.current) return;
@@ -33,10 +41,24 @@ function HomeNodeCard({ node }: { node: any }) {
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         style={{
-          boxShadow: `0 12px 36px ${node.shadowColor}, inset 0 1px 1px rgba(255,255,255,0.3)`,
+          boxShadow: isLocked
+            ? `0 12px 36px rgba(244,63,94,0.25), inset 0 1px 1px rgba(255,255,255,0.2)`
+            : `0 12px 36px ${node.shadowColor}, inset 0 1px 1px rgba(255,255,255,0.3)`,
         }}
-        className="relative flex flex-col items-center glass p-5 sm:p-7 md:p-8 rounded-[28px] sm:rounded-[32px] md:rounded-[36px] transition-transform duration-300 text-center cursor-pointer overflow-hidden border border-white/20 backdrop-blur-xl bg-slate-950/80 will-change-transform w-full"
+        className={`relative flex flex-col items-center glass p-5 sm:p-7 md:p-8 rounded-[28px] sm:rounded-[32px] md:rounded-[36px] transition-transform duration-300 text-center cursor-pointer overflow-hidden backdrop-blur-xl will-change-transform w-full ${
+          isLocked
+            ? "border border-rose-500/40 bg-slate-950/85 hover:border-rose-400"
+            : "border border-white/20 bg-slate-950/80"
+        }`}
       >
+        {/* Top-Right Locked Indicator Badge */}
+        {isLocked && (
+          <div className="absolute top-4 right-4 z-30 flex items-center space-x-1.5 px-3 py-1 rounded-full bg-rose-500/20 border border-rose-500/50 text-rose-300 text-[10px] font-mono font-black tracking-widest uppercase shadow-[0_0_15px_rgba(244,63,94,0.4)] backdrop-blur-md animate-pulse">
+            <Lock className="h-3 w-3 text-rose-400" />
+            <span>TERKUNCI</span>
+          </div>
+        )}
+
         {/* Specular White Sheen Overlay (Apple Glass Surface) */}
         <div className="absolute inset-0 bg-gradient-to-b from-white/[0.12] via-transparent to-black/[0.3] pointer-events-none rounded-[inherit]" />
 
@@ -45,7 +67,7 @@ function HomeNodeCard({ node }: { node: any }) {
           className="pointer-events-none absolute inset-0 rounded-[inherit] transition-opacity duration-300 z-0"
           style={{
             opacity: isHovered ? 1 : 0,
-            background: `radial-gradient(300px circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(255, 255, 255, 0.16), ${node.shadowColor} 50%, transparent 80%)`,
+            background: `radial-gradient(300px circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(255, 255, 255, 0.16), ${isLocked ? "rgba(244,63,94,0.3)" : node.shadowColor} 50%, transparent 80%)`,
           }}
         />
 
@@ -54,7 +76,7 @@ function HomeNodeCard({ node }: { node: any }) {
           className="pointer-events-none absolute -inset-[1px] rounded-[inherit] z-10 transition-opacity duration-300"
           style={{
             opacity: isHovered ? 1 : 0,
-            background: `radial-gradient(200px circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(255, 255, 255, 0.85), ${node.shadowColor} 55%, transparent 80%)`,
+            background: `radial-gradient(200px circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(255, 255, 255, 0.85), ${isLocked ? "rgba(244,63,94,0.5)" : node.shadowColor} 55%, transparent 80%)`,
             WebkitMask: "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)",
             WebkitMaskComposite: "xor",
             maskComposite: "exclude",
@@ -63,7 +85,7 @@ function HomeNodeCard({ node }: { node: any }) {
         />
         
         {/* Icon Container - Apple Squircle */}
-        <div className={`h-14 w-14 sm:h-16 sm:w-16 md:h-20 md:w-20 rounded-[18px] sm:rounded-[22px] ${node.colorClasses.bg} border ${node.colorClasses.border} flex items-center justify-center ${node.colorClasses.text} mb-4 sm:mb-5 shadow-xl relative overflow-hidden group-hover:scale-105 transition-transform duration-300 z-20 backdrop-blur-md`}>
+        <div className={`h-14 w-14 sm:h-16 sm:w-16 md:h-20 md:w-20 rounded-[18px] sm:rounded-[22px] ${isLocked ? "bg-rose-500/15 border border-rose-500/40 text-rose-400" : `${node.colorClasses.bg} border ${node.colorClasses.border} ${node.colorClasses.text}`} flex items-center justify-center mb-4 sm:mb-5 shadow-xl relative overflow-hidden group-hover:scale-105 transition-transform duration-300 z-20 backdrop-blur-md`}>
           <div className="absolute inset-0 bg-white/30 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
           {node.icon}
         </div>
@@ -77,9 +99,24 @@ function HomeNodeCard({ node }: { node: any }) {
         </p>
 
         {/* Action Button Pill */}
-        <div className={`flex items-center text-[11px] sm:text-xs font-mono font-bold ${node.colorClasses.text} uppercase tracking-wider mt-auto z-20 bg-slate-950/80 backdrop-blur-md px-4 py-2 sm:px-5 sm:py-2.5 rounded-full border border-white/15 group-hover:border-white/35 group-hover:bg-slate-900/90 shadow-lg transition-all`}>
-          <span>Akses Node</span>
-          <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 ml-1.5 transform group-hover:translate-x-1.5 transition-transform" />
+        <div
+          className={`flex items-center text-[11px] sm:text-xs font-mono font-bold uppercase tracking-wider mt-auto z-20 backdrop-blur-md px-4 py-2 sm:px-5 sm:py-2.5 rounded-full border shadow-lg transition-all ${
+            isLocked
+              ? "bg-rose-950/70 border-rose-500/50 text-rose-300 group-hover:border-rose-400 group-hover:bg-rose-900/80 shadow-[0_0_15px_rgba(244,63,94,0.3)]"
+              : `bg-slate-950/80 border-white/15 ${node.colorClasses.text} group-hover:border-white/35 group-hover:bg-slate-900/90`
+          }`}
+        >
+          {isLocked ? (
+            <>
+              <Lock className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 text-rose-400 animate-pulse" />
+              <span>Sektor Terkunci</span>
+            </>
+          ) : (
+            <>
+              <span>Akses Node</span>
+              <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 ml-1.5 transform group-hover:translate-x-1.5 transition-transform" />
+            </>
+          )}
         </div>
       </motion.div>
     </Link>

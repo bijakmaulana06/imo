@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import { Link } from "next-view-transitions";
 import { motion, AnimatePresence } from "framer-motion";
 import ContactPhotoCropperModal from "@/components/admin/ContactPhotoCropperModal";
+import { sanitizeUrl } from "@/lib/urlHelper";
 import {
   Layers,
   Users,
@@ -837,7 +838,9 @@ export default function AdminDashboardPage() {
   const handleCreateLink = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const { error } = await supabase.from("hub_links").insert([newLink]);
+      const { url: safeUrl } = sanitizeUrl(newLink.url);
+      const linkToInsert = { ...newLink, url: safeUrl };
+      const { error } = await supabase.from("hub_links").insert([linkToInsert]);
       if (error) throw error;
 
       // Kirim push notifikasi
@@ -1350,10 +1353,20 @@ export default function AdminDashboardPage() {
 
                         <h3 className="font-display font-bold text-lg text-slate-100">{link.label}</h3>
                         <p className="text-xs text-slate-400 font-sans mt-1 line-clamp-2">{link.description || "Tidak ada deskripsi."}</p>
-                        <a href={link.url} target="_blank" rel="noreferrer" className="text-[11px] text-accent-cyan font-mono hover:underline mt-2 inline-flex items-center space-x-1">
-                          <span>{link.url}</span>
-                          <ExternalLink className="h-3 w-3" />
-                        </a>
+                        {(() => {
+                          const { url: safeUrl, isInternal } = sanitizeUrl(link.url);
+                          return (
+                            <a
+                              href={safeUrl}
+                              target={isInternal ? "_self" : "_blank"}
+                              rel="noreferrer"
+                              className="text-[11px] text-accent-cyan font-mono hover:underline mt-2 inline-flex items-center space-x-1"
+                            >
+                              <span className="truncate max-w-xs">{safeUrl}</span>
+                              <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                            </a>
+                          );
+                        })()}
                       </div>
 
                       <div className="flex items-center justify-end space-x-2 border-t border-card-border/30 pt-3 mt-4">

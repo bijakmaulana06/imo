@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useSiteConfig, DEFAULT_SITE_CONFIG } from "@/components/SiteConfigProvider";
+import { useSiteConfig, DEFAULT_SITE_CONFIG, DEFAULT_LOCKED_PAGES, LockedPageConfig } from "@/components/SiteConfigProvider";
 import {
   Globe,
   Palette,
@@ -18,6 +18,7 @@ import {
   Activity,
   TerminalSquare,
   Lock,
+  Unlock,
   Cpu,
   RefreshCcw,
   WifiOff,
@@ -137,7 +138,10 @@ export default function AdminSettingsCommandCenter() {
       const res = await fetch("/api/admin/settings");
       if (res.ok) {
         const data = await res.json();
-        setCoreConfig({ ...DEFAULT_SITE_CONFIG, ...data });
+        const loadedLockedPages = (data.lockedPages && Array.isArray(data.lockedPages) && data.lockedPages.length > 0)
+          ? data.lockedPages
+          : DEFAULT_LOCKED_PAGES;
+        setCoreConfig({ ...DEFAULT_SITE_CONFIG, ...data, lockedPages: loadedLockedPages });
         setGdriveParentFolder(data.gdriveParentFolder || "");
         setTotalGroupsCount(data.totalGroupsCount || 20);
         setTargetMembersPerGroup(data.targetMembersPerGroup || 10);
@@ -781,6 +785,279 @@ export default function AdminSettingsCommandCenter() {
                             <span className="text-[10px] text-slate-600 italic">Mati hingga lockdown aktif</span>
                           )}
                         </div>
+                      </div>
+                    </div>
+
+                    {/* MATRIKS LOCKDOWN HALAMAN SPESIFIK (GRANULAR PAGE ISOLATION) */}
+                    <div className="bg-black/50 border border-slate-800/80 rounded-xl p-5 space-y-5">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-800/60 pb-3">
+                        <div className="flex items-center space-x-2.5">
+                          <div className="p-2 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400">
+                            <ShieldAlert className="h-4 w-4 animate-pulse" />
+                          </div>
+                          <div>
+                            <h3 className="text-xs font-bold text-slate-200 tracking-wider uppercase flex items-center space-x-2">
+                              <span>MATRIKS LOCKDOWN HALAMAN SPESIFIK</span>
+                              <span className="text-[9px] px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 font-mono">
+                                GRANULAR
+                              </span>
+                            </h3>
+                            <p className="text-[10px] text-slate-400">
+                              Kunci akses publik ke rute halaman tertentu secara terpisah dengan pesan isolasi kustom.
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Telemetry Status Counters */}
+                        <div className="flex items-center space-x-2">
+                          {(() => {
+                            const pages = coreConfig.lockedPages || DEFAULT_LOCKED_PAGES;
+                            const lockedCount = pages.filter((p) => p.isLocked).length;
+                            const totalCount = pages.length;
+                            return (
+                              <span className={`text-[10px] font-mono px-2.5 py-1 rounded-lg border font-bold ${
+                                lockedCount > 0
+                                  ? "bg-rose-500/20 border-rose-500/40 text-rose-300 shadow-[0_0_12px_rgba(244,63,94,0.3)] animate-pulse"
+                                  : "bg-black/60 border-slate-800 text-slate-400"
+                              }`}>
+                                {lockedCount} / {totalCount} TERKUNCI
+                              </span>
+                            );
+                          })()}
+                        </div>
+                      </div>
+
+                      {/* Quick Action Toolbar */}
+                      <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-black/70 border border-slate-800/80 rounded-xl">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = (coreConfig.lockedPages || DEFAULT_LOCKED_PAGES).map((p) => ({
+                                ...p,
+                                isLocked: true,
+                              }));
+                              setCoreConfig({ ...coreConfig, lockedPages: updated });
+                            }}
+                            className="px-2.5 py-1.5 rounded-lg bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/50 text-[10px] font-bold tracking-wider transition flex items-center space-x-1.5 shadow-[0_0_10px_rgba(244,63,94,0.2)] cursor-pointer"
+                          >
+                            <Lock className="h-3 w-3" />
+                            <span>Kunci Semua</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = (coreConfig.lockedPages || DEFAULT_LOCKED_PAGES).map((p) => ({
+                                ...p,
+                                isLocked: false,
+                              }));
+                              setCoreConfig({ ...coreConfig, lockedPages: updated });
+                            }}
+                            className="px-2.5 py-1.5 rounded-lg bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-300 border border-emerald-800/50 text-[10px] font-bold tracking-wider transition flex items-center space-x-1.5 cursor-pointer"
+                          >
+                            <Unlock className="h-3 w-3" />
+                            <span>Buka Semua</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (window.confirm("Kembalikan daftar halaman terkunci ke konfigurasi bawaan IMO 2026?")) {
+                                setCoreConfig({ ...coreConfig, lockedPages: DEFAULT_LOCKED_PAGES });
+                              }
+                            }}
+                            className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-[10px] font-bold tracking-wider transition flex items-center space-x-1 cursor-pointer"
+                            title="Reset Preset Bawaan"
+                          >
+                            <RotateCcw className="h-3 w-3" />
+                            <span>Reset Default</span>
+                          </button>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newPage: LockedPageConfig = {
+                              id: `page-${Date.now()}`,
+                              path: "/custom-route",
+                              title: "Halaman Kustom Baru",
+                              isLocked: true,
+                              reason: "Pemeliharaan",
+                              message: "Halaman ini sedang ditutup sementara untuk penyesuaian teknis.",
+                            };
+                            setCoreConfig({
+                              ...coreConfig,
+                              lockedPages: [...(coreConfig.lockedPages || DEFAULT_LOCKED_PAGES), newPage],
+                            });
+                          }}
+                          className="px-3 py-1.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-[10px] font-bold tracking-wider transition flex items-center space-x-1.5 shadow-[0_0_12px_rgba(6,182,212,0.2)] cursor-pointer"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                          <span>Tambah Rute Kustom</span>
+                        </button>
+                      </div>
+
+                      {/* Locked Pages List */}
+                      <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
+                        {(coreConfig.lockedPages || DEFAULT_LOCKED_PAGES).map((page, index) => {
+                          const isLocked = page.isLocked;
+
+                          return (
+                            <div
+                              key={page.id || `locked-page-${index}`}
+                              className={`p-4 rounded-xl border transition-all ${
+                                isLocked
+                                  ? "bg-rose-950/20 border-rose-500/40 shadow-[0_0_20px_rgba(244,63,94,0.12)]"
+                                  : "bg-black/60 border-slate-800 hover:border-slate-700"
+                              }`}
+                            >
+                              {/* Header Row: Title, Route badge, Toggle Switch, Test button, Delete */}
+                              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-slate-800/80 mb-3">
+                                <div className="flex items-center space-x-2.5">
+                                  <div
+                                    className={`p-1.5 rounded-lg border ${
+                                      isLocked
+                                        ? "bg-rose-500/20 border-rose-500/40 text-rose-400 animate-pulse"
+                                        : "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                                    }`}
+                                  >
+                                    {isLocked ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
+                                  </div>
+                                  <div>
+                                    <div className="flex items-center space-x-2">
+                                      <span className="text-xs font-bold text-slate-100">{page.title || "Tanpa Judul"}</span>
+                                      <code className="text-[10px] font-mono px-2 py-0.5 rounded bg-black/60 border border-slate-800 text-cyan-300">
+                                        {page.path}
+                                      </code>
+                                    </div>
+                                    <span className="text-[9px] font-mono text-slate-400">
+                                      Status: {isLocked ? "DIBLOKIR UNTUK PUBLIK" : "TERBUKA NORMAL"}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center space-x-2 self-end sm:self-auto">
+                                  {/* Direct Test Link */}
+                                  <a
+                                    href={page.path}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-mono font-bold tracking-wider transition flex items-center space-x-1"
+                                    title="Uji akses rute ini di tab baru"
+                                  >
+                                    <span>Uji Rute</span>
+                                    <ExternalLink className="h-3 w-3" />
+                                  </a>
+
+                                  {/* Toggle Lock Button */}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const updated = [...(coreConfig.lockedPages || DEFAULT_LOCKED_PAGES)];
+                                      updated[index] = { ...updated[index], isLocked: !isLocked };
+                                      setCoreConfig({ ...coreConfig, lockedPages: updated });
+                                    }}
+                                    className={`px-3 py-1 rounded-lg text-[10px] font-mono font-bold tracking-wider uppercase transition flex items-center space-x-1.5 cursor-pointer ${
+                                      isLocked
+                                        ? "bg-rose-500/25 hover:bg-rose-500/35 text-rose-300 border border-rose-500/50 shadow-[0_0_12px_rgba(244,63,94,0.3)]"
+                                        : "bg-black/80 hover:bg-slate-800 text-slate-400 border border-slate-700"
+                                    }`}
+                                  >
+                                    <span className={`h-1.5 w-1.5 rounded-full ${isLocked ? "bg-rose-400 animate-ping" : "bg-slate-500"}`} />
+                                    <span>{isLocked ? "TERKUNCI" : "TERBUKA"}</span>
+                                  </button>
+
+                                  {/* Delete Button */}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const updated = (coreConfig.lockedPages || DEFAULT_LOCKED_PAGES).filter((_, i) => i !== index);
+                                      setCoreConfig({ ...coreConfig, lockedPages: updated });
+                                    }}
+                                    className="p-1.5 rounded-lg bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 hover:text-rose-300 border border-rose-900/40 transition cursor-pointer"
+                                    title="Hapus Rute"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Form Fields Grid */}
+                              <div className="space-y-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                                  <div>
+                                    <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1">
+                                      Path Rute (Mulai dari /)
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={page.path}
+                                      onChange={(e) => {
+                                        const updated = [...(coreConfig.lockedPages || DEFAULT_LOCKED_PAGES)];
+                                        updated[index] = { ...updated[index], path: e.target.value };
+                                        setCoreConfig({ ...coreConfig, lockedPages: updated });
+                                      }}
+                                      className="w-full px-2.5 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs font-mono text-cyan-300 focus:border-cyan-500 outline-none transition"
+                                      placeholder="/info"
+                                    />
+                                  </div>
+
+                                  <div>
+                                    <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1">
+                                      Judul Sektor / Halaman
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={page.title}
+                                      onChange={(e) => {
+                                        const updated = [...(coreConfig.lockedPages || DEFAULT_LOCKED_PAGES)];
+                                        updated[index] = { ...updated[index], title: e.target.value };
+                                        setCoreConfig({ ...coreConfig, lockedPages: updated });
+                                      }}
+                                      className="w-full px-2.5 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs font-bold text-slate-100 focus:border-cyan-500 outline-none transition"
+                                      placeholder="Status Hub & Pengumpulan"
+                                    />
+                                  </div>
+
+                                  <div>
+                                    <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1">
+                                      Badge Alasan (Reason)
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={page.reason || ""}
+                                      onChange={(e) => {
+                                        const updated = [...(coreConfig.lockedPages || DEFAULT_LOCKED_PAGES)];
+                                        updated[index] = { ...updated[index], reason: e.target.value };
+                                        setCoreConfig({ ...coreConfig, lockedPages: updated });
+                                      }}
+                                      className="w-full px-2.5 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs font-mono text-rose-300 focus:border-rose-500 outline-none transition"
+                                      placeholder="Rekapitulasi Nilai"
+                                    />
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1">
+                                    Pesan Terminal Lockdown (Ditampilkan ke Pengunjung)
+                                  </label>
+                                  <textarea
+                                    rows={2}
+                                    value={page.message || ""}
+                                    onChange={(e) => {
+                                      const updated = [...(coreConfig.lockedPages || DEFAULT_LOCKED_PAGES)];
+                                      updated[index] = { ...updated[index], message: e.target.value };
+                                      setCoreConfig({ ...coreConfig, lockedPages: updated });
+                                    }}
+                                    className="w-full px-2.5 py-1.5 bg-black/70 border border-slate-800 rounded-lg text-xs text-slate-300 focus:border-rose-500 outline-none transition leading-relaxed font-mono"
+                                    placeholder="Tuliskan pesan penjelasan mengapa halaman ini dikunci sementara..."
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useRef, use } from "react";
+import React, { useEffect, useState, useRef, use, useCallback } from "react";
 import StarfieldBackground from "@/components/StarfieldBackground";
 import Card from "@/components/Card";
 import Button from "@/components/Button";
@@ -18,16 +18,11 @@ import {
   Edit3,
   FileType,
   CheckCircle2,
-  AlertTriangle,
 } from "lucide-react";
 import { Link } from "next-view-transitions";
 import { useRouter } from "next/navigation";
-import {
-  generateFilledDocxBuffer,
-  calculateFormProgress,
-} from "@/lib/documentPreview";
+import { calculateFormProgress } from "@/lib/documentPreview";
 import DocumentRealtimePreview from "@/components/documents/DocumentRealtimePreview";
-import { motion, AnimatePresence } from "framer-motion";
 
 function getFieldPlaceholder(field: DocumentFieldConfig): string {
   if (field.placeholder && field.placeholder.trim()) return field.placeholder;
@@ -72,10 +67,14 @@ export default function FillDocumentFormPage({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  // Raw docx template buffer & filled docx buffer for real preview
-  const [rawDocxBuffer, setRawDocxBuffer] = useState<ArrayBuffer | null>(null);
-  const [filledDocxBuffer, setFilledDocxBuffer] = useState<ArrayBuffer | null>(null);
+  // Real Native PDF Preview State (LibreOffice Canvas Buffer)
+  const [pdfDataBuffer, setPdfDataBuffer] = useState<ArrayBuffer | null>(null);
   const [previewLoading, setPreviewLoading] = useState<boolean>(true);
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [hasUnsyncedChanges, setHasUnsyncedChanges] = useState<boolean>(false);
+
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const lastSyncedDataRef = useRef<string>("");
 
   // Mobile View Tab: 'form' or 'preview'
   const [mobileTab, setMobileTab] = useState<"form" | "preview">("form");
@@ -116,74 +115,90 @@ export default function FillDocumentFormPage({
         });
       }
       setFormData(initialForm);
+      lastSyncedDataRef.current = JSON.stringify(initialForm);
 
-      // 2. Fetch template .docx ArrayBuffer for Client-side realtime preview
-      try {
-        let buffer: ArrayBuffer | null = null;
-        const targetUrl = data.file_url || "";
-
-        // First attempt: API proxy for guaranteed CORS safety
-        const proxyRes = await fetch(`/api/documents/template-file?id=${data.id}`);
-        if (proxyRes.ok) {
-          buffer = await proxyRes.arrayBuffer();
-        } else if (targetUrl.startsWith("http")) {
-          // Direct fallback
-          const directRes = await fetch(targetUrl);
-          if (directRes.ok) {
-            buffer = await directRes.arrayBuffer();
-          }
-        }
-
-        if (buffer) {
-          setRawDocxBuffer(buffer);
-          // Initial filled buffer render
-          const initialFilled = generateFilledDocxBuffer(buffer, initialForm, data.fields_config || []);
-          setFilledDocxBuffer(initialFilled);
-        }
-      } catch (bufErr) {
-        console.warn("Could not prefetch docx buffer for preview:", bufErr);
-      }
+      // Render initial real file preview via LibreOffice
+      generateRealPdfPreview(initialForm, data.id);
     } catch (err: any) {
       console.error("Fetch template error:", err);
       setErrorMsg(err.message || "Gagal memuat template dokumen");
+      setPreviewLoading(false);
     } finally {
       setLoading(false);
-      setPreviewLoading(false);
     }
   };
 
-  // 3. Realtime DOCX buffer updater with 100ms debounce
+  // Helper to generate real native file preview with AbortController
+  const generateRealPdfPreview = useCallback(async (currentData: Record<string, any>, currentTplId: string) => {
+    // Abort previous in-flight request to avoid backlog
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    try {
+      setIsSyncing(true);
+      const res = await fetch("/api/generate-document", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          templateId: currentTplId,
+          formData: currentData,
+          outputFormat: "pdf",
+        }),
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        throw new Error("Gagal merender berkas dokumen resmi");
+      }
+
+      const ab = await res.arrayBuffer();
+      setPdfDataBuffer(ab);
+      lastSyncedDataRef.current = JSON.stringify(currentData);
+      setHasUnsyncedChanges(false);
+    } catch (err: any) {
+      if (err.name !== "AbortError") {
+        console.warn("Real PDF preview render note:", err);
+      }
+    } finally {
+      setIsSyncing(false);
+      setPreviewLoading(false);
+    }
+  }, []);
+
+  // Debounced auto-sync when formData changes (triggers 900ms after user pauses typing)
   useEffect(() => {
-    if (!rawDocxBuffer || !template) return;
+    if (!template || loading) return;
+
+    const currentStr = JSON.stringify(formData);
+    if (currentStr !== lastSyncedDataRef.current) {
+      setHasUnsyncedChanges(true);
+    }
 
     let isMounted = true;
-    setPreviewLoading(true);
-
     const timer = setTimeout(() => {
-      try {
-        const updatedBuffer = generateFilledDocxBuffer(
-          rawDocxBuffer,
-          formData,
-          template.fields_config || []
-        );
-
-        if (isMounted) {
-          setFilledDocxBuffer(updatedBuffer);
-          setPreviewLoading(false);
-        }
-      } catch (err) {
-        console.error("Realtime docx update error:", err);
-        if (isMounted) {
-          setPreviewLoading(false);
-        }
+      if (isMounted && currentStr !== lastSyncedDataRef.current) {
+        generateRealPdfPreview(formData, template.id);
       }
-    }, 100);
+    }, 900);
 
     return () => {
       isMounted = false;
       clearTimeout(timer);
     };
-  }, [formData, rawDocxBuffer, template]);
+  }, [formData, template, loading, generateRealPdfPreview]);
+
+  // Clean up abort controller on unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   const progressStats = calculateFormProgress(formData, template?.fields_config || []);
   const { totalFields, filledCount, missingRequired } = progressStats;
@@ -193,11 +208,16 @@ export default function FillDocumentFormPage({
     setFormData((prev) => ({ ...prev, [tag]: value }));
   };
 
+  // Immediate sync when user finishes with an input and leaves it
+  const handleInputBlur = () => {
+    if (template && JSON.stringify(formData) !== lastSyncedDataRef.current) {
+      generateRealPdfPreview(formData, template.id);
+    }
+  };
+
   const handleFocusField = (labelOrTag: string) => {
-    // Switch back to form tab on mobile
     setMobileTab("form");
 
-    // Match field by label or tag
     const targetField = template?.fields_config?.find(
       (f) =>
         f.label?.toLowerCase() === labelOrTag.toLowerCase() ||
@@ -240,7 +260,6 @@ export default function FillDocumentFormPage({
         throw new Error(errJson.error || `Gagal meng-generate dokumen ${format.toUpperCase()}`);
       }
 
-      // Ambil file buffer sebagai blob
       const blob = await res.blob();
       const contentDisposition = res.headers.get("Content-Disposition");
       let fileName = `${template?.title || "dokumen"}_terisi.${format}`;
@@ -252,7 +271,6 @@ export default function FillDocumentFormPage({
         }
       }
 
-      // Trigger unduhan di browser
       const downloadUrl = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = downloadUrl;
@@ -283,7 +301,7 @@ export default function FillDocumentFormPage({
         <StarfieldBackground />
         <div className="relative z-10 text-center text-slate-400 flex flex-col items-center gap-3">
           <div className="w-10 h-10 border-4 border-accent-cyan/30 border-t-accent-cyan rounded-full animate-spin" />
-          <p className="font-mono text-sm">Memuat formulir dokumen & pratinjau asli...</p>
+          <p className="font-mono text-sm">Memuat formulir & template berkas asli...</p>
         </div>
       </div>
     );
@@ -392,10 +410,20 @@ export default function FillDocumentFormPage({
             }`}
           >
             <Eye className="w-4 h-4" />
-            <span>2. Real Preview Asli</span>
-            <span className="inline-flex items-center justify-center px-1.5 py-0.2 rounded-full text-[9px] bg-slate-900 text-cyan-300 border border-cyan-400/30">
-              Live
-            </span>
+            <span>2. Real Preview (LibreOffice)</span>
+            {isSyncing ? (
+              <span className="inline-flex items-center justify-center px-1.5 py-0.2 rounded-full text-[9px] bg-cyan-950 text-cyan-300 border border-cyan-400/40 animate-pulse font-bold">
+                Sync
+              </span>
+            ) : hasUnsyncedChanges ? (
+              <span className="inline-flex items-center justify-center px-1.5 py-0.2 rounded-full text-[9px] bg-amber-950 text-amber-300 border border-amber-400/40 animate-pulse font-bold">
+                Update
+              </span>
+            ) : (
+              <span className="inline-flex items-center justify-center px-1.5 py-0.2 rounded-full text-[9px] bg-slate-900 text-cyan-300 border border-cyan-400/30">
+                100% Asli
+              </span>
+            )}
           </button>
         </div>
 
@@ -468,6 +496,7 @@ export default function FillDocumentFormPage({
                             placeholder={getFieldPlaceholder(field)}
                             value={formData[field.tag] || ""}
                             onChange={(e) => handleInputChange(field.tag, e.target.value)}
+                            onBlur={handleInputBlur}
                             required={field.required !== false}
                             className="w-full px-3.5 py-2.5 rounded-xl bg-black/60 border border-slate-700/80 text-white text-sm focus:outline-none focus:border-accent-cyan focus:ring-1 focus:ring-accent-cyan transition placeholder:text-slate-600"
                           />
@@ -483,6 +512,7 @@ export default function FillDocumentFormPage({
                             placeholder={field.placeholder || `Masukkan angka...`}
                             value={formData[field.tag] || ""}
                             onChange={(e) => handleInputChange(field.tag, e.target.value)}
+                            onBlur={handleInputBlur}
                             required={field.required !== false}
                             className="w-full px-3.5 py-2.5 rounded-xl bg-black/60 border border-slate-700/80 text-white text-sm focus:outline-none focus:border-accent-cyan focus:ring-1 focus:ring-accent-cyan transition placeholder:text-slate-600"
                           />
@@ -497,6 +527,7 @@ export default function FillDocumentFormPage({
                             type="date"
                             value={formData[field.tag] || ""}
                             onChange={(e) => handleInputChange(field.tag, e.target.value)}
+                            onBlur={handleInputBlur}
                             required={field.required !== false}
                             className="w-full px-3.5 py-2.5 rounded-xl bg-black/60 border border-slate-700/80 text-white text-sm focus:outline-none focus:border-accent-cyan focus:ring-1 focus:ring-accent-cyan transition cursor-pointer"
                           />
@@ -511,6 +542,7 @@ export default function FillDocumentFormPage({
                               }}
                               value={formData[field.tag] || ""}
                               onChange={(e) => handleInputChange(field.tag, e.target.value)}
+                              onBlur={handleInputBlur}
                               required={field.required !== false}
                               className="w-full px-3.5 py-2.5 rounded-xl bg-black/60 border border-slate-700/80 text-white text-sm focus:outline-none focus:border-accent-cyan focus:ring-1 focus:ring-accent-cyan transition appearance-none cursor-pointer pr-10"
                             >
@@ -535,6 +567,7 @@ export default function FillDocumentFormPage({
                             placeholder={getFieldPlaceholder(field)}
                             value={formData[field.tag] || ""}
                             onChange={(e) => handleInputChange(field.tag, e.target.value)}
+                            onBlur={handleInputBlur}
                             required={field.required !== false}
                             className="w-full px-3.5 py-2.5 rounded-xl bg-black/60 border border-slate-700/80 text-white text-sm focus:outline-none focus:border-accent-cyan focus:ring-1 focus:ring-accent-cyan transition placeholder:text-slate-600"
                           />
@@ -566,26 +599,31 @@ export default function FillDocumentFormPage({
                   </button>
 
                   <p className="text-center text-[11px] text-slate-400 font-mono leading-relaxed">
-                    * Dokumen di-generate on-the-fly dengan format resmi. Pastikan crosscheck data di panel preview sebelum dicetak.
+                    * Berkas di-generate langsung dengan engine resmi LibreOffice. Kop surat, logo, tabel, dan tata letak dijamin 100% otentik.
                   </p>
                 </div>
               </form>
             </Card>
           </div>
 
-          {/* RIGHT COLUMN: Real Native File Preview */}
+          {/* RIGHT COLUMN: Real Document PDF Canvas Preview */}
           <div
             className={`lg:col-span-7 sticky top-24 self-start ${
               mobileTab === "form" ? "hidden lg:block" : "block"
             }`}
           >
             <DocumentRealtimePreview
-              filledDocxBuffer={filledDocxBuffer}
+              pdfDataBuffer={pdfDataBuffer}
               loading={previewLoading}
+              isSyncing={isSyncing}
+              hasUnsyncedChanges={hasUnsyncedChanges}
               totalFields={totalFields}
               filledCount={filledCount}
               missingRequired={missingRequired}
               templateTitle={template?.title}
+              onRefreshPreview={() => {
+                if (template) generateRealPdfPreview(formData, template.id);
+              }}
               onFocusField={handleFocusField}
               onDownloadPdf={() => handleDownload("pdf")}
               onDownloadDocx={() => handleDownload("docx")}
