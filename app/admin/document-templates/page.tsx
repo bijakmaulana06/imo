@@ -17,6 +17,7 @@ import {
   Settings2,
   Download,
   AlertCircle,
+  Edit3,
 } from "lucide-react";
 import { Link } from "next-view-transitions";
 
@@ -72,8 +73,11 @@ export default function AdminDocumentTemplatesPage() {
   const deleteTemplate = async (id: string) => {
     if (!confirm("Apakah Anda yakin ingin menghapus template dokumen ini?")) return;
     try {
-      const { error } = await supabase.from("document_templates").delete().eq("id", id);
-      if (error) throw error;
+      const res = await fetch(`/api/admin/document-templates/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || "Gagal menghapus template");
+      }
       setTemplates((prev) => prev.filter((t) => t.id !== id));
       setSuccessMsg("Template berhasil dihapus");
       setTimeout(() => setSuccessMsg(null), 3000);
@@ -226,6 +230,15 @@ export default function AdminDocumentTemplatesPage() {
                   </a>
 
                   <div className="flex items-center gap-2">
+                    <Link
+                      href={`/admin/document-templates/edit/${tpl.id}`}
+                      className="px-3 py-1.5 text-xs font-mono rounded-xl bg-purple-500/10 border border-purple-500/30 text-accent-purple hover:bg-purple-500/20 transition flex items-center gap-1.5"
+                      title="Edit File & Konfigurasi Tag Template"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                      <span>Edit</span>
+                    </Link>
+
                     <Link
                       href={`/documents/${tpl.id}`}
                       target="_blank"

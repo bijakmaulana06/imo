@@ -540,19 +540,26 @@ export default function FillDocumentFormPage({
                           />
                         )}
 
-                        {/* Input Type: Number */}
+                        {/* Input Type: Number (Manual Murni Tanpa Spinner / Stepper / Scroll) */}
                         {field.type === "number" && (
                           <input
                             ref={(el) => {
                               inputRefs.current[field.tag] = el;
                             }}
-                            type="number"
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
                             placeholder={field.placeholder || `Masukkan angka...`}
                             value={formData[field.tag] || ""}
-                            onChange={(e) => handleInputChange(field.tag, e.target.value)}
+                            onChange={(e) => {
+                              // Mutlak manual ditulis, hanya izinkan angka
+                              const cleanedVal = e.target.value.replace(/[^0-9]/g, "");
+                              handleInputChange(field.tag, cleanedVal);
+                            }}
+                            onWheel={(e) => (e.target as HTMLElement).blur()}
                             onBlur={handleInputBlur}
                             required={field.required !== false}
-                            className="w-full px-3.5 py-2.5 rounded-xl bg-black/60 border border-slate-700/80 text-white text-sm focus:outline-none focus:border-accent-cyan focus:ring-1 focus:ring-accent-cyan transition placeholder:text-slate-600"
+                            className="w-full px-3.5 py-2.5 rounded-xl bg-black/60 border border-slate-700/80 text-white text-sm focus:outline-none focus:border-accent-cyan focus:ring-1 focus:ring-accent-cyan transition placeholder:text-slate-600 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           />
                         )}
 

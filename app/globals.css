@@ -95,6 +95,19 @@ h1, h2, h3, h4, .font-display {
 }
 
 /* ═══════════════════════════════════════════════════════
+   DISABLE NUMBER INPUT SPINNERS / STEPPER ARROWS GLOBALLY
+   ═══════════════════════════════════════════════════════ */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* ═══════════════════════════════════════════════════════
    APPLE-INSPIRED ULTRA PREMIUM GLASSMORPHISM (HIGH PERFORMANCE)
    ═══════════════════════════════════════════════════════ */
 .glass {

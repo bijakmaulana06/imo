@@ -1488,16 +1488,25 @@ export default function AdminDashboardPage() {
 
                           <div className="flex items-center gap-2">
                             <Link
+                              href={`/admin/document-templates/edit/${tpl.id}`}
+                              className="px-2.5 py-1 text-xs font-mono rounded-lg bg-purple-500/10 border border-purple-500/30 text-accent-purple hover:bg-purple-500/20 transition flex items-center gap-1 cursor-pointer"
+                              title="Edit File & Konfigurasi Tag Template"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                              <span>Edit</span>
+                            </Link>
+
+                            <Link
                               href={`/documents/${tpl.id}`}
                               target="_blank"
-                              className="px-2.5 py-1 text-xs font-mono rounded-lg bg-accent-cyan/10 border border-accent-cyan/30 text-accent-cyan hover:bg-accent-cyan/20 transition"
+                              className="px-2.5 py-1 text-xs font-mono rounded-lg bg-accent-cyan/10 border border-accent-cyan/30 text-accent-cyan hover:bg-accent-cyan/20 transition cursor-pointer"
                             >
                               Uji Form
                             </Link>
 
                             <button
                               onClick={() => handleDeleteDocTemplate(tpl.id)}
-                              className="p-1.5 text-rose-400 hover:bg-rose-500/10 rounded-lg border border-rose-500/20 transition"
+                              className="p-1.5 text-rose-400 hover:bg-rose-500/10 rounded-lg border border-rose-500/20 transition cursor-pointer"
                               title="Hapus Template"
                             >
                               <Trash2 className="w-4 h-4" />
