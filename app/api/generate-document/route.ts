@@ -7,6 +7,10 @@ import path from "path";
 import os from "os";
 import { execFile } from "child_process";
 import { promisify } from "util";
+import {
+  buildDocumentFileName,
+  prepareFormDataForDocx,
+} from "@/lib/documentHelper";
 
 const execFileAsync = promisify(execFile);
 
@@ -38,7 +42,14 @@ export async function POST(request: NextRequest) {
       template = cached.template;
       fileBuffer = cached.fileBuffer;
     } else {
-      const supabase = await createClient();
+      let supabase = await createClient();
+      if (process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.NEXT_PUBLIC_SUPABASE_URL) {
+        const { createClient: createSupabaseJsClient } = await import("@supabase/supabase-js");
+        supabase = createSupabaseJsClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL,
+          process.env.SUPABASE_SERVICE_ROLE_KEY
+        ) as any;
+      }
 
       // 1. Ambil metadata template dari database
       const { data: dbTemplate, error: dbError } = await supabase
@@ -138,14 +149,11 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Sanitasi data form agar tidak ada value null/undefined
-    const sanitizedData: Record<string, any> = {};
-    if (formData && typeof formData === "object") {
-      Object.keys(formData).forEach((key) => {
-        const val = formData[key];
-        sanitizedData[key] = val !== undefined && val !== null ? String(val) : "";
-      });
-    }
+    // Sanitasi data form & format tanggal resmi Indonesia beserta lokasi
+    const sanitizedData = prepareFormDataForDocx(
+      formData,
+      template.fields_config || []
+    );
 
     // Render tag dengan data ter-sanitasi
     try {
@@ -169,9 +177,8 @@ export async function POST(request: NextRequest) {
       compression: "DEFLATE",
     });
 
-    const safeTitle = (template.title || "dokumen")
-      .replace(/[^a-zA-Z0-9_-]/g, "_")
-      .toLowerCase();
+    const docxFileName = buildDocumentFileName(template.title, formData, "docx");
+    const encodedDocxFileName = encodeURIComponent(docxFileName);
 
     // Jika format yang diminta adalah docx
     if (outputFormat === "docx") {
@@ -180,7 +187,7 @@ export async function POST(request: NextRequest) {
         headers: {
           "Content-Type":
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-          "Content-Disposition": `attachment; filename="${safeTitle}_terisi.docx"`,
+          "Content-Disposition": `attachment; filename="${docxFileName.replace(/"/g, '')}"; filename*=UTF-8''${encodedDocxFileName}`,
         },
       });
     }
@@ -266,12 +273,15 @@ export async function POST(request: NextRequest) {
       throw new Error("Gagal mengkonversi dokumen Word ke PDF Native. Pastikan koneksi internet stabil.");
     }
 
+    const pdfFileName = buildDocumentFileName(template.title, formData, "pdf");
+    const encodedPdfFileName = encodeURIComponent(pdfFileName);
+
     // Kembalikan PDF Native
     return new NextResponse(new Uint8Array(pdfBuffer), {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="${safeTitle}_terisi.pdf"`,
+        "Content-Disposition": `attachment; filename="${pdfFileName.replace(/"/g, '')}"; filename*=UTF-8''${encodedPdfFileName}`,
       },
     });
   } catch (err: any) {

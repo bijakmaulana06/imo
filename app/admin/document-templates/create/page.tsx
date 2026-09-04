@@ -135,8 +135,23 @@ export default function CreateDocumentTemplatePage() {
         );
 
         setFields(newFields);
+        const hasDateTag = extractedTags.some((t) => {
+          const lt = t.toLowerCase();
+          return lt.includes("tanggal") || lt.includes("date") || lt.includes("tgl");
+        });
+        const hasLokasiTag = extractedTags.some((t) => {
+          const lt = t.toLowerCase();
+          return lt.includes("lokasi") || lt.includes("kota");
+        });
+
+        let noteText = "";
+        if (hasDateTag && !hasLokasiTag) {
+          noteText =
+            " • Catatan: Tag tanggal terdeteksi tanpa {lokasi}. Sistem autoform akan otomatis menambahkan input Lokasi dan memformatnya: {lokasi}, [tanggal] [bulan] [tahun].";
+        }
+
         setExtractedInfo(
-          `Otomatis mendeteksi ${extractedTags.length} tag dari file Word!`
+          `Otomatis mendeteksi ${extractedTags.length} tag dari file Word!${noteText}`
         );
 
         if (!title) {

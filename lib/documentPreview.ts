@@ -1,6 +1,7 @@
 import PizZip from "pizzip";
 import Docxtemplater from "docxtemplater";
 import { DocumentFieldConfig } from "@/types/document";
+import { prepareFormDataForDocx } from "@/lib/documentHelper";
 
 export interface PreviewStats {
   totalFields: number;
@@ -74,26 +75,7 @@ export function generateFilledDocxBuffer(
     nullGetter: () => "",
   });
 
-  const sanitizedData: Record<string, string> = {};
-
-  // Populate defined fields
-  fieldsConfig.forEach((field) => {
-    const tag = field.tag;
-    const val = formData[tag];
-    if (val !== undefined && val !== null && String(val).trim() !== "") {
-      sanitizedData[tag] = String(val);
-    } else {
-      sanitizedData[tag] = "";
-    }
-  });
-
-  // Populate any other keys in formData
-  Object.keys(formData).forEach((key) => {
-    if (!(key in sanitizedData)) {
-      const val = formData[key];
-      sanitizedData[key] = val !== undefined && val !== null ? String(val) : "";
-    }
-  });
+  const sanitizedData = prepareFormDataForDocx(formData, fieldsConfig);
 
   doc.render(sanitizedData);
 

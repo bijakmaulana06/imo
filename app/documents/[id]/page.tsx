@@ -18,16 +18,25 @@ import {
   Edit3,
   FileType,
   CheckCircle2,
+  Sparkles,
 } from "lucide-react";
 import { Link } from "next-view-transitions";
 import { useRouter } from "next/navigation";
 import { calculateFormProgress } from "@/lib/documentPreview";
 import DocumentRealtimePreview from "@/components/documents/DocumentRealtimePreview";
+import {
+  buildDocumentFileName,
+  formatIndonesianDate,
+  getEffectiveDocumentFields,
+} from "@/lib/documentHelper";
 
 function getFieldPlaceholder(field: DocumentFieldConfig): string {
   if (field.placeholder && field.placeholder.trim()) return field.placeholder;
   const labelLower = (field.label || "").toLowerCase();
   const tagLower = (field.tag || "").toLowerCase();
+  if (labelLower.includes("lokasi") || tagLower.includes("lokasi") || labelLower.includes("kota")) {
+    return "Contoh: Semarang, Jakarta, Surabaya";
+  }
   if (labelLower.includes("nama") || tagLower.includes("nama")) {
     return "Xaviera Putri";
   }
@@ -103,17 +112,18 @@ export default function FillDocumentFormPage({
 
       setTemplate(data);
 
-      // Inisialisasi nilai awal formData berdasarkan fields_config
+      // Hitung field efektif (otomatis menambahkan input Lokasi jika belum ada di template)
+      const effectiveFields = getEffectiveDocumentFields(data.fields_config || []);
+
+      // Inisialisasi nilai awal formData berdasarkan effectiveFields
       const initialForm: Record<string, any> = {};
-      if (Array.isArray(data.fields_config)) {
-        data.fields_config.forEach((f: DocumentFieldConfig) => {
-          if (f.type === "select" && f.options && f.options.length > 0) {
-            initialForm[f.tag] = f.defaultValue || f.options[0];
-          } else {
-            initialForm[f.tag] = f.defaultValue || "";
-          }
-        });
-      }
+      effectiveFields.forEach((f: DocumentFieldConfig) => {
+        if (f.type === "select" && f.options && f.options.length > 0) {
+          initialForm[f.tag] = f.defaultValue || f.options[0];
+        } else {
+          initialForm[f.tag] = f.defaultValue || "";
+        }
+      });
       setFormData(initialForm);
       lastSyncedDataRef.current = JSON.stringify(initialForm);
 
@@ -200,12 +210,31 @@ export default function FillDocumentFormPage({
     };
   }, []);
 
-  const progressStats = calculateFormProgress(formData, template?.fields_config || []);
+  // Daftar field efektif (termasuk tag lokasi pendamping jika ada tag tanggal)
+  const effectiveFields = React.useMemo(
+    () => getEffectiveDocumentFields(template?.fields_config || []),
+    [template?.fields_config]
+  );
+
+  const progressStats = calculateFormProgress(formData, effectiveFields);
   const { totalFields, filledCount, missingRequired } = progressStats;
   const isFormComplete = missingRequired.length === 0 && totalFields > 0;
 
   const handleInputChange = (tag: string, value: any) => {
-    setFormData((prev) => ({ ...prev, [tag]: value }));
+    setFormData((prev) => {
+      const updated = { ...prev, [tag]: value };
+      // Sinkronkan key lokasi
+      if (tag.startsWith("lokasi_")) {
+        updated["lokasi"] = value;
+      } else if (tag === "lokasi") {
+        effectiveFields.forEach((f) => {
+          if (f.tag.startsWith("lokasi_")) {
+            updated[f.tag] = value;
+          }
+        });
+      }
+      return updated;
+    });
   };
 
   // Immediate sync when user finishes with an input and leaves it
@@ -218,7 +247,7 @@ export default function FillDocumentFormPage({
   const handleFocusField = (labelOrTag: string) => {
     setMobileTab("form");
 
-    const targetField = template?.fields_config?.find(
+    const targetField = effectiveFields.find(
       (f) =>
         f.label?.toLowerCase() === labelOrTag.toLowerCase() ||
         f.tag?.toLowerCase() === labelOrTag.toLowerCase()
@@ -262,12 +291,21 @@ export default function FillDocumentFormPage({
 
       const blob = await res.blob();
       const contentDisposition = res.headers.get("Content-Disposition");
-      let fileName = `${template?.title || "dokumen"}_terisi.${format}`;
+      let fileName = buildDocumentFileName(template?.title || "dokumen", formData, format);
 
       if (contentDisposition) {
-        const match = contentDisposition.match(/filename="?([^"]+)"?/);
-        if (match && match[1]) {
-          fileName = match[1];
+        const matchUtf8 = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
+        if (matchUtf8 && matchUtf8[1]) {
+          try {
+            fileName = decodeURIComponent(matchUtf8[1]);
+          } catch {
+            fileName = matchUtf8[1];
+          }
+        } else {
+          const match = contentDisposition.match(/filename="?([^";]+)"?/i);
+          if (match && match[1]) {
+            fileName = match[1];
+          }
         }
       }
 
@@ -458,8 +496,8 @@ export default function FillDocumentFormPage({
               )}
 
               <form onSubmit={handleSubmit} className="space-y-5">
-                {Array.isArray(template?.fields_config) &&
-                  template.fields_config.map((field: DocumentFieldConfig) => {
+                {Array.isArray(effectiveFields) &&
+                  effectiveFields.map((field: DocumentFieldConfig) => {
                     const isFieldFilled =
                       formData[field.tag] !== undefined &&
                       formData[field.tag] !== null &&
@@ -482,7 +520,7 @@ export default function FillDocumentFormPage({
                             )}
                           </label>
                           <span className="text-[10px] font-mono text-slate-500">
-                            &#123;{field.tag}&#125;
+                            &#123;{field.tag.startsWith("lokasi_") ? "lokasi" : field.tag}&#125;
                           </span>
                         </div>
 
@@ -520,17 +558,33 @@ export default function FillDocumentFormPage({
 
                         {/* Input Type: Date Picker */}
                         {field.type === "date" && (
-                          <input
-                            ref={(el) => {
-                              inputRefs.current[field.tag] = el;
-                            }}
-                            type="date"
-                            value={formData[field.tag] || ""}
-                            onChange={(e) => handleInputChange(field.tag, e.target.value)}
-                            onBlur={handleInputBlur}
-                            required={field.required !== false}
-                            className="w-full px-3.5 py-2.5 rounded-xl bg-black/60 border border-slate-700/80 text-white text-sm focus:outline-none focus:border-accent-cyan focus:ring-1 focus:ring-accent-cyan transition cursor-pointer"
-                          />
+                          <>
+                            <input
+                              ref={(el) => {
+                                inputRefs.current[field.tag] = el;
+                              }}
+                              type="date"
+                              value={formData[field.tag] || ""}
+                              onChange={(e) => handleInputChange(field.tag, e.target.value)}
+                              onBlur={handleInputBlur}
+                              required={field.required !== false}
+                              className="w-full px-3.5 py-2.5 rounded-xl bg-black/60 border border-slate-700/80 text-white text-sm focus:outline-none focus:border-accent-cyan focus:ring-1 focus:ring-accent-cyan transition cursor-pointer"
+                            />
+                            {formData[field.tag] && (
+                              <div className="mt-2 px-3 py-1.5 rounded-xl bg-cyan-950/40 border border-cyan-500/30 text-[11px] font-mono text-cyan-300 flex items-center gap-1.5 shadow-sm">
+                                <Sparkles className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                                <span>
+                                  Format Surat:{" "}
+                                  <strong className="text-white font-semibold">
+                                    {formatIndonesianDate(
+                                      formData[field.tag],
+                                      formData[`lokasi_${field.tag}`] || formData["lokasi"]
+                                    )}
+                                  </strong>
+                                </span>
+                              </div>
+                            )}
+                          </>
                         )}
 
                         {/* Input Type: Select (Dropdown) */}
