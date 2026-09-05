@@ -58,6 +58,33 @@ type ActiveTab = "links" | "contacts" | "announcements" | "templates" | "tasks" 
 
 const DEFAULT_ADMIN_HTML_TEMPLATE = DEFAULT_ID_CARD_TEMPLATE;
 
+function sortTemplatesNatural<T extends { name: string }>(items: T[]): T[] {
+  const extractNum = (str: string) => {
+    const kMatch = str.match(/kelompok\s*(\d+)/i);
+    if (kMatch) return parseInt(kMatch[1], 10);
+
+    const allMatches = str.match(/\d+/g);
+    if (allMatches && allMatches.length > 0) {
+      if (allMatches.length > 1 && allMatches[0] === '2026') {
+        return parseInt(allMatches[1], 10);
+      }
+      return parseInt(allMatches[allMatches.length - 1], 10);
+    }
+    return Number.MAX_SAFE_INTEGER;
+  };
+
+  return [...items].sort((a, b) => {
+    const numA = extractNum(a.name);
+    const numB = extractNum(b.name);
+
+    if (numA !== numB) {
+      return numA - numB;
+    }
+
+    return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+  });
+}
+
 export default function AdminDashboardPage() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("links");
   const [loading, setLoading] = useState(true);
@@ -148,6 +175,7 @@ export default function AdminDashboardPage() {
   // PSD Template Manager State
   const [psdTemplates, setPsdTemplates] = useState<any[]>([]);
   const [uploadingPsd, setUploadingPsd] = useState(false);
+  const [uploadPsdStatus, setUploadPsdStatus] = useState<string>("");
   const [newPsd, setNewPsd] = useState({ name: "", description: "", is_default: true });
   const [selectedPsdFile, setSelectedPsdFile] = useState<File | null>(null);
   const [psdSuccessMsg, setPsdSuccessMsg] = useState<string | null>(null);
@@ -381,8 +409,9 @@ export default function AdminDashboardPage() {
       setAnnouncements(annoData || []);
 
       const { data: templateData } = await supabase.from("id_card_templates").select("*").order("created_at", { ascending: false });
-      setTemplates(templateData || []);
-      setPsdTemplates(templateData || []);
+      const sortedTemplates = sortTemplatesNatural(templateData || []);
+      setTemplates(sortedTemplates);
+      setPsdTemplates(sortedTemplates);
 
       const { data: taskData } = await supabase.from("task_definitions").select("*").order("name", { ascending: true });
       setTasks(taskData || []);
@@ -624,7 +653,7 @@ export default function AdminDashboardPage() {
       const res = await fetch("/api/id-card-templates");
       if (res.ok) {
         const data = await res.json();
-        setPsdTemplates(data.templates || []);
+        setPsdTemplates(sortTemplatesNatural(data.templates || []));
       }
     } catch (e) {
       console.warn("Gagal memuat templat PSD:", e);
@@ -1064,45 +1093,89 @@ export default function AdminDashboardPage() {
       return;
     }
 
+    if (!selectedPsdFile.name.toLowerCase().endsWith(".psd")) {
+      setPsdErrorMsg("File harus berformat .PSD (Photoshop Document).");
+      return;
+    }
+
     setUploadingPsd(true);
+    setUploadPsdStatus("Mempersiapkan izin upload...");
     setPsdErrorMsg(null);
     setPsdSuccessMsg(null);
 
     try {
-      const formData = new FormData();
-      formData.append("file", selectedPsdFile);
-      formData.append("name", newPsd.name || selectedPsdFile.name);
-      formData.append("description", newPsd.description);
-      formData.append("is_default", String(newPsd.is_default));
-      formData.append("is_active", "true");
-
-      const res = await fetch("/api/id-card-templates", {
+      // 1. Dapatkan Signed Upload URL dari server
+      const urlRes = await fetch("/api/id-card-templates/upload-url", {
         method: "POST",
-        body: formData,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          filename: selectedPsdFile.name,
+          contentType: selectedPsdFile.type || "image/vnd.adobe.photoshop",
+        }),
       });
 
-      const responseText = await res.text();
+      const urlData = await urlRes.json();
+      if (!urlRes.ok || !urlData.token || !urlData.path) {
+        throw new Error(urlData.error || "Gagal mendapatkan izin unggah ke storage.");
+      }
+
+      // 2. Upload file PSD langsung dari browser ke Supabase Storage (Bypass batas 4.5MB Vercel!)
+      const fileSizeMb = (selectedPsdFile.size / (1024 * 1024)).toFixed(1);
+      setUploadPsdStatus(`Mengunggah file (${fileSizeMb} MB) ke Storage CDN...`);
+
+      const { error: uploadError } = await supabase.storage
+        .from("idcard_templates")
+        .uploadToSignedUrl(urlData.path, urlData.token, selectedPsdFile, {
+          contentType: selectedPsdFile.type || "image/vnd.adobe.photoshop",
+        });
+
+      if (uploadError) {
+        throw new Error(`Gagal mengunggah file ke Storage: ${uploadError.message}`);
+      }
+
+      // 3. Simpan metadata templat ke database
+      setUploadPsdStatus("Menyimpan konfigurasi templat...");
+      const saveRes = await fetch("/api/id-card-templates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newPsd.name || selectedPsdFile.name,
+          description: newPsd.description,
+          is_default: Boolean(newPsd.is_default),
+          is_active: true,
+          background_url: urlData.publicUrl,
+          layout_json: {
+            psd_url: urlData.publicUrl,
+            file_name: selectedPsdFile.name,
+            storage_path: urlData.path,
+            storage_type: "supabase",
+            file_size: selectedPsdFile.size,
+            uploaded_at: new Date().toISOString(),
+          },
+        }),
+      });
+
+      const responseText = await saveRes.text();
       let data: any = {};
       try {
         data = JSON.parse(responseText);
       } catch (jsonErr) {
-        if (res.status === 413 || responseText.includes("Request Entity Too Large")) {
-          throw new Error("Ukuran file templat PSD terlalu besar (Maksimal 4.5MB). Silakan gunakan file PSD yang lebih kecil.");
-        }
-        throw new Error(`Respon server tidak valid (${res.status}): ${responseText.slice(0, 100)}`);
+        throw new Error(`Respon server tidak valid (${saveRes.status}): ${responseText.slice(0, 100)}`);
       }
 
-      if (!res.ok) throw new Error(data.error || "Gagal mengunggah templat PSD.");
+      if (!saveRes.ok) throw new Error(data.error || "Gagal menyimpan metadata templat PSD.");
 
-      setPsdSuccessMsg(`Templat "${data.template?.name || 'PSD'}" berhasil disimpan!`);
+      setPsdSuccessMsg(`Templat "${data.template?.name || selectedPsdFile.name}" berhasil disimpan tanpa batasan ukuran!`);
       setNewPsd({ name: "", description: "", is_default: false });
       setSelectedPsdFile(null);
       await loadPsdTemplates();
       setTimeout(() => setPsdSuccessMsg(null), 4000);
     } catch (err: any) {
+      console.error("Upload PSD template error:", err);
       setPsdErrorMsg(err.message || "Gagal mengunggah templat PSD.");
     } finally {
       setUploadingPsd(false);
+      setUploadPsdStatus("");
     }
   };
 
@@ -1838,7 +1911,7 @@ export default function AdminDashboardPage() {
                         {uploadingPsd ? (
                           <>
                             <RefreshCw className="h-4 w-4 mr-1.5 animate-spin" />
-                            <span>Mengunggah ke Storage...</span>
+                            <span>{uploadPsdStatus || "Mengunggah ke Storage..."}</span>
                           </>
                         ) : (
                           <>

@@ -32,6 +32,35 @@ const FALLBACK_TEMPLATE: TemplateItem = {
   is_default: true,
 };
 
+function sortTemplatesNatural<T extends { name: string }>(items: T[]): T[] {
+  const extractNum = (str: string) => {
+    // 1. Prioritaskan angka setelah kata 'kelompok' (misal 'Kelompok 1', 'Kelompok 2')
+    const kMatch = str.match(/kelompok\s*(\d+)/i);
+    if (kMatch) return parseInt(kMatch[1], 10);
+
+    // 2. Atau cek angka apa saja di dalam nama
+    const allMatches = str.match(/\d+/g);
+    if (allMatches && allMatches.length > 0) {
+      if (allMatches.length > 1 && allMatches[0] === '2026') {
+        return parseInt(allMatches[1], 10);
+      }
+      return parseInt(allMatches[allMatches.length - 1], 10);
+    }
+    return Number.MAX_SAFE_INTEGER;
+  };
+
+  return [...items].sort((a, b) => {
+    const numA = extractNum(a.name);
+    const numB = extractNum(b.name);
+
+    if (numA !== numB) {
+      return numA - numB;
+    }
+
+    return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+  });
+}
+
 export default function IdCardPage() {
   const [templates, setTemplates] = useState<TemplateItem[]>([]);
   const [selectedTemplateUrl, setSelectedTemplateUrl] = useState<string>("");
@@ -48,10 +77,11 @@ export default function IdCardPage() {
         
         const list: TemplateItem[] = data.templates || [];
         const activeList = list.filter((t) => t.is_active !== false);
-        setTemplates(activeList);
+        const sortedList = sortTemplatesNatural(activeList);
+        setTemplates(sortedList);
 
-        if (activeList.length > 0) {
-          const defaultItem = activeList.find((t) => t.is_default) || activeList[0];
+        if (sortedList.length > 0) {
+          const defaultItem = sortedList.find((t) => t.is_default) || sortedList[0];
           const psdUrl = defaultItem.background_url || defaultItem.layout_json?.psd_url || "/templates/id-card.psd";
           setSelectedTemplateUrl(psdUrl);
           setSelectedTemplateId(defaultItem.id);

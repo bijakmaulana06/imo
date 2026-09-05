@@ -194,49 +194,60 @@ function drawTextField(
 ) {
   const { left, top, right, bottom } = field.bounds;
   const bWidth  = right - left;
-  const bHeight = bottom - top;
 
   const showPlaceholder = options.showPlaceholder !== false;
 
-  const rendered = field.rawTemplate.replace(/\{(\w+)\}/g, (_m, tag) => {
+  let text = field.rawTemplate.replace(/\{(\w+)\}/g, (_match, tag) => {
     const val = options.values[tag.toLowerCase()];
     if (val !== undefined && val !== '') return val;
     return showPlaceholder ? `{${tag}}` : '';
   });
 
-  if (!rendered.trim()) return;
+  if (!text.trim()) return;
 
-  let fontSize = field.style.fontSize ?? 24;
-  if (bHeight > 0) fontSize = Math.min(fontSize, bHeight * 0.75);
-  fontSize = Math.max(fontSize, 10);
+  // Font resolution order:
+  // 1. fontOverrides[tag] (per-tag override)
+  // 2. globalFont (global override)
+  // 3. field.style.fontName (font asli PSD)
+  // 4. 'sans-serif' fallback
+  const resolvedFont =
+    options.fontOverrides?.[field.tag] ||
+    options.globalFont ||
+    field.style.fontName ||
+    'sans-serif';
 
-  const textAlign = justificationToAlign(field.style.justification);
-  const textColor = colorToCss(field.style.color);
+  const isBold =
+    options.boldOverrides?.[field.tag] ??
+    options.boldOverrides?.['global'] ??
+    false;
 
-  const resolvedFont = options.fontOverrides?.[field.tag]
-    || options.globalFont
-    || field.style.fontName
-    || 'sans-serif';
+  const isItalic =
+    options.italicOverrides?.[field.tag] ??
+    options.italicOverrides?.['global'] ??
+    false;
 
-  const isBold   = options.boldOverrides?.[field.tag]   ?? options.boldOverrides?.['global']   ?? false;
-  const isItalic = options.italicOverrides?.[field.tag] ?? options.italicOverrides?.['global'] ?? false;
-
-  const fontStyle = `${isItalic ? 'italic ' : ''}${isBold ? 'bold ' : ''}${fontSize}px "${resolvedFont}", sans-serif`;
-
-  const cx = left + bWidth / 2;
-  const drawX = textAlign === 'right' ? right : textAlign === 'center' ? cx : left;
-  const drawY = top + bHeight / 2;
-
-  const lines      = rendered.split('\n');
-  const lineHeight = fontSize * 1.25;
-  const totalH     = (lines.length - 1) * lineHeight;
-  const startY     = drawY - totalH / 2;
+  const fontStyle = [
+    isItalic ? 'italic' : '',
+    isBold ? 'bold' : '',
+    `${field.style.fontSize}px`,
+    `"${resolvedFont}", sans-serif`,
+  ].filter(Boolean).join(' ');
 
   ctx.save();
-  ctx.globalAlpha = 1;
-  ctx.globalCompositeOperation = 'source-over';
   ctx.font = fontStyle;
-  ctx.fillStyle = textColor;
+  ctx.fillStyle = colorToCss(field.style.color);
+
+  const textAlign = justificationToAlign(field.style.justification);
+  let drawX: number;
+  if (textAlign === 'right')       drawX = right;
+  else if (textAlign === 'center') drawX = left + bWidth / 2;
+  else                             drawX = left;
+
+  const lines = text.split('\n');
+  const lineHeight = field.style.fontSize * 1.25;
+  const totalTextHeight = lines.length * lineHeight;
+  const startY = (top + bottom) / 2 - totalTextHeight / 2 + lineHeight / 2;
+
   ctx.textAlign = textAlign;
   ctx.textBaseline = 'middle';
   lines.forEach((line, i) => ctx.fillText(line, drawX, startY + i * lineHeight));
@@ -304,6 +315,3 @@ export function renderIdCard(
     }
   }
 }
-
-
-

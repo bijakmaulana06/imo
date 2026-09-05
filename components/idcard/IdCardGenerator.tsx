@@ -7,6 +7,7 @@ import FontPicker from '@/components/idcard/FontPicker';
 import PhotoCropperModal from '@/components/idcard/PhotoCropperModal';
 import Card from '@/components/Card';
 import Button from '@/components/Button';
+import { jsPDF } from 'jspdf';
 
 import { renderIdCard } from '@/lib/idcard/renderIdCard';
 import {
@@ -76,6 +77,8 @@ export default function IdCardGenerator({ templateUrl, allowUserUpload = false }
   const [boldOverrides, setBoldOverrides] = useState<Record<string, boolean>>({ global: true });
   const [italicOverrides, setItalicOverrides] = useState<Record<string, boolean>>({});
   const [openFontTag, setOpenFontTag] = useState<string | null>(null);
+  const [downloadingPdf, setDownloadingPdf] = useState<boolean>(false);
+  const [pdfOrientation, setPdfOrientation] = useState<'auto' | 'portrait' | 'landscape'>('auto');
 
   // Load default Griffy font on mount
   useEffect(() => {
@@ -201,7 +204,63 @@ export default function IdCardGenerator({ templateUrl, allowUserUpload = false }
     });
   }, [parsed, values, photoImg, fontStatuses, globalFont, fontOverrides, boldOverrides, italicOverrides]);
 
-  const handleDownload = () => {
+  const handleDownloadPdfA4 = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    setDownloadingPdf(true);
+    try {
+      let orientation: 'portrait' | 'landscape';
+      if (pdfOrientation === 'portrait') {
+        orientation = 'portrait';
+      } else if (pdfOrientation === 'landscape') {
+        orientation = 'landscape';
+      } else {
+        orientation = canvas.width >= canvas.height ? 'landscape' : 'portrait';
+      }
+
+      const doc = new jsPDF({
+        orientation,
+        unit: 'mm',
+        format: 'a4',
+        compress: true,
+      });
+
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+
+      const imgRatio = canvas.width / canvas.height;
+      const pageRatio = pageWidth / pageHeight;
+
+      let destWidth = pageWidth;
+      let destHeight = pageHeight;
+      let destX = 0;
+      let destY = 0;
+
+      if (imgRatio > pageRatio) {
+        destWidth = pageWidth;
+        destHeight = pageWidth / imgRatio;
+        destY = (pageHeight - destHeight) / 2;
+      } else {
+        destHeight = pageHeight;
+        destWidth = pageHeight * imgRatio;
+        destX = (pageWidth - destWidth) / 2;
+      }
+
+      const imgData = canvas.toDataURL('image/png', 1.0);
+      doc.addImage(imgData, 'PNG', destX, destY, destWidth, destHeight, undefined, 'FAST');
+
+      const name = values['nama']?.trim().replace(/\s+/g, '_') || 'id_card';
+      doc.save(`IDCard_A4_${name}.pdf`);
+    } catch (err: any) {
+      console.error('Gagal membuat PDF A4:', err);
+      alert('Gagal membuat PDF A4: ' + (err.message || err));
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
+
+  const handleDownloadPng = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     canvas.toBlob((blob) => {
@@ -567,16 +626,80 @@ export default function IdCardGenerator({ templateUrl, allowUserUpload = false }
                 ))}
               </div>
 
-              {/* Tombol Unduh ID Card */}
-              <Button
-                variant="primary"
-                size="lg"
-                onClick={handleDownload}
-                className="w-full mt-3 shadow-[0_0_30px_rgba(125,249,255,0.4)]"
-              >
-                <Download className="w-5 h-5 mr-2" />
-                <span>Unduh ID Card (PNG High-Res)</span>
-              </Button>
+              {/* Box Unduh ID Card A4 */}
+              <div className="flex flex-col gap-2.5 pt-2">
+                <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-slate-950/80 border border-slate-800 text-xs">
+                  <span className="text-slate-400 font-mono flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Ukuran:</span>
+                    <strong className="text-cyan-300 font-bold">A4 (210 × 297 mm)</strong>
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setPdfOrientation('portrait')}
+                      className={`px-2 py-0.5 rounded text-[10px] font-mono transition-all cursor-pointer ${
+                        pdfOrientation === 'portrait'
+                          ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-bold'
+                          : 'text-slate-500 hover:text-slate-300'
+                      }`}
+                    >
+                      Portrait
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPdfOrientation('landscape')}
+                      className={`px-2 py-0.5 rounded text-[10px] font-mono transition-all cursor-pointer ${
+                        pdfOrientation === 'landscape'
+                          ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-bold'
+                          : 'text-slate-500 hover:text-slate-300'
+                      }`}
+                    >
+                      Landscape
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPdfOrientation('auto')}
+                      className={`px-2 py-0.5 rounded text-[10px] font-mono transition-all cursor-pointer ${
+                        pdfOrientation === 'auto'
+                          ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-bold'
+                          : 'text-slate-500 hover:text-slate-300'
+                      }`}
+                    >
+                      Auto
+                    </button>
+                  </div>
+                </div>
+
+                <Button
+                  variant="primary"
+                  size="lg"
+                  onClick={handleDownloadPdfA4}
+                  disabled={downloadingPdf}
+                  className="w-full shadow-[0_0_30px_rgba(125,249,255,0.4)] flex items-center justify-center gap-2"
+                >
+                  {downloadingPdf ? (
+                    <>
+                      <RefreshCw className="w-5 h-5 animate-spin" />
+                      <span>Membuat PDF A4 Hi-Res...</span>
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="w-5 h-5 text-slate-950" />
+                      <span className="font-bold">Unduh ID Card (PDF A4 Hi-Res)</span>
+                    </>
+                  )}
+                </Button>
+
+                <button
+                  type="button"
+                  onClick={handleDownloadPng}
+                  className="w-full py-2 px-3 rounded-xl bg-slate-900/60 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-slate-200 text-xs font-mono flex items-center justify-center gap-2 transition-all cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Unduh Format Gambar (PNG)</span>
+                </button>
+              </div>
             </Card>
           </div>
         </div>

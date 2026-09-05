@@ -1,12 +1,5 @@
 /**
- * renderIdCard.ts
- * ---------------------------------------------------------------------------
- * 3-PASS RENDER ARCHITECTURE:
- * Pass 1 – Gambar slot {foto} (foto user / placeholder) PERTAMA KALI pada canvas.
- * Pass 2 – Gambar semua layer raster PSD (bingkai, portal kristal, overlay dengan lubang transparan)
- *           DI ATAS foto. Ini memastikan elemen bingkai PSD menutupi pinggiran foto
- *           dan foto tampil di BELAKANG desain melalui lubang transparan.
- * Pass 3 – Gambar semua teks replacement ({nama}, {nim}, dll.) DI ATAS segalanya.
+ * renderIdCard.ts (idcard-generator copy)
  */
 
 import type { Layer, Color } from 'ag-psd';
@@ -15,11 +8,13 @@ import type { ParsedTemplate, TemplateField } from './psdTemplate';
 export interface RenderOptions {
   values: Record<string, string>;
   photo?: HTMLImageElement | null;
-  /** rasio tinggi:lebar bingkai foto. Default 4/3 = mengikuti proporsi umum foto 3x4. */
   photoAspectRatio?: number;
-  /** tebal & warna garis bingkai foto, set null untuk tanpa bingkai */
   photoBorder?: { width: number; color: string } | null;
   showPlaceholder?: boolean;
+  globalFont?: string;
+  fontOverrides?: Record<string, string>;
+  boldOverrides?: Record<string, boolean>;
+  italicOverrides?: Record<string, boolean>;
 }
 
 const BLEND_MODE_MAP: Record<string, GlobalCompositeOperation> = {
@@ -40,7 +35,6 @@ const BLEND_MODE_MAP: Record<string, GlobalCompositeOperation> = {
   'soft light': 'soft-light',
 };
 
-/** Best-effort konversi tipe Color milik ag-psd (RGBA/RGB/FRGB/CMYK/grayscale) ke string CSS. */
 function colorToCss(color: Color | undefined): string {
   if (!color) return '#000000';
   if ('fr' in color) {
@@ -68,30 +62,6 @@ function justificationToAlign(j: string | undefined): CanvasTextAlign {
   if (j.includes('right')) return 'right';
   if (j.includes('center')) return 'center';
   return 'left';
-}
-
-function drawTemplateText(ctx: CanvasRenderingContext2D, field: TemplateField, value: string) {
-  const { left, top, right, bottom } = field.bounds;
-  const width = right - left;
-
-  ctx.save();
-  ctx.font = `${field.style.fontSize}px "${field.style.fontName}", sans-serif`;
-  ctx.fillStyle = colorToCss(field.style.color);
-  ctx.textAlign = justificationToAlign(field.style.justification);
-  ctx.textBaseline = 'middle';
-
-  const x = ctx.textAlign === 'right' ? right : ctx.textAlign === 'center' ? left + width / 2 : left;
-  const y = (top + bottom) / 2;
-
-  const rendered = field.rawTemplate.replace(/\{(\w+)\}/g, (_m, t) =>
-    t.toLowerCase() === field.tag ? value : `{${t}}`,
-  );
-  const lines = rendered.split('\n');
-  const lineHeight = field.style.fontSize * 1.2;
-  const startY = y - ((lines.length - 1) * lineHeight) / 2;
-  lines.forEach((line, i) => ctx.fillText(line, x, startY + i * lineHeight));
-
-  ctx.restore();
 }
 
 function drawImageCover(
@@ -162,25 +132,27 @@ function drawPhotoPlaceholder(
   const frameWidth = right - left;
   const rawHeight = bottom - top;
   const frameHeight = rawHeight > frameWidth * 0.5 ? rawHeight : frameWidth * aspectRatio;
-  const frameTop = (top + bottom) / 2 - frameHeight / 2;
+  const centerY = (top + bottom) / 2;
+  const frameTop = centerY - frameHeight / 2;
+  const frameLeft = left;
 
   ctx.save();
   ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
   ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
   ctx.setLineDash([4, 4]);
   ctx.lineWidth = 1.5;
-  ctx.fillRect(left, frameTop, frameWidth, frameHeight);
-  ctx.strokeRect(left, frameTop, frameWidth, frameHeight);
+  ctx.fillRect(frameLeft, frameTop, frameWidth, frameHeight);
+  ctx.strokeRect(frameLeft, frameTop, frameWidth, frameHeight);
 
   ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
   ctx.font = '14px sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('{foto}', left + frameWidth / 2, (top + bottom) / 2);
+  ctx.fillText('{foto}', frameLeft + frameWidth / 2, centerY);
   ctx.restore();
 }
 
-function drawLayer(
+function drawRasterLayer(
   ctx: CanvasRenderingContext2D,
   layer: Layer,
   taggedTextLayers: Set<Layer>,
@@ -190,24 +162,88 @@ function drawLayer(
 
   if (layer.children) {
     for (let i = layer.children.length - 1; i >= 0; i--) {
-      drawLayer(ctx, layer.children[i], taggedTextLayers, photoLayers);
+      drawRasterLayer(ctx, layer.children[i], taggedTextLayers, photoLayers);
     }
     return;
   }
 
   if (taggedTextLayers.has(layer) || photoLayers.has(layer)) return;
+  if (!layer.canvas) return;
 
-  if (layer.canvas) {
-    ctx.save();
-    const rawOpacity = layer.opacity ?? 1;
-    ctx.globalAlpha = rawOpacity > 1 ? rawOpacity / 255 : rawOpacity;
-    ctx.globalCompositeOperation = BLEND_MODE_MAP[layer.blendMode ?? 'normal'] ?? 'source-over';
-    ctx.drawImage(layer.canvas, layer.left ?? 0, layer.top ?? 0);
-    ctx.restore();
-  }
+  ctx.save();
+  const rawOpacity = layer.opacity ?? 1;
+  ctx.globalAlpha = rawOpacity > 1 ? rawOpacity / 255 : rawOpacity;
+  ctx.globalCompositeOperation = BLEND_MODE_MAP[layer.blendMode ?? 'normal'] ?? 'source-over';
+  ctx.drawImage(layer.canvas, layer.left ?? 0, layer.top ?? 0);
+  ctx.restore();
 }
 
-export function renderIdCard(canvas: HTMLCanvasElement, parsed: ParsedTemplate, options: RenderOptions) {
+function drawTextField(
+  ctx: CanvasRenderingContext2D,
+  field: TemplateField,
+  options: RenderOptions,
+) {
+  const { left, top, right, bottom } = field.bounds;
+  const bWidth = right - left;
+  const showPlaceholder = options.showPlaceholder !== false;
+
+  let text = field.rawTemplate.replace(/\{(\w+)\}/g, (_match, tag) => {
+    const val = options.values[tag.toLowerCase()];
+    if (val !== undefined && val !== '') return val;
+    return showPlaceholder ? `{${tag}}` : '';
+  });
+
+  if (!text.trim()) return;
+
+  const resolvedFont =
+    options.fontOverrides?.[field.tag] ||
+    options.globalFont ||
+    field.style.fontName ||
+    'sans-serif';
+
+  const isBold =
+    options.boldOverrides?.[field.tag] ??
+    options.boldOverrides?.['global'] ??
+    false;
+
+  const isItalic =
+    options.italicOverrides?.[field.tag] ??
+    options.italicOverrides?.['global'] ??
+    false;
+
+  const fontStyle = [
+    isItalic ? 'italic' : '',
+    isBold ? 'bold' : '',
+    `${field.style.fontSize}px`,
+    `"${resolvedFont}", sans-serif`,
+  ].filter(Boolean).join(' ');
+
+  ctx.save();
+  ctx.font = fontStyle;
+  ctx.fillStyle = colorToCss(field.style.color);
+
+  const textAlign = justificationToAlign(field.style.justification);
+  let drawX: number;
+  if (textAlign === 'right') drawX = right;
+  else if (textAlign === 'center') drawX = left + bWidth / 2;
+  else drawX = left;
+
+  const lines = text.split('\n');
+  const lineHeight = field.style.fontSize * 1.25;
+  const totalTextHeight = lines.length * lineHeight;
+  const startY = (top + bottom) / 2 - totalTextHeight / 2 + lineHeight / 2;
+
+  ctx.textAlign = textAlign;
+  ctx.textBaseline = 'middle';
+  lines.forEach((line, i) => ctx.fillText(line, drawX, startY + i * lineHeight));
+  ctx.restore();
+}
+
+export function renderIdCard(
+  canvas: HTMLCanvasElement,
+  parsed: ParsedTemplate,
+  options: RenderOptions,
+) {
   canvas.width = parsed.width;
   canvas.height = parsed.height;
   const ctx = canvas.getContext('2d');
@@ -215,15 +251,14 @@ export function renderIdCard(canvas: HTMLCanvasElement, parsed: ParsedTemplate, 
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  const photoField = parsed.fields.find(f => f.type === 'photo') ?? null;
+  const photoField = parsed.fields.find((f) => f.type === 'photo') ?? null;
   const taggedTextLayers = new Set<Layer>(
-    parsed.fields.filter(f => f.type === 'text').map(f => f.layer)
+    parsed.fields.filter((f) => f.type === 'text').map((f) => f.layer),
   );
   const photoLayers = new Set<Layer>(
-    parsed.fields.filter(f => f.type === 'photo').map(f => f.layer)
+    parsed.fields.filter((f) => f.type === 'photo').map((f) => f.layer),
   );
 
-  // ── PASS 1: Draw photo field BEHIND design raster layers ───────────────────
   if (photoField) {
     if (options.photo) {
       ctx.save();
@@ -248,18 +283,14 @@ export function renderIdCard(canvas: HTMLCanvasElement, parsed: ParsedTemplate, 
     }
   }
 
-  // ── PASS 2: Draw all raster design layers ──────────────────────────────────
   const children = parsed.psd.children ?? [];
   for (let i = children.length - 1; i >= 0; i--) {
-    drawLayer(ctx, children[i], taggedTextLayers, photoLayers);
+    drawRasterLayer(ctx, children[i], taggedTextLayers, photoLayers);
   }
 
-  // ── PASS 3: Draw text replacements ─────────────────────────────────────────
   for (const field of parsed.fields) {
     if (field.type === 'text') {
-      drawTemplateText(ctx, field, options.values[field.tag] ?? '');
+      drawTextField(ctx, field, options);
     }
   }
 }
-
-

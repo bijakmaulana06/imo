@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { parseTemplate, type ParsedTemplate } from '@/lib/psdTemplate';
 import { checkFonts, loadCustomFont, type FontStatus } from '@/lib/fontManager';
 import { renderIdCard } from '@/lib/renderIdCard';
+import { jsPDF } from 'jspdf';
 
 interface IdCardGeneratorProps {
   /** URL template .psd yang sudah disiapkan admin (public/ folder atau Supabase Storage).
@@ -80,6 +81,51 @@ export default function IdCardGenerator({ templateUrl }: IdCardGeneratorProps) {
     if (!parsed || !canvasRef.current) return;
     renderIdCard(canvasRef.current, parsed, { values, photo: photoImg });
   }, [parsed, values, photoImg, fontStatuses]);
+
+  const handleDownloadPdfA4 = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    try {
+      const orientation = canvas.width >= canvas.height ? 'landscape' : 'portrait';
+      const doc = new jsPDF({
+        orientation,
+        unit: 'mm',
+        format: 'a4',
+        compress: true,
+      });
+
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+
+      const imgRatio = canvas.width / canvas.height;
+      const pageRatio = pageWidth / pageHeight;
+
+      let destWidth = pageWidth;
+      let destHeight = pageHeight;
+      let destX = 0;
+      let destY = 0;
+
+      if (imgRatio > pageRatio) {
+        destWidth = pageWidth;
+        destHeight = pageWidth / imgRatio;
+        destY = (pageHeight - destHeight) / 2;
+      } else {
+        destHeight = pageHeight;
+        destWidth = pageHeight * imgRatio;
+        destX = (pageWidth - destWidth) / 2;
+      }
+
+      const imgData = canvas.toDataURL('image/png', 1.0);
+      doc.addImage(imgData, 'PNG', destX, destY, destWidth, destHeight, undefined, 'FAST');
+
+      const name = values['nama']?.trim().replace(/\s+/g, '_') || 'id-card';
+      doc.save(`IDCard_A4_${name}.pdf`);
+    } catch (err: any) {
+      console.error('Gagal membuat PDF A4:', err);
+      handleDownload();
+    }
+  };
 
   const handleDownload = () => {
     const canvas = canvasRef.current;
@@ -185,13 +231,22 @@ export default function IdCardGenerator({ templateUrl }: IdCardGeneratorProps) {
             </div>
           )}
 
-          <button
-            type="button"
-            onClick={handleDownload}
-            className="mt-2 rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800"
-          >
-            Unduh ID Card
-          </button>
+          <div className="mt-2 flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={handleDownloadPdfA4}
+              className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800"
+            >
+              Unduh ID Card (PDF A4)
+            </button>
+            <button
+              type="button"
+              onClick={handleDownload}
+              className="text-xs text-neutral-500 hover:text-neutral-700 underline"
+            >
+              Unduh Format Gambar (PNG)
+            </button>
+          </div>
         </div>
       )}
     </div>
