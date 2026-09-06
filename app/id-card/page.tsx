@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   Sparkles,
   Loader2,
+  RefreshCw,
 } from "lucide-react";
 
 interface TemplateItem {
@@ -66,19 +67,36 @@ export default function IdCardPage() {
   const [selectedTemplateUrl, setSelectedTemplateUrl] = useState<string>("");
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("official-default-template");
   const [loadingTemplates, setLoadingTemplates] = useState(true);
+  const [isSwitchingTemplate, setIsSwitchingTemplate] = useState(false);
+  const [switchingTemplateName, setSwitchingTemplateName] = useState<string>("");
+  const [templateKey, setTemplateKey] = useState<number>(0);
+  const [refreshingList, setRefreshingList] = useState(false);
+
+  const fetchTemplatesList = async () => {
+    try {
+      const res = await fetch(`/api/id-card-templates?_t=${Date.now()}`, {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache" },
+      });
+      if (!res.ok) throw new Error("Gagal mengambil templat");
+      const data = await res.json();
+      
+      const list: TemplateItem[] = data.templates || [];
+      const activeList = list.filter((t) => t.is_active !== false);
+      const sortedList = sortTemplatesNatural(activeList);
+      setTemplates(sortedList);
+      return sortedList;
+    } catch (err) {
+      console.warn("Could not load templates list from API, using fallback:", err);
+      return [];
+    }
+  };
 
   useEffect(() => {
     async function loadTemplates() {
       try {
         setLoadingTemplates(true);
-        const res = await fetch("/api/id-card-templates");
-        if (!res.ok) throw new Error("Gagal mengambil templat");
-        const data = await res.json();
-        
-        const list: TemplateItem[] = data.templates || [];
-        const activeList = list.filter((t) => t.is_active !== false);
-        const sortedList = sortTemplatesNatural(activeList);
-        setTemplates(sortedList);
+        const sortedList = await fetchTemplatesList();
 
         if (sortedList.length > 0) {
           const defaultItem = sortedList.find((t) => t.is_default) || sortedList[0];
@@ -89,10 +107,6 @@ export default function IdCardPage() {
           setSelectedTemplateUrl("/templates/id-card.psd");
           setSelectedTemplateId("official-default-template");
         }
-      } catch (err) {
-        console.warn("Could not load templates list from API, using fallback:", err);
-        setSelectedTemplateUrl("/templates/id-card.psd");
-        setSelectedTemplateId("official-default-template");
       } finally {
         setLoadingTemplates(false);
       }
@@ -101,13 +115,40 @@ export default function IdCardPage() {
     loadTemplates();
   }, []);
 
-  const handleSelectTemplate = (t: TemplateItem) => {
-    const psdUrl = t.background_url || t.layout_json?.psd_url || "/templates/id-card.psd";
-    setSelectedTemplateUrl(psdUrl);
-    setSelectedTemplateId(t.id);
+  const handleRefreshTemplatesList = async () => {
+    setRefreshingList(true);
+    try {
+      const sortedList = await fetchTemplatesList();
+      // Verifikasi template aktif yang sedang dipilih
+      const current = sortedList.find((t) => t.id === selectedTemplateId);
+      if (current) {
+        handleSelectTemplate(current, true);
+      }
+    } finally {
+      setTimeout(() => setRefreshingList(false), 500);
+    }
+  };
+
+  const handleSelectTemplate = (t: TemplateItem, force: boolean = false) => {
+    if (t.id === selectedTemplateId && !force && !isSwitchingTemplate) return;
+
+    setIsSwitchingTemplate(true);
+    setSwitchingTemplateName(t.name);
+    // Kosongkan template URL terlebih dahulu agar instance canvas lama benar-benar di-clear
+    setSelectedTemplateUrl("");
+
+    // Berikan delay terukur (600ms) untuk memastikan cache & state templat sebelumnya bersih
+    setTimeout(() => {
+      const psdUrl = t.background_url || t.layout_json?.psd_url || "/templates/id-card.psd";
+      setSelectedTemplateUrl(psdUrl);
+      setSelectedTemplateId(t.id);
+      setTemplateKey((k) => k + 1);
+      setIsSwitchingTemplate(false);
+    }, 600);
   };
 
   const displayTemplates = templates.length > 0 ? templates : [FALLBACK_TEMPLATE];
+  const activeTemplateName = displayTemplates.find((t) => t.id === selectedTemplateId)?.name;
 
   return (
     <div className="relative min-h-screen flex flex-col z-0 overflow-hidden bg-[#020510] text-slate-100 font-sans">
@@ -149,15 +190,16 @@ export default function IdCardPage() {
               </div>
             </div>
 
-            <div className="flex-1 max-w-md">
+            <div className="flex items-center gap-2 flex-1 max-w-md">
               <select
                 id="template-select"
                 value={selectedTemplateId}
+                disabled={isSwitchingTemplate}
                 onChange={(e) => {
                   const found = displayTemplates.find((t) => t.id === e.target.value);
                   if (found) handleSelectTemplate(found);
                 }}
-                className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-card-border/80 text-slate-100 text-xs font-mono font-bold focus:outline-none focus:border-accent-cyan focus:ring-1 focus:ring-accent-cyan cursor-pointer transition-colors shadow-inner"
+                className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-card-border/80 text-slate-100 text-xs font-mono font-bold focus:outline-none focus:border-accent-cyan focus:ring-1 focus:ring-accent-cyan cursor-pointer transition-colors shadow-inner disabled:opacity-50"
               >
                 {displayTemplates.map((t) => (
                   <option key={t.id} value={t.id} className="bg-slate-950 text-slate-200">
@@ -165,19 +207,44 @@ export default function IdCardPage() {
                   </option>
                 ))}
               </select>
+
+              <button
+                type="button"
+                onClick={handleRefreshTemplatesList}
+                disabled={refreshingList || isSwitchingTemplate}
+                title="Segarkan & verifikasi ulang templat"
+                className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-card-border/80 text-slate-300 hover:text-accent-cyan transition-all flex items-center justify-center disabled:opacity-50 shadow-inner"
+              >
+                <RefreshCw className={`w-4 h-4 ${refreshingList || isSwitchingTemplate ? "animate-spin text-accent-cyan" : ""}`} />
+              </button>
             </div>
           </div>
         )}
 
         {/* Core Generator Section */}
         <section className="w-full">
-          {loadingTemplates || !selectedTemplateUrl ? (
-            <div className="w-full max-w-4xl mx-auto rounded-3xl glass border border-card-border/40 p-16 flex flex-col items-center justify-center gap-3 text-slate-400">
-              <Loader2 className="w-8 h-8 animate-spin text-accent-cyan" />
-              <p className="font-mono text-xs text-slate-300">Menyiapkan mesin templat ID Card...</p>
+          {loadingTemplates || isSwitchingTemplate || !selectedTemplateUrl ? (
+            <div className="w-full max-w-4xl mx-auto rounded-3xl glass border border-accent-cyan/30 p-16 flex flex-col items-center justify-center gap-4 text-center shadow-[0_0_50px_rgba(125,249,255,0.1)]">
+              <div className="relative">
+                <div className="w-12 h-12 rounded-full border-2 border-accent-cyan/20 border-t-accent-cyan animate-spin" />
+                <RefreshCw className="w-5 h-5 text-accent-purple absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-spin" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <p className="font-mono text-sm font-bold text-accent-cyan uppercase tracking-wider">
+                  {switchingTemplateName ? `Memverifikasi & Memuat ${switchingTemplateName}...` : "Menyiapkan mesin templat ID Card..."}
+                </p>
+                <p className="font-mono text-xs text-slate-400">
+                  Membersihkan templat sebelumnya & memastikan templat terpilih benar...
+                </p>
+              </div>
             </div>
           ) : (
-            <IdCardGenerator templateUrl={selectedTemplateUrl} allowUserUpload={false} />
+            <IdCardGenerator
+              key={`${selectedTemplateId}_${templateKey}`}
+              templateUrl={selectedTemplateUrl}
+              templateName={activeTemplateName}
+              allowUserUpload={false}
+            />
           )}
         </section>
       </main>

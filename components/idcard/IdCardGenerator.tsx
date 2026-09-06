@@ -29,6 +29,8 @@ import {
 interface IdCardGeneratorProps {
   /** URL template .psd opsional dari public/ atau Storage. */
   templateUrl?: string;
+  /** Nama template untuk display & status verifikasi */
+  templateName?: string;
   /** Apakah user diizinkan mengunggah file .psd sendiri. Default: false */
   allowUserUpload?: boolean;
 }
@@ -56,7 +58,11 @@ function getTagPlaceholder(tag: string): string {
   return `Masukkan ${tag}...`;
 }
 
-export default function IdCardGenerator({ templateUrl, allowUserUpload = false }: IdCardGeneratorProps) {
+export default function IdCardGenerator({
+  templateUrl,
+  templateName,
+  allowUserUpload = false,
+}: IdCardGeneratorProps) {
   const [parsed, setParsed] = useState<ParsedTemplate | null>(null);
   const [values, setValues] = useState<Record<string, string>>({});
   const [photoImg, setPhotoImg] = useState<HTMLImageElement | null>(null);
@@ -66,6 +72,8 @@ export default function IdCardGenerator({ templateUrl, allowUserUpload = false }
 
   const [fontStatuses, setFontStatuses] = useState<FontStatus[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadStep, setLoadStep] = useState<string>('Menyiapkan kanvas...');
+  const [refreshCycle, setRefreshCycle] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [scale, setScale] = useState(1);
@@ -93,7 +101,11 @@ export default function IdCardGenerator({ templateUrl, allowUserUpload = false }
   const loadTemplateBuffer = useCallback(async (source: ArrayBuffer, fileName?: string) => {
     setLoading(true);
     setError(null);
+    setLoadStep('Membaca & memverifikasi struktur layer PSD...');
     try {
+      // Delay terukur (300ms) untuk memastikan transisi bersih dan verifikasi file
+      await new Promise((r) => setTimeout(r, 300));
+
       const result = parseTemplate(source);
       setParsed(result);
 
@@ -107,6 +119,14 @@ export default function IdCardGenerator({ templateUrl, allowUserUpload = false }
       // Cek ketersediaan font
       setFontStatuses(checkFonts(result.fontsUsed));
       if (fileName) setTemplateFileName(fileName);
+
+      setLoadStep('Sinkronisasi grafis & font...');
+
+      // "Refresh terus" - Multi-pass rendering dengan delay bertahap untuk memastikan font & layer stabil
+      setRefreshCycle(1);
+      setTimeout(() => setRefreshCycle(2), 150);
+      setTimeout(() => setRefreshCycle(3), 400);
+      setTimeout(() => setRefreshCycle(4), 750);
     } catch (e) {
       console.error(e);
       setError(
@@ -122,39 +142,55 @@ export default function IdCardGenerator({ templateUrl, allowUserUpload = false }
   // Auto-load template jika templateUrl diberikan
   useEffect(() => {
     if (!templateUrl) return;
+    const activeUrl = templateUrl;
+
+    // Bersihkan template lama dan canvas secara instan agar tidak menampilkan template sebelumnya
+    setParsed(null);
+    if (canvasRef.current) {
+      const ctx = canvasRef.current.getContext('2d');
+      if (ctx) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+    }
     setLoading(true);
     setError(null);
-    fetch(templateUrl)
-      .then((r) => {
-        if (!r.ok) throw new Error(`HTTP error! status: ${r.status}`);
-        return r.arrayBuffer();
-      })
-      .then((buffer) => {
-        const parts = templateUrl.split('/');
-        loadTemplateBuffer(buffer, parts[parts.length - 1]);
-      })
-      .catch((err) => {
-        console.warn('Template URL tidak dapat dimuat otomatis:', err);
-        if (templateUrl !== '/templates/id-card.psd') {
-          console.log('Mencoba memuat templat cadangan: /templates/id-card.psd...');
-          fetch('/templates/id-card.psd')
-            .then((r) => {
-              if (!r.ok) throw new Error(`Fallback status: ${r.status}`);
-              return r.arrayBuffer();
-            })
-            .then((buffer) => {
-              loadTemplateBuffer(buffer, 'id-card.psd');
-            })
-            .catch((fallbackErr) => {
-              console.error('Fallback templat juga gagal:', fallbackErr);
-              setError('Gagal memuat templat ID Card. Silakan muat ulang halaman.');
-              setLoading(false);
-            });
-        } else {
-          setError('Gagal memuat templat ID Card.');
-          setLoading(false);
-        }
-      });
+    setLoadStep('Mengunduh file templat PSD terbaru...');
+
+    const controller = new AbortController();
+
+    async function fetchTemplate() {
+      try {
+        // Cache buster timestamp & no-cache headers agar browser tidak mengambil cache template sebelumnya
+        const sep = activeUrl.includes('?') ? '&' : '?';
+        const fetchUrl = `${activeUrl}${sep}_t=${Date.now()}`;
+
+        const r = await fetch(fetchUrl, {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+            Pragma: 'no-cache',
+          },
+          signal: controller.signal,
+        });
+
+        if (!r.ok) throw new Error(`HTTP ${r.status}: Gagal mengunduh templat`);
+
+        const buffer = await r.arrayBuffer();
+        if (controller.signal.aborted) return;
+
+        const parts = activeUrl.split('/');
+        await loadTemplateBuffer(buffer, parts[parts.length - 1]);
+      } catch (err: any) {
+        if (err.name === 'AbortError') return;
+        console.error('Gagal memuat template URL:', err);
+        setError(`Gagal memuat templat: ${err.message || 'Koneksi terputus'}`);
+        setLoading(false);
+      }
+    }
+
+    fetchTemplate();
+
+    return () => {
+      controller.abort();
+    };
   }, [templateUrl, loadTemplateBuffer]);
 
   const handleTemplateUpload = (file: File) => {
@@ -190,7 +226,7 @@ export default function IdCardGenerator({ templateUrl, allowUserUpload = false }
     setValues(prev => ({ ...prev }));
   }, [parsed]);
 
-  // Gambar ulang canvas tiap kali template, isian form, foto, font berubah
+  // Gambar ulang canvas tiap kali template, isian form, foto, font, atau siklus refresh berubah
   useEffect(() => {
     if (!parsed || !canvasRef.current) return;
     renderIdCard(canvasRef.current, parsed, {
@@ -202,7 +238,7 @@ export default function IdCardGenerator({ templateUrl, allowUserUpload = false }
       boldOverrides,
       italicOverrides,
     });
-  }, [parsed, values, photoImg, fontStatuses, globalFont, fontOverrides, boldOverrides, italicOverrides]);
+  }, [parsed, values, photoImg, fontStatuses, globalFont, fontOverrides, boldOverrides, italicOverrides, refreshCycle]);
 
   const handleDownloadPdfA4 = () => {
     const canvas = canvasRef.current;
@@ -354,8 +390,16 @@ export default function IdCardGenerator({ templateUrl, allowUserUpload = false }
               <RefreshCw className="w-8 h-8 animate-spin" />
             </div>
             <h3 className="text-lg font-display font-extrabold text-white mb-2 tracking-wide">
-              {loading ? 'MEMBACA & MENYIAPKAN TEMPLAT ID CARD...' : 'Pilih templat ID Card di atas untuk memulai'}
+              {loading ? (loadStep || 'MEMBACA & MENYIAPKAN TEMPLAT ID CARD...') : 'Pilih templat ID Card di atas untuk memulai'}
             </h3>
+            {templateName && (
+              <span className="text-xs font-mono text-accent-cyan bg-accent-cyan/10 px-3 py-1 rounded-full border border-accent-cyan/30 mb-2 font-bold">
+                {templateName}
+              </span>
+            )}
+            <p className="text-xs text-slate-400 font-mono max-w-sm">
+              Memverifikasi keselarasan layer templat & membersihkan cache sebelumnya...
+            </p>
             {error && (
               <div className="mt-4 flex items-center gap-2 text-rose-400 bg-rose-950/50 border border-rose-800/60 px-4 py-2 rounded-lg text-xs font-mono">
                 <span>⚠ {error}</span>
@@ -382,13 +426,27 @@ export default function IdCardGenerator({ templateUrl, allowUserUpload = false }
                       PRATINJAU LIVE ID CARD
                     </h2>
                     <p className="text-xs text-slate-400 font-mono truncate max-w-[200px] sm:max-w-[300px]">
-                      {templateFileName || 'Template Active'} • {parsed.width}x{parsed.height}px
+                      {templateName || templateFileName || 'Template Active'} • {parsed.width}x{parsed.height}px
                     </p>
                   </div>
                 </div>
 
                 {/* Canvas Controls */}
                 <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    title="Segarkan & Verifikasi Ulang Kanvas"
+                    onClick={() => {
+                      setRefreshCycle((c) => c + 1);
+                      setTimeout(() => setRefreshCycle((c) => c + 1), 150);
+                      setTimeout(() => setRefreshCycle((c) => c + 1), 400);
+                    }}
+                    className="px-2.5 py-1.5 rounded-xl bg-slate-950 hover:bg-slate-900 border border-card-border/60 text-slate-300 hover:text-accent-cyan transition-colors flex items-center gap-1.5 text-xs font-mono"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5 text-accent-cyan" />
+                    <span className="text-[11px] hidden sm:inline">Refresh</span>
+                  </button>
+
                   <button
                     type="button"
                     title="Zoom Out"

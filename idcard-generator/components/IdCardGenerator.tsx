@@ -41,13 +41,19 @@ export default function IdCardGenerator({ templateUrl }: IdCardGeneratorProps) {
   // Auto-load template dari URL (mode normal / mahasiswa)
   useEffect(() => {
     if (!templateUrl) return;
-    fetch(templateUrl)
+    setParsed(null);
+    setLoading(true);
+    const sep = templateUrl.includes('?') ? '&' : '?';
+    fetch(`${templateUrl}${sep}_t=${Date.now()}`, { cache: 'no-store' })
       .then((r) => {
         if (!r.ok) throw new Error();
         return r.arrayBuffer();
       })
       .then(loadTemplate)
-      .catch(() => setError('Gagal mengambil template dari server.'));
+      .catch(() => {
+        setError('Gagal mengambil template dari server.');
+        setLoading(false);
+      });
   }, [templateUrl, loadTemplate]);
 
   const handleTemplateUpload = (file: File) => {
