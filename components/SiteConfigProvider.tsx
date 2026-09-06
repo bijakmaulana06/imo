@@ -52,30 +52,28 @@ export default function SiteConfigProvider({ children }: { children: React.React
     fetchConfig();
   }, []);
 
-  // Sync dev bypass state with session storage & url
+  // Sync dev bypass state with session storage & url token
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const hasAnyLockdown = config.maintenanceMode || config.lockedPages?.some((p) => p.isLocked);
+    const stored = sessionStorage.getItem("imo_lockdown_bypass");
+    const urlParams = new URLSearchParams(window.location.search);
+    const tokenParam = urlParams.get("token");
+    const validToken = config.devBypassToken;
 
-    if (hasAnyLockdown) {
-      const stored = sessionStorage.getItem("imo_lockdown_bypass");
-      const urlParams = new URLSearchParams(window.location.search);
-      const hasParam = urlParams.get("bypass") === "1" || urlParams.get("dev") === "1";
-      const isPreviewRoute = pathname?.startsWith("/preview");
+    const isTokenMatch = Boolean(
+      tokenParam && validToken && tokenParam.trim() === validToken.trim()
+    );
 
-      if (stored === "1" || hasParam || isPreviewRoute) {
-        setIsDevBypass(true);
-        sessionStorage.setItem("imo_lockdown_bypass", "1");
-        document.cookie = "imo_lockdown_bypass=1; path=/; max-age=86400; SameSite=Lax";
+    if (stored === "1" || isTokenMatch) {
+      setIsDevBypass(true);
+      sessionStorage.setItem("imo_lockdown_bypass", "1");
+      if (tokenParam) {
+        sessionStorage.setItem("imo_dev_token", tokenParam.trim());
       }
-    } else {
-      // If no lockdown is active anywhere, clean up bypass session
-      setIsDevBypass(false);
-      sessionStorage.removeItem("imo_lockdown_bypass");
-      document.cookie = "imo_lockdown_bypass=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+      document.cookie = "imo_lockdown_bypass=1; path=/; max-age=86400; SameSite=Lax";
     }
-  }, [config.maintenanceMode, config.lockedPages, pathname]);
+  }, [config.devBypassToken, pathname]);
 
   const handleSetDevBypass = (active: boolean) => {
     setIsDevBypass(active);
@@ -85,6 +83,8 @@ export default function SiteConfigProvider({ children }: { children: React.React
         document.cookie = "imo_lockdown_bypass=1; path=/; max-age=86400; SameSite=Lax";
       } else {
         sessionStorage.removeItem("imo_lockdown_bypass");
+        sessionStorage.removeItem("imo_dev_token");
+        sessionStorage.removeItem("imo_dev_token_valid");
         document.cookie = "imo_lockdown_bypass=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
       }
     }
@@ -268,7 +268,7 @@ export default function SiteConfigProvider({ children }: { children: React.React
   return (
     <SiteConfigContext.Provider value={{ config, refreshConfig: fetchConfig, isDevBypass, setDevBypass: handleSetDevBypass }}>
       {/* Floating DEVELOPMENT MODE Indicator HUD Bar during Lockdown Bypass */}
-      {((config.maintenanceMode && isBypassed) || (matchingLockedPage && isBypassed)) && !isAdminPath && (
+      {isBypassed && !isAdminPath && (
         <div className="sticky top-0 left-0 right-0 z-[200] bg-black/90 border-b border-amber-500/60 shadow-[0_4px_30px_rgba(245,158,11,0.35)] backdrop-blur-xl px-4 py-2 flex items-center justify-between font-mono text-xs text-amber-200 transition-all select-none">
           <div className="flex items-center space-x-3 max-w-4xl truncate">
             <span className="flex h-2.5 w-2.5 relative">
@@ -276,12 +276,14 @@ export default function SiteConfigProvider({ children }: { children: React.React
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
             </span>
             <span className="bg-amber-500/20 border border-amber-400/50 px-2 py-0.5 rounded text-[11px] font-black tracking-widest text-amber-300 shadow-[0_0_10px_rgba(245,158,11,0.3)]">
-              DEVELOPMENT MODE
+              DEVELOPER MODE
             </span>
             <span className="hidden sm:inline text-slate-400 text-[11px] truncate">
               {config.maintenanceMode
                 ? "[GLOBAL LOCKDOWN BYPASS ACTIVE — ADMIN TESTING PROTOCOL]"
-                : `[SECTOR LOCKDOWN BYPASS ACTIVE — "${matchingLockedPage?.title}" DIKUNCI UNTUK PUBLIK]`}
+                : matchingLockedPage
+                ? `[SECTOR LOCKDOWN BYPASS ACTIVE — "${matchingLockedPage?.title}" DIKUNCI UNTUK PUBLIK]`
+                : "[DEV BYPASS ACTIVE — SEMUA FITUR TERBUKA PENUH]"}
             </span>
           </div>
 

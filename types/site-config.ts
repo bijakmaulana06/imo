@@ -40,6 +40,7 @@ export interface SiteConfig {
   taskSubmissionFrozen: boolean;
   taskFreezeMessage: string;
   lockedPages?: LockedPageConfig[];
+  devBypassToken?: string;
 
   // Root System Controls
   swCacheVersion: string;
@@ -184,6 +185,7 @@ export const DEFAULT_SITE_CONFIG: SiteConfig = {
   taskSubmissionFrozen: false,
   taskFreezeMessage: "Pengiriman dan verifikasi berkas sedang dibekukan sementara untuk rekapitulasi data.",
   lockedPages: DEFAULT_LOCKED_PAGES,
+  devBypassToken: "imo_dev_preview_2026",
 
   swCacheVersion: "v1.0.0",
   killServiceWorker: false,

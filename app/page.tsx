@@ -11,11 +11,11 @@ import { motion, useScroll, useTransform } from "framer-motion";
 import HomePhotoSpotlight from "@/components/HomePhotoSpotlight";
 
 function HomeNodeCard({ node }: { node: any }) {
-  const { config } = useSiteConfig();
+  const { config, isDevBypass } = useSiteConfig();
   const cardRef = useRef<HTMLDivElement>(null);
   const [isHovered, setIsHovered] = useState(false);
 
-  const isLocked = config.lockedPages?.some((p) => {
+  const isLocked = !isDevBypass && config.lockedPages?.some((p) => {
     if (!p.isLocked || !p.path) return false;
     const target = p.path.trim().toLowerCase();
     const current = node.href.toLowerCase();

@@ -99,6 +99,16 @@ export default function AdminSettingsCommandCenter() {
   const [testEndpoint, setTestEndpoint] = useState("");
   const [testingPush, setTestingPush] = useState(false);
   const [purgingCache, setPurgingCache] = useState(false);
+  const [copiedToken, setCopiedToken] = useState(false);
+  const [copiedBypassLink, setCopiedBypassLink] = useState(false);
+
+  const generateRandomDevToken = () => {
+    const randomHex = Array.from(crypto.getRandomValues(new Uint8Array(8)))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+    const newToken = `dev_${randomHex}`;
+    setCoreConfig((prev: any) => ({ ...prev, devBypassToken: newToken }));
+  };
 
   useEffect(() => {
     const handleResize = () => {
@@ -749,41 +759,110 @@ export default function AdminSettingsCommandCenter() {
                       <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Terminal Message</label>
                       <input type="text" value={coreConfig.maintenanceMessage} onChange={(e) => setCoreConfig({ ...coreConfig, maintenanceMessage: e.target.value })} className="w-full px-3 py-2 bg-black/70 border border-slate-800 rounded-lg text-xs focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition mb-4" />
 
-                      {/* Dev Bypass URL Info Box */}
-                      <div className={`p-3.5 rounded-xl border text-xs font-mono transition-all ${coreConfig.maintenanceMode ? "bg-amber-950/25 border-amber-500/40 text-amber-200" : "bg-black/40 border-slate-800 text-slate-500"}`}>
-                        <div className="flex items-center justify-between gap-2 mb-1.5">
+                      {/* LINK & KODE TOKEN KHUSUS DEVELOPER (BYPASS LOCK FITUR) */}
+                      <div className="mt-5 p-4 rounded-xl border border-amber-500/40 bg-gradient-to-br from-amber-950/20 via-black/60 to-black/80 font-mono shadow-[0_0_25px_rgba(245,158,11,0.1)] space-y-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
                           <div className="flex items-center space-x-2">
-                            <span className={`h-2 w-2 rounded-full ${coreConfig.maintenanceMode ? "bg-amber-400 animate-ping" : "bg-slate-600"}`} />
-                            <span className="font-bold text-[11px] tracking-wider uppercase">
-                              URL KHUSUS PENGUJI (DEVELOPMENT BYPASS)
+                            <span className="h-2.5 w-2.5 rounded-full bg-amber-400 animate-ping" />
+                            <span className="font-bold text-xs text-amber-300 tracking-wider uppercase flex items-center gap-1.5">
+                              <Unlock className="h-3.5 w-3.5 text-amber-400" />
+                              LINK &amp; KODE TOKEN KHUSUS DEVELOPER
                             </span>
                           </div>
-                          <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${coreConfig.maintenanceMode ? "bg-amber-500/20 text-amber-300 border border-amber-400/40" : "bg-slate-800 text-slate-500"}`}>
-                            {coreConfig.maintenanceMode ? "AKTIF" : "NONAKTIF (404)"}
+                          <span className="text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase bg-amber-500/20 text-amber-300 border border-amber-400/40 w-fit">
+                            BYPASS GATEWAY ACTIVE
                           </span>
                         </div>
-                        <p className="text-[11px] text-slate-400 leading-relaxed mb-2.5">
-                          {coreConfig.maintenanceMode
-                            ? "Lockdown sedang aktif. Anda dapat menggunakan URL khusus berikut untuk menguji website dalam status Development Mode."
-                            : "URL bypass penguji otomatis dinonaktifkan saat website dalam keadaan normal (tidak lockdown)."}
+
+                        <p className="text-slate-400 text-xs leading-relaxed">
+                          Gunakan tautan khusus atau kode token acak di bawah ini untuk <span className="text-amber-300 font-bold">membypass seluruh fitur atau halaman yang sedang terkunci</span> (baik Cinematic Lockdown maupun isolasi sektor spesifik). Bagikan link ini hanya kepada developer/admin.
                         </p>
-                        <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-800/60">
-                          <code className="text-[11px] px-2 py-1 rounded bg-black/60 border border-slate-800 text-cyan-300 font-bold select-all">
-                            /preview
-                          </code>
-                          {coreConfig.maintenanceMode ? (
-                            <a
-                              href="/preview"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center space-x-1 px-3 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-[10px] font-bold tracking-wider transition"
+
+                        {/* Row 1: Kode Token Acak */}
+                        <div className="space-y-1.5 bg-black/70 p-3.5 rounded-xl border border-slate-800">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                              Kode Token Acak Developer
+                            </label>
+                            <span className="text-[10px] text-slate-500">Kunci otentikasi masuk preview</span>
+                          </div>
+                          
+                          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
+                            <input
+                              type="text"
+                              value={coreConfig.devBypassToken || "imo_dev_preview_2026"}
+                              onChange={(e) => setCoreConfig({ ...coreConfig, devBypassToken: e.target.value })}
+                              className="flex-1 px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-xs font-mono text-cyan-300 font-bold focus:border-amber-400 outline-none"
+                            />
+
+                            <button
+                              type="button"
+                              onClick={generateRandomDevToken}
+                              title="Generate kode token acak baru"
+                              className="inline-flex items-center space-x-1.5 px-3 py-2 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-[11px] font-bold tracking-wider transition shrink-0"
                             >
-                              <span>Buka Penguji</span>
-                              <ExternalLink className="h-3 w-3" />
-                            </a>
-                          ) : (
-                            <span className="text-[10px] text-slate-600 italic">Mati hingga lockdown aktif</span>
-                          )}
+                              <RefreshCw className="h-3.5 w-3.5" />
+                              <span>Acak Token Baru</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(coreConfig.devBypassToken || "imo_dev_preview_2026");
+                                setCopiedToken(true);
+                                setTimeout(() => setCopiedToken(false), 2000);
+                              }}
+                              className="inline-flex items-center space-x-1 px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-[11px] font-bold transition shrink-0"
+                            >
+                              {copiedToken ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                              <span>{copiedToken ? "Tersalin!" : "Salin Token"}</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Row 2: Link Khusus Developer */}
+                        <div className="space-y-1.5 bg-black/70 p-3.5 rounded-xl border border-slate-800">
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                            Tautan Lengkap Developer (Auto-Bypass Link)
+                          </label>
+                          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                            <div className="flex-1 px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-[11px] text-amber-300 font-mono font-bold truncate select-all">
+                              {typeof window !== "undefined"
+                                ? `${window.location.origin}/preview?token=${encodeURIComponent(coreConfig.devBypassToken || "imo_dev_preview_2026")}`
+                                : `/preview?token=${coreConfig.devBypassToken || "imo_dev_preview_2026"}`}
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const fullUrl = `${window.location.origin}/preview?token=${encodeURIComponent(coreConfig.devBypassToken || "imo_dev_preview_2026")}`;
+                                  navigator.clipboard.writeText(fullUrl);
+                                  setCopiedBypassLink(true);
+                                  setTimeout(() => setCopiedBypassLink(false), 2000);
+                                }}
+                                className="flex-1 sm:flex-none inline-flex items-center justify-center space-x-1.5 px-3 py-2 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-[11px] font-bold tracking-wider transition"
+                              >
+                                {copiedBypassLink ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                                <span>{copiedBypassLink ? "Link Disalin!" : "Salin Link"}</span>
+                              </button>
+
+                              <a
+                                href={`/preview?token=${encodeURIComponent(coreConfig.devBypassToken || "imo_dev_preview_2026")}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center justify-center space-x-1.5 px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-[11px] font-bold transition"
+                              >
+                                <span>Buka Preview</span>
+                                <ExternalLink className="h-3.5 w-3.5" />
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 text-[10px] text-slate-400 pt-1">
+                          <Sparkles className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                          <span>Jangan lupa klik tombol <strong className="text-cyan-300 font-bold">Simpan Pengaturan</strong> di bawah agar token baru tersimpan permanen di database.</span>
                         </div>
                       </div>
                     </div>

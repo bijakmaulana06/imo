@@ -36,6 +36,7 @@ export async function GET() {
       taskSubmissionFrozen: false,
       taskFreezeMessage: "Pengiriman dan verifikasi berkas sedang dibekukan sementara untuk rekapitulasi data.",
       lockedPages: DEFAULT_LOCKED_PAGES,
+      devBypassToken: "imo_dev_preview_2026",
       
       // Global Top Banner
       enableGlobalBanner: false,

@@ -34,6 +34,7 @@ export async function GET() {
       taskSubmissionFrozen: false,
       taskFreezeMessage: "Pengiriman dan verifikasi berkas sedang dibekukan sementara untuk rekapitulasi data.",
       lockedPages: DEFAULT_LOCKED_PAGES,
+      devBypassToken: "imo_dev_preview_2026",
       
       // Root System Controls
       swCacheVersion: "v1.0.0",
@@ -170,6 +171,10 @@ export async function GET() {
 
     if (!parsedConfig.lockedPages || !Array.isArray(parsedConfig.lockedPages) || parsedConfig.lockedPages.length === 0) {
       parsedConfig.lockedPages = DEFAULT_LOCKED_PAGES;
+    }
+
+    if (!parsedConfig.devBypassToken || typeof parsedConfig.devBypassToken !== "string") {
+      parsedConfig.devBypassToken = "imo_dev_" + Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 10);
     }
 
     return NextResponse.json(parsedConfig);
