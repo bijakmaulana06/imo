@@ -109,11 +109,20 @@ function drawPhotoField(
   const frameHeight = rawHeight > frameWidth * 0.5 ? rawHeight : frameWidth * aspectRatio;
   const frameTop    = (top + bottom) / 2 - frameHeight / 2;
 
+  // Bleed margin to ensure photo comfortably covers irregular/organic cutout masks
+  // and sits behind frame raster layers without black or transparent gaps
+  const bleedX = Math.max(60, Math.round(frameWidth * 0.25));
+  const bleedY = Math.max(70, Math.round(frameHeight * 0.25));
+  const drawLeft   = left - bleedX;
+  const drawTop    = frameTop - bleedY;
+  const drawWidth  = frameWidth + bleedX * 2;
+  const drawHeight = frameHeight + bleedY * 2;
+
   ctx.save();
   ctx.beginPath();
-  ctx.rect(left, frameTop, frameWidth, frameHeight);
+  ctx.rect(drawLeft, drawTop, drawWidth, drawHeight);
   ctx.clip();
-  drawImageCover(ctx, photo, left, frameTop, frameWidth, frameHeight);
+  drawImageCover(ctx, photo, drawLeft, drawTop, drawWidth, drawHeight);
   ctx.restore();
 
   if (border && border.width > 0) {
@@ -137,12 +146,20 @@ function drawPhotoPlaceholder(
   const frameHeight = rawHeight > frameWidth * 0.5 ? rawHeight : frameWidth * aspectRatio;
   const frameTop    = (top + bottom) / 2 - frameHeight / 2;
 
+  const bleedX = Math.max(60, Math.round(frameWidth * 0.25));
+  const bleedY = Math.max(70, Math.round(frameHeight * 0.25));
+  const drawLeft   = left - bleedX;
+  const drawTop    = frameTop - bleedY;
+  const drawWidth  = frameWidth + bleedX * 2;
+  const drawHeight = frameHeight + bleedY * 2;
+
   ctx.save();
   ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+  ctx.fillRect(drawLeft, drawTop, drawWidth, drawHeight);
+
   ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
   ctx.setLineDash([4, 4]);
   ctx.lineWidth = 1.5;
-  ctx.fillRect(left, frameTop, frameWidth, frameHeight);
   ctx.strokeRect(left, frameTop, frameWidth, frameHeight);
 
   ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';

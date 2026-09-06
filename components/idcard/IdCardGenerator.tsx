@@ -531,9 +531,9 @@ export default function IdCardGenerator({
                   <label className="text-sm font-semibold text-cyan-300 flex items-center justify-between">
                     <span className="flex items-center gap-2">
                       <ImageIcon className="w-4 h-4 text-cyan-400" />
-                      Pasfoto ID Card ({'{foto}'})
+                      Foto Bebas ID Card ({'{foto}'})
                     </span>
-                    <span className="text-[10px] text-slate-400 uppercase font-mono">Portrait 3x4</span>
+                    <span className="text-[10px] text-slate-400 uppercase font-mono">Foto Bebas</span>
                   </label>
                   
                   <div className="flex flex-wrap items-center gap-2.5 mt-1">

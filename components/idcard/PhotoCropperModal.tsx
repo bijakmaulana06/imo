@@ -155,7 +155,7 @@ export default function PhotoCropperModal({
             </div>
             <div>
               <h3 className="text-base font-bold text-white tracking-wide">
-                EDIT & PENYESUAIAN PASFOTO
+                EDIT & PENYESUAIAN FOTO BEBAS
               </h3>
               <p className="text-xs text-slate-400 font-mono">
                 Atur posisi, perbesar/perkecil, dan rotasi foto agar pas pada ID Card
