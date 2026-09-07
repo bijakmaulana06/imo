@@ -1,9 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { parseTemplate, type ParsedTemplate } from '@/lib/psdTemplate';
-import { checkFonts, loadCustomFont, type FontStatus } from '@/lib/fontManager';
-import { renderIdCard } from '@/lib/renderIdCard';
+import { parseTemplate, type ParsedTemplate } from '../lib/psdTemplate';
+import { checkFonts, loadCustomFont, type FontStatus } from '../lib/fontManager';
+import { renderIdCard, wrapMottoText } from '../lib/renderIdCard';
 import { jsPDF } from 'jspdf';
 
 interface IdCardGeneratorProps {
@@ -175,22 +175,48 @@ export default function IdCardGenerator({ templateUrl }: IdCardGeneratorProps) {
       {/* Form, dibuat otomatis dari tag yang terdeteksi di template */}
       {parsed && (
         <div className="flex w-full flex-col gap-4 md:w-72">
-          {parsed.textTags.map((tag) => (
-            <label key={tag} className="flex flex-col gap-1 text-sm">
-              <span className="font-medium capitalize text-neutral-700">{tag}</span>
-              <input
-                type="text"
-                value={values[tag] ?? ''}
-                onChange={(e) => setValues((v) => ({ ...v, [tag]: e.target.value }))}
-                placeholder={
-                  tag.toLowerCase().includes('nama')
-                    ? 'Xaviera Putri'
-                    : tag.toLowerCase().includes('nim')
-                    ? '260xxxxxxxx'
-                    : `Isi ${tag}`
-                }
-            </label>
-          ))}
+          {parsed.textTags.map((tag) => {
+            const lowerTag = tag.toLowerCase().trim();
+            const isName = lowerTag === 'nama' || lowerTag === 'name' || lowerTag.includes('nama');
+            const isMotto = lowerTag === 'motto' || lowerTag === 'quote' || lowerTag.includes('motto') || lowerTag.includes('quote');
+
+            return (
+              <label key={tag} className="flex flex-col gap-1 text-sm">
+                <span className="font-medium capitalize text-neutral-700">{tag}</span>
+                {isMotto ? (
+                  <textarea
+                    rows={3}
+                    maxLength={132}
+                    value={values[tag] ?? ''}
+                    onChange={(e) => setValues((v) => ({ ...v, [tag]: e.target.value }))}
+                    placeholder="Chasing Glories"
+                    className="rounded border border-neutral-300 px-3 py-1.5 text-sm resize-y"
+                  />
+                ) : (
+                  <input
+                    type="text"
+                    maxLength={isName ? 16 : undefined}
+                    value={values[tag] ?? ''}
+                    onChange={(e) => {
+                      let val = e.target.value;
+                      if (isName && val.length > 16) {
+                        val = val.slice(0, 16);
+                      }
+                      setValues((v) => ({ ...v, [tag]: val }));
+                    }}
+                    placeholder={
+                      isName
+                        ? 'Xaviera Putri'
+                        : tag.toLowerCase().includes('nim')
+                        ? '260xxxxxxxx'
+                        : `Isi ${tag}`
+                    }
+                    className="rounded border border-neutral-300 px-3 py-1.5 text-sm"
+                  />
+                )}
+              </label>
+            );
+          })}
 
           {parsed.hasPhotoSlot && (
             <label className="flex flex-col gap-1 text-sm">

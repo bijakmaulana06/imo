@@ -9,7 +9,7 @@ import Card from '@/components/Card';
 import Button from '@/components/Button';
 import { jsPDF } from 'jspdf';
 
-import { renderIdCard } from '@/lib/idcard/renderIdCard';
+import { renderIdCard, wrapMottoText } from '@/lib/idcard/renderIdCard';
 import {
   Upload,
   Download,
@@ -621,20 +621,43 @@ export default function IdCardGenerator({
                   </div>
                 )}
 
-                {parsed.textTags.map((tag) => (
-                  <div key={tag} className="flex flex-col gap-1.5">
-                    <label className="text-xs font-semibold capitalize text-slate-300 flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-cyan-400" />
-                      {tag}
-                      <span className="text-[10px] text-slate-500 font-mono lower">({`{${tag}}`})</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={values[tag] ?? ''}
-                      onChange={(e) => setValues((v) => ({ ...v, [tag]: e.target.value }))}
-                      placeholder={getTagPlaceholder(tag)}
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-white placeholder-slate-500 text-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 focus:outline-none transition-all"
-                    />
+                {parsed.textTags.map((tag) => {
+                  const lowerTag = tag.toLowerCase().trim();
+                  const isName = lowerTag === 'nama' || lowerTag === 'name' || lowerTag.includes('nama');
+                  const isMotto = lowerTag === 'motto' || lowerTag === 'quote' || lowerTag.includes('motto') || lowerTag.includes('quote');
+
+                  return (
+                    <div key={tag} className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold capitalize text-slate-300 flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-cyan-400" />
+                        {tag}
+                        <span className="text-[10px] text-slate-500 font-mono lower">({`{${tag}}`})</span>
+                      </label>
+                      {isMotto ? (
+                        <textarea
+                          rows={3}
+                          maxLength={132}
+                          value={values[tag] ?? ''}
+                          onChange={(e) => setValues((v) => ({ ...v, [tag]: e.target.value }))}
+                          placeholder={getTagPlaceholder(tag)}
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-white placeholder-slate-500 text-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 focus:outline-none transition-all resize-y min-h-[72px]"
+                        />
+                      ) : (
+                        <input
+                          type="text"
+                          maxLength={isName ? 16 : undefined}
+                          value={values[tag] ?? ''}
+                          onChange={(e) => {
+                            let val = e.target.value;
+                            if (isName && val.length > 16) {
+                              val = val.slice(0, 16);
+                            }
+                            setValues((v) => ({ ...v, [tag]: val }));
+                          }}
+                          placeholder={getTagPlaceholder(tag)}
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-white placeholder-slate-500 text-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 focus:outline-none transition-all"
+                        />
+                      )}
                     {/* Collapsible Per-tag font + bold/italic */}
                     <div className="flex items-center justify-between text-[11px]">
                       <button
@@ -680,8 +703,9 @@ export default function IdCardGenerator({
                         >I</button>
                       </div>
                     )}
-                  </div>
-                ))}
+                    </div>
+                  );
+                })}
               </div>
 
               {/* Box Unduh ID Card A4 */}

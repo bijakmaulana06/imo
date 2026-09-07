@@ -202,6 +202,72 @@ function drawRasterLayer(
 }
 
 // ---------------------------------------------------------------------------
+// Motto text wrapping helper (max 8 kata atau 44 huruf per baris, maks 3 baris)
+// ---------------------------------------------------------------------------
+export function wrapMottoText(text: string, maxWords = 8, maxChars = 44, maxLines = 3): string {
+  if (!text) return '';
+  const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const paragraphs = normalized.split('\n');
+  const wrappedLines: string[] = [];
+
+  for (let pIndex = 0; pIndex < paragraphs.length; pIndex++) {
+    if (wrappedLines.length >= maxLines) break;
+
+    const paragraph = paragraphs[pIndex];
+    const trimmed = paragraph.trim();
+    if (!trimmed) {
+      wrappedLines.push('');
+      continue;
+    }
+
+    const words = trimmed.split(/\s+/).filter(Boolean);
+    let currentWords: string[] = [];
+    let currentLen = 0;
+
+    for (const word of words) {
+      if (wrappedLines.length >= maxLines) break;
+
+      const isLastAllowedLine = wrappedLines.length === maxLines - 1;
+
+      let w = word;
+      while (w.length > maxChars) {
+        if (currentWords.length > 0) {
+          wrappedLines.push(currentWords.join(' '));
+          currentWords = [];
+          currentLen = 0;
+          if (wrappedLines.length >= maxLines) break;
+        }
+        wrappedLines.push(w.slice(0, maxChars));
+        w = w.slice(maxChars);
+        if (wrappedLines.length >= maxLines) break;
+      }
+      if (!w || wrappedLines.length >= maxLines) continue;
+
+      const wouldExceedWordCount = currentWords.length >= maxWords;
+      const wouldExceedCharCount = currentLen > 0 && (currentLen + 1 + w.length > maxChars);
+
+      if (wouldExceedWordCount || wouldExceedCharCount) {
+        if (isLastAllowedLine) {
+          break;
+        }
+        wrappedLines.push(currentWords.join(' '));
+        currentWords = [w];
+        currentLen = w.length;
+      } else {
+        currentWords.push(w);
+        currentLen += (currentLen === 0 ? 0 : 1) + w.length;
+      }
+    }
+
+    if (currentWords.length > 0 && wrappedLines.length < maxLines) {
+      wrappedLines.push(currentWords.join(' '));
+    }
+  }
+
+  return wrappedLines.slice(0, maxLines).join('\n');
+}
+
+// ---------------------------------------------------------------------------
 // PASS 3 helper: draw text replacements on top
 // ---------------------------------------------------------------------------
 function drawTextField(
@@ -215,12 +281,27 @@ function drawTextField(
   const showPlaceholder = options.showPlaceholder !== false;
 
   let text = field.rawTemplate.replace(/\{(\w+)\}/g, (_match, tag) => {
-    const val = options.values[tag.toLowerCase()];
-    if (val !== undefined && val !== '') return val;
+    let val = options.values[tag.toLowerCase()];
+    if (val !== undefined && val !== '') {
+      const lower = tag.toLowerCase().trim();
+      if (lower === 'nama' || lower === 'name' || lower.includes('nama')) {
+        if (val.length > 16) val = val.slice(0, 16);
+      }
+      return val;
+    }
     return showPlaceholder ? `{${tag}}` : '';
   });
 
   if (!text.trim()) return;
+
+  const lowerTag = field.tag.toLowerCase().trim();
+  const isMotto = lowerTag === 'motto' || lowerTag === 'quote' || lowerTag.includes('motto') || lowerTag.includes('quote');
+  if (isMotto) {
+    text = wrapMottoText(text, 8, 44);
+  }
+
+
+  const lines = text.split('\n');
 
   // Font resolution order:
   // 1. fontOverrides[tag] (per-tag override)
@@ -260,10 +341,12 @@ function drawTextField(
   else if (textAlign === 'center') drawX = left + bWidth / 2;
   else                             drawX = left;
 
-  const lines = text.split('\n');
   const lineHeight = field.style.fontSize * 1.25;
-  const totalTextHeight = lines.length * lineHeight;
-  const startY = (top + bottom) / 2 - totalTextHeight / 2 + lineHeight / 2;
+
+  // Tag position: start at original tag center, do NOT offset upwards when multiple lines are added; continue downwards
+  const startY = isMotto
+    ? (top + bottom) / 2
+    : ((top + bottom) / 2 - (lines.length * lineHeight) / 2 + lineHeight / 2);
 
   ctx.textAlign = textAlign;
   ctx.textBaseline = 'middle';
