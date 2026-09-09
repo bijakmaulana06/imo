@@ -20,7 +20,13 @@ export function votingSecret() {
 }
 
 export function configuredOrigin() {
-  const value = process.env.APP_ORIGIN || process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null) || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null);
+  let value = process.env.APP_ORIGIN || process.env.NEXT_PUBLIC_APP_URL;
+  if (process.env.NODE_ENV === "production" && value && (value.includes("localhost") || value.includes("127.0.0.1"))) {
+    value = "";
+  }
+  if (!value) {
+    value = (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null) || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null);
+  }
   if (!value) return null;
   try {
     const raw = value.startsWith("http://") || value.startsWith("https://") ? value : `https://${value}`;
@@ -35,8 +41,7 @@ export function configuredOrigin() {
 
 /** Exact origin + a non-simple custom header prevent cross-site form/fetch CSRF. */
 export function requireSameOrigin(request: NextRequest) {
-  const expected = configuredOrigin() || (process.env.NODE_ENV !== "production" ? request.nextUrl.origin : null);
-  if (!expected) throw new VotingError(503, "Origin aplikasi voting belum dikonfigurasi.");
+  const expected = configuredOrigin() || request.nextUrl.origin;
   if (request.headers.get("origin") !== expected || request.headers.get("x-voting-request") !== "1") {
     throw new VotingError(403, "Permintaan tidak berasal dari halaman voting ini.");
   }

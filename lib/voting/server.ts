@@ -8,7 +8,7 @@ import type { Candidate, Election, ElectionSnapshot, MonitorSnapshot, VoterSessi
 import { clientAddressHash, configuredOrigin, digest, newSessionToken, sessionToken, userAgentHash, uuid, VotingError, votingSecret } from "./security";
 
 export function isVotingConfigured() {
-  return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.VOTING_SECRET && process.env.VOTING_SECRET.length >= 32 && (process.env.NODE_ENV !== "production" || configuredOrigin()));
+  return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.VOTING_SECRET && process.env.VOTING_SECRET.length >= 32);
 }
 
 /** The service-role key is deliberately required, with no anon-key fallback. */
