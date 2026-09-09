@@ -116,6 +116,14 @@ export interface SiteConfig {
 
 export const DEFAULT_LOCKED_PAGES: LockedPageConfig[] = [
   {
+    id: "voting",
+    path: "/voting",
+    title: "Pemilihan Ketua Angkatan (Voting)",
+    isLocked: false,
+    reason: "Bilik Suara Ditutup",
+    message: "Akses bilik suara pemilihan ketua angkatan sedang dibatasi sementara oleh panitia penyelenggara.",
+  },
+  {
     id: "info",
     path: "/info",
     title: "Status Hub & Pengumpulan",

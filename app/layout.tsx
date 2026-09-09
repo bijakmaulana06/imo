@@ -44,9 +44,13 @@ export default function RootLayout({
     <ViewTransitions>
       <html
         lang="id"
+        suppressHydrationWarning
         className={`${josefinSans.variable} ${montserrat.variable} ${cinzelDecorative.variable} ${griffy.variable} h-full antialiased dark`}
       >
-        <body className="min-h-full flex flex-col bg-background text-foreground font-sans">
+        <body
+          suppressHydrationWarning
+          className="min-h-full flex flex-col bg-background text-foreground font-sans"
+        >
           <SiteConfigProvider>
             {children}
             <PushNotificationManager />

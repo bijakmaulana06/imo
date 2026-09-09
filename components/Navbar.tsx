@@ -13,6 +13,7 @@ import {
   QrCode,
   FileEdit,
   Users,
+  Vote,
   Lock
 } from "lucide-react";
 import ImoLogo from "./ImoLogo";
@@ -37,6 +38,7 @@ export default function Navbar() {
   };
 
   const navigation = [
+    { name: "Voting", label: "Ketua Angkatan", href: "/voting", icon: Vote },
     { name: "Panduan", label: "Panduan & Artikel", href: "/guide", icon: BookOpen },
     { name: "Penjelajahan", label: "Pusat Hub", href: "/hub", icon: Compass },
     { name: "Status Tugas", label: "Scanner Drive", href: "/info", icon: CheckCircle2 },
@@ -54,7 +56,7 @@ export default function Navbar() {
         onMouseMove={handleMouseMove}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
-        className="relative w-full max-w-5xl rounded-full touch-manipulation select-none pointer-events-auto transition-transform duration-300 overflow-hidden border border-white/20 backdrop-blur-xl bg-slate-950/75 shadow-[0_12px_32px_rgba(0,0,0,0.6),inset_0_1px_1px_rgba(255,255,255,0.3)] will-change-transform"
+        className="relative w-full max-w-6xl rounded-full touch-manipulation select-none pointer-events-auto transition-transform duration-300 overflow-hidden border border-white/20 backdrop-blur-xl bg-slate-950/75 shadow-[0_12px_32px_rgba(0,0,0,0.6),inset_0_1px_1px_rgba(255,255,255,0.3)] will-change-transform"
       >
         {/* Apple Glass Specular Top Sheen */}
         <div className="absolute inset-0 bg-gradient-to-b from-white/[0.12] via-transparent to-black/[0.2] pointer-events-none rounded-full" />
@@ -200,4 +202,3 @@ export default function Navbar() {
     </div>
   );
 }
-

@@ -133,7 +133,7 @@ export default function PushNotificationManager() {
   };
 
   // Do not render prompt on admin routes
-  if (pathname?.startsWith("/admin") || !isSupported) {
+  if (pathname?.startsWith("/admin") || pathname?.startsWith("/voting") || !isSupported) {
     return null;
   }
 

@@ -1255,6 +1255,13 @@ export default function AdminDashboardPage() {
       </header>
 
       <main className="flex-grow max-w-6xl mx-auto w-full px-4 py-10 relative z-10">
+        <div className="flex justify-end mb-3">
+          <Link href="/admin/voting" className="inline-flex items-center gap-2 px-4 py-2 text-xs border border-amber-200/25 text-amber-100 hover:bg-amber-100/10 transition-colors rounded-xl">
+            <ListChecks className="h-4 w-4" />
+            Kelola pemilihan ketua angkatan
+            <ExternalLink className="h-3 w-3" />
+          </Link>
+        </div>
         {/* Simple Node Map UI with Connected Circuit SVG */}
         <div className="relative flex flex-col items-center py-6 w-full mb-8 border-b border-card-border/30">
 

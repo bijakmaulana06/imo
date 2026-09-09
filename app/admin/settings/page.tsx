@@ -1816,6 +1816,7 @@ export default function AdminSettingsCommandCenter() {
                       <div className="space-y-2">
                         {coreConfig.homeNodesOrder?.map((nodeId, idx) => {
                            const nodeLabels: Record<string, string> = {
+                             "voting": "The Next Chapter (Voting)",
                              "guide": "Panduan & Embed Dokumen",
                              "hub": "Pusat Penjelajahan (Hub)",
                              "info": "Status Tugas Kelompok",

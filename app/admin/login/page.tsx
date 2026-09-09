@@ -27,7 +27,7 @@ export default function AdminLoginPage() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/admin/dashboard`,
+          redirectTo: `${window.location.origin}/auth/callback?next=/admin/dashboard`,
           queryParams: {
             access_type: "offline",
             prompt: "consent",
@@ -60,26 +60,6 @@ export default function AdminLoginPage() {
       });
 
       if (signInError) {
-        if (signInError.message.includes("Invalid login credentials")) {
-          const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-              data: { role: "admin" },
-            },
-          });
-
-          if (signUpError) throw signUpError;
-
-          if (signUpData.session) {
-            router.push("/admin/dashboard");
-            return;
-          } else {
-            setErrorMsg("Akun admin baru berhasil dibuat! Silakan coba klik 'Masuk Portal Admin' sekali lagi.");
-            setLoading(false);
-            return;
-          }
-        }
         throw signInError;
       }
 

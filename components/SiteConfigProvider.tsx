@@ -99,8 +99,8 @@ export default function SiteConfigProvider({ children }: { children: React.React
     if (config.accentYellow) root.style.setProperty("--accent-yellow", config.accentYellow);
     if (config.backgroundColor) root.style.setProperty("--background", config.backgroundColor);
     
-    if (config.metaTitle) document.title = config.metaTitle;
-  }, [config]);
+    if (config.metaTitle && !pathname.startsWith("/voting") && !pathname.startsWith("/admin/voting")) document.title = config.metaTitle;
+  }, [config, pathname]);
 
   const isAdminPath = pathname?.startsWith("/admin");
   const isPreviewPath = pathname?.startsWith("/preview");

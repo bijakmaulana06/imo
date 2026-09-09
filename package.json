@@ -3,11 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -H 0.0.0.0",
-    "dev:https": "next dev -H 0.0.0.0 -p 3000 --experimental-https",
+    "dev": "next dev --webpack -H 0.0.0.0",
+    "dev:https": "next dev --webpack -H 0.0.0.0 -p 3000 --experimental-https",
     "build": "next build",
     "start": "next start -H 0.0.0.0 -p 3000",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:voting": "node --test tests/voting-security.test.mjs tests/voting-security-db.test.mjs tests/voting-reset-voters.test.mjs",
+    "test:voting:browser": "node --test tests/voting-browser.test.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1102.0",
@@ -22,6 +24,7 @@
     "ag-psd": "^31.0.2",
     "cropperjs": "^1.6.2",
     "date-fns": "^4.4.0",
+    "docx": "^9.7.1",
     "docx-preview": "^0.4.0",
     "docxtemplater": "^3.69.3",
     "fabric": "^5.3.0",
@@ -44,7 +47,8 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "sharp": "^0.33.5",
-    "three": "^0.185.1"
+    "three": "^0.185.1",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

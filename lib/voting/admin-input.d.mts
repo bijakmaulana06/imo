@@ -1,0 +1,10 @@
+export type ElectionInput = { title: string; year: string; status?: "draft" | "open" | "closed"; opens_at?: string | null; closes_at?: string | null; is_current?: boolean };
+export type CandidateInput = { election_id: string; number: number; name: string; tagline: string; vision: string; mission: string[]; photo_key: string | null; accent: string; is_active: boolean };
+export function parseCsv(source: string): string[][];
+export function parseVoterCsv(source: string): string[];
+export function parseVoterExcel(buffer: ArrayBuffer | Uint8Array): string[];
+export type NamedVoter = { nim: string; name: string };
+export function parseNamedVoterExcel(buffer: ArrayBuffer | Uint8Array): NamedVoter[];
+export function validateNamedVoter(input: unknown): NamedVoter;
+export function validateElection(input: unknown, partial?: boolean): ElectionInput;
+export function validateCandidates(input: unknown, electionId: string): CandidateInput[];

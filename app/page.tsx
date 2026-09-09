@@ -5,7 +5,7 @@ import Navbar from "@/components/Navbar";
 import StarfieldBackground from "@/components/StarfieldBackground";
 import ImoLogo from "@/components/ImoLogo";
 import { Link } from "next-view-transitions";
-import { Rocket, Sparkles, BookOpen, Compass, Contact, ArrowRight, ChevronDown, ClipboardCheck, IdCard, FileText, Lock } from "lucide-react";
+import { Rocket, Sparkles, BookOpen, Compass, Contact, ArrowRight, ChevronDown, ClipboardCheck, IdCard, FileText, Lock, Vote } from "lucide-react";
 import { useSiteConfig } from "@/components/SiteConfigProvider";
 import { motion, useScroll, useTransform } from "framer-motion";
 import HomePhotoSpotlight from "@/components/HomePhotoSpotlight";
@@ -138,6 +138,15 @@ export default function Home() {
   }, []);
 
   const ALL_NODES: Record<string, any> = {
+    voting: {
+      id: "voting",
+      title: "The Next Chapter",
+      desc: "Kenali kandidat dan tentukan ketua angkatan. Satu suara, arah baru.",
+      href: "/voting",
+      icon: <Vote className="h-6 w-6" />,
+      colorClasses: { border: "border-amber-200/40", bg: "bg-amber-200/10", text: "text-amber-200" },
+      shadowColor: "rgba(197,178,140,0.3)",
+    },
     guide: {
       id: "guide",
       title: config.guideHeroTitle || "Panduan",
@@ -194,7 +203,8 @@ export default function Home() {
     },
   };
 
-  const orderArray = config.homeNodesOrder || ["guide", "hub", "info", "idcard", "documents", "contact"];
+  const configuredOrder = config.homeNodesOrder || ["guide", "hub", "info", "idcard", "documents", "contact"];
+  const orderArray = configuredOrder.includes("voting") ? configuredOrder : ["voting", ...configuredOrder];
   
   const dynamicNodes = orderArray.map((id, index) => {
     const nodeDef = ALL_NODES[id];
@@ -354,5 +364,4 @@ export default function Home() {
     </div>
   );
 }
-
 

@@ -10,8 +10,20 @@ export default function Template({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [isNavigating, setIsNavigating] = useState(false);
 
-  // 2-second gimmick timer for page transition loading screen
+  const isFirstMount = React.useRef(true);
+  const prevPathname = React.useRef(pathname);
+
+  // 2-second gimmick timer only for actual page transitions, not initial load or re-renders
   useEffect(() => {
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      prevPathname.current = pathname;
+      return;
+    }
+    if (prevPathname.current === pathname) return;
+    prevPathname.current = pathname;
+
+    if (pathname.startsWith("/voting") || pathname.startsWith("/admin/voting")) return;
     setIsNavigating(true);
     const timer = setTimeout(() => {
       setIsNavigating(false);
@@ -19,6 +31,9 @@ export default function Template({ children }: { children: React.ReactNode }) {
 
     return () => clearTimeout(timer);
   }, [pathname]);
+
+  // The election experience provides its own black opening and scroll stage.
+  if (pathname.startsWith("/voting") || pathname.startsWith("/admin/voting")) return <>{children}</>;
 
   return (
     <div className="relative w-full min-h-screen flex flex-col overflow-x-hidden">
