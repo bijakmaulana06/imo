@@ -20,10 +20,11 @@ export function votingSecret() {
 }
 
 export function configuredOrigin() {
-  const value = process.env.APP_ORIGIN || process.env.NEXT_PUBLIC_APP_URL;
+  const value = process.env.APP_ORIGIN || process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null) || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null);
   if (!value) return null;
   try {
-    const url = new URL(value);
+    const raw = value.startsWith("http://") || value.startsWith("https://") ? value : `https://${value}`;
+    const url = new URL(raw);
     if (url.username || url.password || !["http:", "https:"].includes(url.protocol)) return null;
     if (process.env.NODE_ENV === "production" && url.protocol !== "https:") return null;
     return url.origin;
