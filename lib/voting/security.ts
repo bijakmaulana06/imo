@@ -19,13 +19,13 @@ export function votingSecret() {
   return secret;
 }
 
-export function configuredOrigin() {
-  let value = process.env.APP_ORIGIN || process.env.NEXT_PUBLIC_APP_URL;
+export function configuredOrigin(): string | null {
+  let value: string | undefined = process.env.APP_ORIGIN || process.env.NEXT_PUBLIC_APP_URL;
   if (process.env.NODE_ENV === "production" && value && (value.includes("localhost") || value.includes("127.0.0.1"))) {
-    value = "";
+    value = undefined;
   }
   if (!value) {
-    value = (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null) || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null);
+    value = (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : undefined) || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined);
   }
   if (!value) return null;
   try {
